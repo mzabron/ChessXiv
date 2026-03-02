@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:latest
+    container_name: chessbase_db_container
+    restart: always
+    environment:
+      POSTGRES_USER: chessbase_user
+      POSTGRES_PASSWORD: chessbase_password
+      POSTGRES_DB: chessbase_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+volumes:
+  postgres_data:
