@@ -13,15 +13,6 @@ public class GameRepository(ChessBaseDbContext dbContext) : IGameRepository
             return;
         }
 
-        foreach (var game in games)
-        {
-            foreach (var move in game.Moves)
-            {
-                move.GameId = game.Id;
-                move.Game = game;
-            }
-        }
-
         await dbContext.Games.AddRangeAsync(games, cancellationToken);
     }
 }
