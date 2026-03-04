@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\ChessBase.Application\ChessBase.Application.csproj" />
     <ProjectReference Include="..\ChessBase.Domain\ChessBase.Domain.csproj" />
   </ItemGroup>
 

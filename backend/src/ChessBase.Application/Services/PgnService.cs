@@ -1,10 +1,11 @@
+using ChessBase.Application.Abstractions;
 using ChessBase.Domain.Entities;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace ChessBase.Application.Services;
 
-public class PgnService
+public class PgnService : IPgnParser
 {
     private static readonly Regex GameSeparatorRegex = new(@"(?:\r?\n[ \t]*){3,}", RegexOptions.Compiled);
     private static readonly Regex TagRegex = new(@"^\[(\w+)\s+""(.*)""\]$", RegexOptions.Compiled);
@@ -20,7 +21,7 @@ public class PgnService
         "*"
     ];
 
-    public IEnumerable<Game> ParsePgn(string pgn)
+    public IReadOnlyCollection<Game> ParsePgn(string pgn)
     {
         var games = new List<Game>();
 
