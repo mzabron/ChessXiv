@@ -22,4 +22,5 @@ public class Game
     public Guid? CollectionId { get; set; }
     public string? UserId { get; set; }
     public ICollection<Move> Moves { get; set; } = new List<Move>();
+    public ICollection<Position> Positions { get; set; } = new List<Position>();
 }

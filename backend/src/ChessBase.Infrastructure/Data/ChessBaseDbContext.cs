@@ -12,6 +12,7 @@ public class ChessBaseDbContext : DbContext
 
     public DbSet<Game> Games { get; set; }
     public DbSet<Move> Moves { get; set; }
+    public DbSet<Position> Positions { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Move>(entity =>
@@ -21,6 +22,16 @@ public class ChessBaseDbContext : DbContext
                 .WithMany(g => g.Moves)
                 .HasForeignKey(m => m.GameId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<Position>(entity =>
+        {
+            entity.HasIndex(p => p.FenHash);
+            entity.HasIndex(p => new {p.GameId, p.PlyCount });
+            entity
+                .HasOne(p => p.Game)
+                .WithMany(g => g.Positions)
+                .HasForeignKey(p => p.GameId);
+
         });
     }
 }
