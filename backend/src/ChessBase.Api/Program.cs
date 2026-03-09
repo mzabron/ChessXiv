@@ -1,6 +1,10 @@
 using ChessBase.Application.Abstractions;
 using ChessBase.Application.Abstractions.Repositories;
 using ChessBase.Application.Services;
+using ChessBase.Domain.Engine.Abstractions;
+using ChessBase.Domain.Engine.Factories;
+using ChessBase.Domain.Engine.Serialization;
+using ChessBase.Domain.Engine.Services;
 using ChessBase.Infrastructure.Data;
 using ChessBase.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Diagnostics;
@@ -18,6 +22,11 @@ builder.Services.AddDbContext<ChessBaseDbContext>(options =>
 
 builder.Services.AddScoped<IPgnParser, PgnService>();
 builder.Services.AddScoped<IGameRepository, GameRepository>();
+builder.Services.AddScoped<IPositionImportCoordinator, PositionImportCoordinator>();
+builder.Services.AddScoped<IBoardStateSerializer, FenBoardStateSerializer>();
+builder.Services.AddScoped<IBoardStateFactory, BoardStateFactory>();
+builder.Services.AddScoped<IBoardStateTransition, BitboardBoardStateTransition>();
+builder.Services.AddScoped<IPositionHasher, ZobristPositionHasher>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<IPgnImportService, PgnImportService>();
 

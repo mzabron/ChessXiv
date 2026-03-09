@@ -12,8 +12,9 @@ public class PgnImportServiceTests
     {
         var parser = new FakePgnParser();
         var repository = new FakeGameRepository();
+        var positionCoordinator = new FakePositionImportCoordinator();
         var unitOfWork = new FakeUnitOfWork();
-        var service = new PgnImportService(parser, repository, unitOfWork);
+        var service = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         var result = await service.ImportAsync(string.Empty);
 
@@ -22,6 +23,7 @@ public class PgnImportServiceTests
         Assert.Equal(0, result.SkippedCount);
         Assert.Equal(0, parser.CallCount);
         Assert.Equal(0, repository.CallCount);
+        Assert.Equal(0, positionCoordinator.CallCount);
         Assert.Equal(0, unitOfWork.CallCount);
     }
 
@@ -33,8 +35,9 @@ public class PgnImportServiceTests
             GamesToReturn = []
         };
         var repository = new FakeGameRepository();
+        var positionCoordinator = new FakePositionImportCoordinator();
         var unitOfWork = new FakeUnitOfWork();
-        var service = new PgnImportService(parser, repository, unitOfWork);
+        var service = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         var result = await service.ImportAsync("[Event \"X\"]\n\n*");
 
@@ -43,6 +46,7 @@ public class PgnImportServiceTests
         Assert.Equal(0, result.SkippedCount);
         Assert.Equal(1, parser.CallCount);
         Assert.Equal(0, repository.CallCount);
+        Assert.Equal(0, positionCoordinator.CallCount);
         Assert.Equal(0, unitOfWork.CallCount);
     }
 
@@ -58,8 +62,9 @@ public class PgnImportServiceTests
             GamesToReturn = [validGameOne, invalidGame, validGameTwo]
         };
         var repository = new FakeGameRepository();
+        var positionCoordinator = new FakePositionImportCoordinator();
         var unitOfWork = new FakeUnitOfWork();
-        var service = new PgnImportService(parser, repository, unitOfWork);
+        var service = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         var result = await service.ImportAsync("pgn-content");
 
@@ -68,8 +73,10 @@ public class PgnImportServiceTests
         Assert.Equal(1, result.SkippedCount);
 
         Assert.Equal(1, repository.CallCount);
+        Assert.Equal(1, positionCoordinator.CallCount);
         Assert.Equal(1, unitOfWork.CallCount);
         Assert.Equal(2, repository.LastSavedGames.Count);
+        Assert.Equal(2, positionCoordinator.LastGames.Count);
         Assert.DoesNotContain(repository.LastSavedGames, game => string.IsNullOrWhiteSpace(game.White));
     }
 
@@ -81,14 +88,16 @@ public class PgnImportServiceTests
             GamesToReturn = [CreateGame("Alpha", "Beta")]
         };
         var repository = new FakeGameRepository();
+        var positionCoordinator = new FakePositionImportCoordinator();
         var unitOfWork = new FakeUnitOfWork();
-        var service = new PgnImportService(parser, repository, unitOfWork);
+        var service = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         using var cts = new CancellationTokenSource();
         var token = cts.Token;
 
         await service.ImportAsync("pgn-content", token);
 
+        Assert.Equal(token, positionCoordinator.LastToken);
         Assert.Equal(token, repository.LastToken);
         Assert.Equal(token, unitOfWork.LastToken);
     }
@@ -152,6 +161,22 @@ public class PgnImportServiceTests
             CallCount++;
             LastToken = cancellationToken;
             return Task.FromResult(1);
+        }
+    }
+
+    private sealed class FakePositionImportCoordinator : IPositionImportCoordinator
+    {
+        public int CallCount { get; private set; }
+        public List<Game> LastGames { get; } = [];
+        public CancellationToken LastToken { get; private set; }
+
+        public Task PopulateAsync(IReadOnlyCollection<Game> games, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            LastToken = cancellationToken;
+            LastGames.Clear();
+            LastGames.AddRange(games);
+            return Task.CompletedTask;
         }
     }
 }

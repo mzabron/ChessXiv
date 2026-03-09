@@ -4,7 +4,11 @@ using ChessBase.Application.Contracts;
 
 namespace ChessBase.Application.Services;
 
-public class PgnImportService(IPgnParser pgnParser, IGameRepository gameRepository, IUnitOfWork unitOfWork) : IPgnImportService
+public class PgnImportService(
+	IPgnParser pgnParser,
+	IGameRepository gameRepository,
+	IPositionImportCoordinator positionImportCoordinator,
+	IUnitOfWork unitOfWork) : IPgnImportService
 {
 	public async Task<PgnImportResult> ImportAsync(string pgn, CancellationToken cancellationToken = default)
 	{
@@ -25,6 +29,7 @@ public class PgnImportService(IPgnParser pgnParser, IGameRepository gameReposito
 
 		if (validGames.Count > 0)
 		{
+			await positionImportCoordinator.PopulateAsync(validGames, cancellationToken);
 			await gameRepository.AddRangeAsync(validGames, cancellationToken);
 			await unitOfWork.SaveChangesAsync(cancellationToken);
 		}

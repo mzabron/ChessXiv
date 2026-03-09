@@ -1,4 +1,7 @@
 using ChessBase.Application.Services;
+using ChessBase.Domain.Engine.Factories;
+using ChessBase.Domain.Engine.Serialization;
+using ChessBase.Domain.Engine.Services;
 using ChessBase.IntegrationTests.Infrastructure;
 using ChessBase.Infrastructure.Data;
 using ChessBase.Infrastructure.Repositories;
@@ -17,8 +20,13 @@ public class PgnImportPersistenceTests(PostgresTestFixture fixture)
         await using var dbContext = fixture.CreateDbContext();
         var parser = new PgnService();
         var repository = new GameRepository(dbContext);
+        var serializer = new FenBoardStateSerializer();
+        var factory = new BoardStateFactory(serializer);
+        var transition = new BitboardBoardStateTransition();
+        var hasher = new ZobristPositionHasher();
+        var positionCoordinator = new PositionImportCoordinator(factory, serializer, transition, hasher);
         var unitOfWork = new EfUnitOfWork(dbContext);
-        var importService = new PgnImportService(parser, repository, unitOfWork);
+        var importService = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         const string pgn = """
             [Event "Integration Import"]
@@ -40,11 +48,14 @@ public class PgnImportPersistenceTests(PostgresTestFixture fixture)
 
         var gamesCount = await dbContext.Games.CountAsync();
         var movesCount = await dbContext.Moves.CountAsync();
+        var positionsCount = await dbContext.Positions.CountAsync();
         Assert.Equal(1, gamesCount);
         Assert.Equal(2, movesCount);
+        Assert.Equal(5, positionsCount);
 
         var savedGame = await dbContext.Games
             .Include(game => game.Moves)
+            .Include(game => game.Positions)
             .SingleAsync();
 
         Assert.Equal("Alpha", savedGame.White);
@@ -59,5 +70,8 @@ public class PgnImportPersistenceTests(PostgresTestFixture fixture)
         Assert.Equal(0.25, moveOne.BlackEval);
         Assert.Equal("0:10:00", moveOne.WhiteClk);
         Assert.Equal("0:09:58", moveOne.BlackClk);
+
+        var maxPly = savedGame.Positions.Max(position => position.PlyCount);
+        Assert.Equal(4, maxPly);
     }
 }
