@@ -1,7 +1,6 @@
 #######################################
 # Root / General
 #######################################
-
 .DS_Store
 Thumbs.db
 *.log
@@ -9,83 +8,54 @@ Thumbs.db
 *.temp
 
 #######################################
-# .NET / C#
+# .NET / C# / vscode
 #######################################
-
-bin/
-obj/
 **/bin/
 **/obj/
-
 *.user
 *.suo
 *.userosscache
 *.sln.docstates
-
 .vs/
 .idea/
-
-#######################################
-# Rider / JetBrains
-#######################################
-
-.idea/
+.vscode/
 *.sln.iml
 
 #######################################
-# Visual Studio Code
+# Environment & Secrets 
 #######################################
-
-.vscode/
+.env
+.env.*
+!.env.example
+**/appsettings.json
+**/appsettings.Development.json
+**/appsettings.local.json
+**/UserSecretsId
+**/environment.development.ts
+**/environment.local.ts
 
 #######################################
-# NuGet
+# NuGet / Node / Angular
 #######################################
-
 *.nupkg
 packages/
 .nuget/
-
-#######################################
-# Angular / Node
-#######################################
-
 **/node_modules/
 dist/
 .angular/
 coverage/
-
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+*-debug.log*
+*-error.log*
 
 #######################################
-# Environment files (VERY IMPORTANT)
+# Docker & DB
 #######################################
-
-# Backend secrets
-backend/src/ChessBase.Api/appsettings.Development.json
-
-# Frontend environment overrides
-frontend/chessbase-client/src/environments/environment.development.ts
-
-#######################################
-# PostgreSQL local files
-#######################################
-
+docker-compose.override.yml
 *.pgsql
 *.sql.backup
 
 #######################################
-# Docker (if added later)
-#######################################
-
-docker-compose.override.yml
-
-#######################################
 # OS Generated
 #######################################
-
 ehthumbs.db
 Desktop.ini

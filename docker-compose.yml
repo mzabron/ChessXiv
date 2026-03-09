@@ -4,11 +4,11 @@ services:
     container_name: chessbase_db_container
     restart: always
     environment:
-      POSTGRES_USER: chessbase_user
-      POSTGRES_PASSWORD: chessbase_password
-      POSTGRES_DB: chessbase_db
+      POSTGRES_USER: ${CHESSBASE_DB_USER}
+      POSTGRES_PASSWORD: ${CHESSBASE_DB_PASSWORD}
+      POSTGRES_DB: ${CHESSBASE_DB_NAME}
     ports:
-      - "5432:5432"
+      - "${CHESSBASE_DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
 

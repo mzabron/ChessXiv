@@ -5,7 +5,7 @@ internal static class PgnServiceTestData
     public static string LoadGamesSamplePgn()
     {
         var root = FindProjectRoot();
-        var pgnPath = Path.Combine(root, "TestData", "games_sample.pgn");
+        var pgnPath = Path.Combine(root, "../TestData", "games_sample.pgn");
         return File.ReadAllText(pgnPath);
     }
 
