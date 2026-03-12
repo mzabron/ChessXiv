@@ -54,4 +54,24 @@ public class PgnServiceTagTests
 
         Assert.Equal(new DateTime(2026, 1, 4), game.Date);
     }
+
+    [Fact]
+    public void ParsePgn_ExtractsYear_WhenDateIsPartial()
+    {
+        const string pgn = """
+            [Event "Year Fallback"]
+            [Site "Test"]
+            [Date "2023.??.??"]
+            [White "Alpha"]
+            [Black "Beta"]
+            [Result "1-0"]
+
+            1. e4 e5 1-0
+            """;
+
+        var game = _service.ParsePgn(pgn).Single();
+
+        Assert.Null(game.Date);
+        Assert.Equal(2023, game.Year);
+    }
 }

@@ -134,6 +134,7 @@ public class PgnService : IPgnParser
         }
 
         game.Moves = ParseMoves(movesPart, game.Id);
+        game.MoveCount = game.Moves.Count;
 
         if (game.Result == "*" && TryGetTrailingResult(movesPart, out var inferredResult))
         {
@@ -198,6 +199,11 @@ public class PgnService : IPgnParser
         if (TryParsePgnDate(rawDate, out var parsedDate))
         {
             game.Date = parsedDate;
+            game.Year = parsedDate.Year;
+        }
+        else if (TryExtractYearFromPgnDate(rawDate, out var parsedYear))
+        {
+            game.Year = parsedYear;
         }
     }
 
@@ -418,6 +424,28 @@ public class PgnService : IPgnParser
 
         date = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
         return true;
+    }
+
+    private static bool TryExtractYearFromPgnDate(string? rawDate, out int year)
+    {
+        year = 0;
+        if (string.IsNullOrWhiteSpace(rawDate))
+        {
+            return false;
+        }
+
+        var trimmed = rawDate.Trim();
+        if (trimmed.Length < 4)
+        {
+            return false;
+        }
+
+        if (!char.IsDigit(trimmed[0]) || !char.IsDigit(trimmed[1]) || !char.IsDigit(trimmed[2]) || !char.IsDigit(trimmed[3]))
+        {
+            return false;
+        }
+
+        return int.TryParse(trimmed.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out year);
     }
 
     private static bool TryGetTrailingResult(string movesText, out string result)

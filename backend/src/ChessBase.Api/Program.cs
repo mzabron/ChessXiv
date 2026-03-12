@@ -22,6 +22,8 @@ builder.Services.AddDbContext<ChessBaseDbContext>(options =>
 
 builder.Services.AddScoped<IPgnParser, PgnService>();
 builder.Services.AddScoped<IGameRepository, GameRepository>();
+builder.Services.AddScoped<IGameExplorerRepository, GameExplorerRepository>();
+builder.Services.AddScoped<IPlayerRepository, PlayerRepository>();
 builder.Services.AddScoped<IPositionImportCoordinator, PositionImportCoordinator>();
 builder.Services.AddScoped<IBoardStateSerializer, FenBoardStateSerializer>();
 builder.Services.AddScoped<IBoardStateFactory, BoardStateFactory>();
@@ -29,6 +31,7 @@ builder.Services.AddScoped<IBoardStateTransition, BitboardBoardStateTransition>(
 builder.Services.AddScoped<IPositionHasher, ZobristPositionHasher>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<IPgnImportService, PgnImportService>();
+builder.Services.AddScoped<IGameExplorerService, GameExplorerService>();
 
 var app = builder.Build();
 
