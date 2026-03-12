@@ -1,0 +1,52 @@
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 14px 28px rgb(61 42 27 / 8%);
+}
+
+.panel-header {
+  padding: 0.75rem 0.85rem 0.55rem;
+
+  h2 {
+    margin: 0;
+    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+    font-weight: 700;
+    font-size: 0.94rem;
+    letter-spacing: 0.02em;
+  }
+
+  p {
+    margin: 0.28rem 0 0;
+    color: var(--muted);
+    font-size: 0.76rem;
+  }
+}
+
+.tree-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+  padding: 0 0.85rem 0.85rem;
+}
+
+.tree-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  border: 1px solid #dfd2bc;
+  border-radius: 8px;
+  padding: 0.45rem 0.58rem;
+  background: #f8f3e8;
+}
+
+.move {
+  font: 600 0.8rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
+  color: #342518;
+}
+
+.meta {
+  font-size: 0.72rem;
+  color: #6f604e;
+}

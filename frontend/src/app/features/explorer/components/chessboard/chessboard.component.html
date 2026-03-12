@@ -1,0 +1,54 @@
+<article class="panel board-panel">
+  <div class="player-strip top" aria-label="Black player details">
+    <div class="player-main">
+      <span class="player-name">Hikaru Nakamura</span>
+      <span class="player-rating">2780</span>
+    </div>
+    <span class="player-clock">00:08:42</span>
+  </div>
+
+  <div class="board" role="img" aria-label="Chessboard placeholder">
+    <div class="board-grid">
+      @for (rank of ranks; track rank) {
+        @for (file of files; track file) {
+          <div class="square" [class.light]="(rank + $index) % 2 === 0" [class.dark]="(rank + $index) % 2 !== 0">
+            @if (rank === 1) {
+              <span class="file-label">{{ file }}</span>
+            }
+            @if (file === 'a') {
+              <span class="rank-label">{{ rank }}</span>
+            }
+          </div>
+        }
+      }
+    </div>
+  </div>
+
+  <div class="player-strip bottom" aria-label="White player details">
+    <div class="player-main">
+      <span class="player-name">Magnus Carlsen</span>
+      <span class="player-rating">2835</span>
+    </div>
+    <span class="player-clock">00:13:28</span>
+  </div>
+
+  <div class="board-toolbar">
+    <button type="button" class="tool-btn icon-only" (click)="flipBoard()" aria-label="Reverse board">&#8635;</button>
+    <button type="button" class="tool-btn" (click)="setPosition()">Set position</button>
+    <div class="move-controls" aria-label="Move navigation controls">
+      <button type="button" class="icon-btn" (click)="goToGameStart()" aria-label="Go to game start">
+        <span class="icon-double" aria-hidden="true"><span>&#9664;</span><span>&#9664;</span></span>
+      </button>
+      <button type="button" class="icon-btn" (click)="goPreviousMove()" aria-label="Previous move">
+        <span class="icon-single" aria-hidden="true">&#9664;</span>
+      </button>
+      <button type="button" class="icon-btn" (click)="goNextMove()" aria-label="Next move">
+        <span class="icon-single" aria-hidden="true">&#9654;</span>
+      </button>
+      <button type="button" class="icon-btn" (click)="goToGameEnd()" aria-label="Go to game end">
+        <span class="icon-double" aria-hidden="true"><span>&#9654;</span><span>&#9654;</span></span>
+      </button>
+      <button type="button" class="tool-btn clear" (click)="clearPosition()">Clear</button>
+    </div>
+  </div>
+</article>

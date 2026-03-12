@@ -1,0 +1,78 @@
+.filter-form {
+  padding: 0.85rem;
+}
+
+.tab-note {
+  margin: 0 0 0.8rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.tab-note.disabled {
+  color: #967f68;
+}
+
+.filters-grid {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.filters-grid:disabled {
+  opacity: 0.58;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+
+  span {
+    font-size: 0.76rem;
+    color: #5f503f;
+    font-weight: 600;
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    border: 1px solid #d3c6ae;
+    border-radius: 8px;
+    background: #fbf8f1;
+    color: #302419;
+    padding: 0.5rem 0.58rem;
+    font: 500 0.8rem/1.2 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 4.1rem;
+  }
+}
+
+.control-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.2rem;
+
+  input[type='checkbox'] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+  }
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 720px) {
+  .filters-grid {
+    grid-template-columns: 1fr;
+  }
+}

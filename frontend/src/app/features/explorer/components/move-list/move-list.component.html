@@ -1,0 +1,11 @@
+<article class="panel move-list-panel">
+  <div class="moves-table" aria-label="Move list placeholder">
+    @for (row of moveRows; track row.number) {
+      <div class="move-row">
+        <span class="ply-number">{{ row.number }}.</span>
+        <button type="button" class="move-btn" disabled>{{ row.white }}</button>
+        <button type="button" class="move-btn" disabled>{{ row.black }}</button>
+      </div>
+    }
+  </div>
+</article>

@@ -1,0 +1,24 @@
+<main class="layout" #layoutRoot [class.resizing]="isResizing" [style.--left-pane-width.px]="leftPaneWidth">
+  <section class="left-column" aria-label="Chessboard and filters">
+    <div class="board-moves-row">
+      <app-chessboard />
+      <app-move-list />
+    </div>
+    <app-games-tree />
+  </section>
+
+  <div
+    class="resize-handle"
+    role="separator"
+    aria-label="Resize board and games list panels"
+    aria-orientation="vertical"
+    (mousedown)="startResize($event)"
+  ></div>
+
+  <section class="right-column" aria-label="Games list">
+    <app-games-list
+      (importDatabase)="importDatabase()"
+      (searchCommunityDatabase)="searchCommunityDatabase()"
+    />
+  </section>
+</main>

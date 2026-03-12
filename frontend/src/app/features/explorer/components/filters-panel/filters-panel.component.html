@@ -1,0 +1,143 @@
+<div class="filter-form">
+  <p class="tab-note" [class.disabled]="!gamesLoaded">
+    Search filters are disabled until a database is loaded.
+  </p>
+
+  <fieldset class="filters-grid" [disabled]="!gamesLoaded">
+    <label class="control">
+      <span>White first name</span>
+      <input type="text" placeholder="e.g. Magnus" />
+    </label>
+
+    <label class="control">
+      <span>White last name</span>
+      <input type="text" placeholder="e.g. Carlsen" />
+    </label>
+
+    <label class="control">
+      <span>Black first name</span>
+      <input type="text" placeholder="e.g. Hikaru" />
+    </label>
+
+    <label class="control">
+      <span>Black last name</span>
+      <input type="text" placeholder="e.g. Nakamura" />
+    </label>
+
+    <label class="control control-checkbox wide">
+      <input type="checkbox" />
+      <span>Ignore colors</span>
+    </label>
+
+    <label class="control control-checkbox wide">
+      <input type="checkbox" />
+      <span>Elo enabled</span>
+    </label>
+
+    <label class="control">
+      <span>Elo from</span>
+      <input type="number" placeholder="1200" />
+    </label>
+
+    <label class="control">
+      <span>Elo to</span>
+      <input type="number" placeholder="2900" />
+    </label>
+
+    <label class="control wide">
+      <span>Elo mode</span>
+      <select>
+        <option>None</option>
+        <option>Both</option>
+        <option>Average</option>
+        <option>Any</option>
+      </select>
+    </label>
+
+    <label class="control control-checkbox wide">
+      <input type="checkbox" />
+      <span>Year enabled</span>
+    </label>
+
+    <label class="control">
+      <span>Year from</span>
+      <input type="number" placeholder="1990" />
+    </label>
+
+    <label class="control">
+      <span>Year to</span>
+      <input type="number" placeholder="2026" />
+    </label>
+
+    <label class="control">
+      <span>ECO code</span>
+      <input type="text" placeholder="B90" />
+    </label>
+
+    <label class="control">
+      <span>Result</span>
+      <select>
+        <option>Any</option>
+        <option>1-0</option>
+        <option>0-1</option>
+        <option>1/2-1/2</option>
+      </select>
+    </label>
+
+    <label class="control">
+      <span>Move count from</span>
+      <input type="number" placeholder="1" />
+    </label>
+
+    <label class="control">
+      <span>Move count to</span>
+      <input type="number" placeholder="150" />
+    </label>
+
+    <label class="control control-checkbox wide">
+      <input type="checkbox" />
+      <span>Search by position</span>
+    </label>
+
+    <label class="control wide">
+      <span>FEN</span>
+      <textarea rows="2" placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"></textarea>
+    </label>
+
+    <label class="control wide">
+      <span>Position mode</span>
+      <select>
+        <option>Exact</option>
+        <option>Contains</option>
+      </select>
+    </label>
+
+    <label class="control">
+      <span>Sort by</span>
+      <select>
+        <option>Year</option>
+        <option>Date</option>
+        <option>Elo</option>
+        <option>MoveCount</option>
+      </select>
+    </label>
+
+    <label class="control">
+      <span>Sort direction</span>
+      <select>
+        <option>Desc</option>
+        <option>Asc</option>
+      </select>
+    </label>
+
+    <label class="control">
+      <span>Page</span>
+      <input type="number" value="1" />
+    </label>
+
+    <label class="control">
+      <span>Page size</span>
+      <input type="number" value="50" />
+    </label>
+  </fieldset>
+</div>

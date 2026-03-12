@@ -1,0 +1,66 @@
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 14px 28px rgb(61 42 27 / 8%);
+}
+
+.tabs {
+  display: flex;
+  padding: 0.35rem 0.35rem 0;
+  gap: 0.35rem;
+  border-bottom: 1px solid #e1d6c5;
+  background: #f4ede0;
+}
+
+.tab-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #6a5b49;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  padding: 0.56rem 0.85rem;
+  font: 600 0.86rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: var(--panel);
+  color: #33261a;
+  border-color: #e1d6c5;
+  border-bottom-color: var(--panel);
+}
+
+.panel-header {
+  padding: 1rem 1rem 0.75rem;
+
+  h2 {
+    margin: 0;
+    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+  }
+
+  p {
+    margin: 0.35rem 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+}
+
+.games-panel {
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.tab-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}

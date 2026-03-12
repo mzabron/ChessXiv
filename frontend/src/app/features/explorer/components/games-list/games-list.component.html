@@ -1,0 +1,42 @@
+<article class="panel games-panel">
+  <div class="tabs" role="tablist" aria-label="Games panel tabs">
+    <button
+      type="button"
+      role="tab"
+      class="tab-btn"
+      [class.active]="activeTab === 'games'"
+      [attr.aria-selected]="activeTab === 'games'"
+      (click)="selectTab('games')"
+    >
+      Games
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="tab-btn"
+      [class.active]="activeTab === 'filters'"
+      [attr.aria-selected]="activeTab === 'filters'"
+      (click)="selectTab('filters')"
+    >
+      Filters
+    </button>
+  </div>
+
+  @if (activeTab === 'games') {
+    <div class="tab-body" role="tabpanel" aria-label="Games tab content">
+      <header class="panel-header">
+        <h2>Games</h2>
+        <p>No games loaded yet.</p>
+      </header>
+
+      <app-empty-games-state
+        (importDatabase)="importDatabase.emit()"
+        (searchCommunityDatabase)="searchCommunityDatabase.emit()"
+      />
+    </div>
+  } @else {
+    <div class="tab-body" role="tabpanel" aria-label="Filters tab content">
+      <app-filters-panel [gamesLoaded]="gamesLoaded" />
+    </div>
+  }
+</article>

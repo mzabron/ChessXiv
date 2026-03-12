@@ -1,0 +1,165 @@
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 14px 28px rgb(61 42 27 / 8%);
+}
+
+.board-panel {
+  overflow: hidden;
+}
+
+.player-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  font: 600 0.78rem/1.2 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  color: #4b3a2b;
+  background: transparent;
+}
+
+.player-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-rating {
+  color: #7c6850;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.player-clock {
+  color: #5f4d3b;
+  font: 600 0.8rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
+}
+
+.board-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.55rem 0.65rem 0.5rem;
+}
+
+.tool-btn,
+.icon-btn {
+  border: 1px solid #d3c6ae;
+  border-radius: 9px;
+  background: #f0ecdf;
+  color: var(--accent-strong);
+  font: 600 0.84rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
+  cursor: pointer;
+}
+
+.tool-btn {
+  padding: 0.4rem 0.62rem;
+}
+
+.move-controls {
+  display: flex;
+  gap: 0.28rem;
+  margin-left: auto;
+}
+
+.icon-btn {
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-btn.icon-only {
+  width: 1.95rem;
+  height: 1.95rem;
+  padding: 0;
+  font-size: 1rem;
+}
+
+.icon-single,
+.icon-double {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  color: #3d2f23;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+}
+
+.icon-single {
+  font-size: 0.7rem;
+}
+
+.icon-double {
+  gap: 0.04rem;
+  font-size: 0.58rem;
+}
+
+.board {
+  padding: 0.55rem 0.65rem;
+}
+
+.board-grid {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: 100%;
+  max-width: none;
+  aspect-ratio: 1;
+}
+
+.tool-btn.clear {
+  background: #e9dfce;
+  color: #5e4b39;
+}
+
+.square {
+  position: relative;
+}
+
+.square.light {
+  background: var(--square-light);
+}
+
+.square.dark {
+  background: var(--square-dark);
+}
+
+.file-label,
+.rank-label {
+  position: absolute;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgb(0 0 0 / 55%);
+}
+
+.file-label {
+  right: 0.2rem;
+  bottom: 0.14rem;
+}
+
+.rank-label {
+  left: 0.2rem;
+  top: 0.14rem;
+}
+
+@media (max-width: 980px) {
+  .board-grid {
+    margin: 0 auto;
+  }
+}
