@@ -1,1 +1,8 @@
-<app-explorer-page />
+<main class="app-layout">
+  <div class="content-area">
+    <app-explorer-page [isFocusMode]="isFocusMode" />
+  </div>
+  <app-sidebar (loginClick)="toggleLoginModal()" (toggleLayout)="toggleFocusMode()" />
+</main>
+
+<app-login-modal *ngIf="isLoginModalOpen" (close)="toggleLoginModal()" />

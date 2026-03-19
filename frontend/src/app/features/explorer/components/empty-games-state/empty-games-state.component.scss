@@ -59,3 +59,9 @@
   background: #f0ecdf;
   border-color: #d3c6ae;
 }
+
+:host-context(body.dark-theme) {
+  .action-button.primary { color: #fff; background: var(--accent); }
+  .action-button.primary:hover { background: var(--accent-strong); }
+  .action-button.ghost { color: var(--accent-strong); background: var(--panel); border-color: var(--line); }
+}

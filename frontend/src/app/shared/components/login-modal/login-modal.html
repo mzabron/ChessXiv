@@ -1,0 +1,32 @@
+<div class="modal-overlay" (click)="onClose()">
+  <div class="modal-container" (click)="$event.stopPropagation()">
+    <button class="close-btn" (click)="onClose()" title="Close">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+    
+    <div class="modal-header">
+      <h2>Welcome Back</h2>
+      <p>Log in to access your saved games and settings.</p>
+    </div>
+
+    <form class="login-form">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="Enter your email" required />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Enter your password" required />
+      </div>
+
+      <button type="button" class="btn-primary" (click)="onClose()">Sign In</button>
+      
+      <div class="divider">
+        <span>or</span>
+      </div>
+
+      <button type="button" class="btn-secondary" (click)="onClose()">Create an Account</button>
+    </form>
+  </div>
+</div>

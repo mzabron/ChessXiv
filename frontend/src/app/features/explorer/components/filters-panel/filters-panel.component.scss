@@ -76,3 +76,11 @@
     grid-template-columns: 1fr;
   }
 }
+
+:host-context(body.dark-theme) {
+  .tab-note.disabled { color: var(--muted); }
+  .control span { color: var(--text); }
+  .control input,
+  .control select,
+  .control textarea { border-color: var(--line); background: var(--bg); color: var(--text); }
+}

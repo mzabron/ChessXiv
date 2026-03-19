@@ -1,0 +1,61 @@
+:host {
+  display: block;
+  height: 100vh;
+  width: 64px;
+  background-color: var(--sidebar-bg, var(--panel, #fbf8f1));
+  border-left: 1px solid var(--sidebar-border, #e5e7eb);
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  z-index: 10;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  padding: 24px 0;
+}
+
+.sidebar-top, .sidebar-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 12px;
+  color: var(--icon-color, #4b5563);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background-color: var(--icon-hover-bg, #f3f4f6);
+    color: var(--icon-hover-color, #111827);
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  svg {
+    transition: stroke 0.2s ease;
+  }
+}
+
+// Dark theme variables
+:host-context(body.dark-theme) {
+  --sidebar-bg: #1f2937;
+  --sidebar-border: #374151;
+  --icon-color: #9ca3af;
+  --icon-hover-bg: #374151;
+  --icon-hover-color: #f9fafb;
+}

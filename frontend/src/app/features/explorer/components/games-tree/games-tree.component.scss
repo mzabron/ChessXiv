@@ -50,3 +50,9 @@
   font-size: 0.72rem;
   color: #6f604e;
 }
+
+:host-context(body.dark-theme) {
+  .tree-item { border-color: var(--line); background: var(--bg); }
+  .move { color: var(--text); }
+  .meta { color: var(--muted); }
+}

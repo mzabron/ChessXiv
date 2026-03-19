@@ -64,3 +64,9 @@
   min-height: 0;
   flex: 1;
 }
+
+:host-context(body.dark-theme) {
+  .tabs { background: var(--bg); border-bottom-color: var(--line); }
+  .tab-btn { color: var(--muted); }
+  .tab-btn.active { background: var(--panel); color: var(--text); border-color: var(--line); border-bottom-color: var(--panel); }
+}

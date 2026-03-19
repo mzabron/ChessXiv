@@ -46,3 +46,7 @@
     min-height: auto;
   }
 }
+
+:host-context(body.dark-theme) {
+  .move-btn { color: var(--text); }
+}

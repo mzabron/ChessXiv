@@ -163,3 +163,16 @@
     margin: 0 auto;
   }
 }
+
+:host-context(body.dark-theme) {
+  .player-strip { color: var(--text); }
+  .player-rating { color: var(--muted); }
+  .player-clock { color: #a1a1aa; }
+  .tool-btn,
+  .icon-btn { border-color: var(--line); background: var(--panel); color: var(--accent-strong); }
+  .icon-single,
+  .icon-double { color: var(--text); }
+  .tool-btn.clear { background: var(--line); color: var(--text); }
+  .file-label,
+  .rank-label { color: rgba(255, 255, 255, 0.45); }
+}

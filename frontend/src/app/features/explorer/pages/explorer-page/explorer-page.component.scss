@@ -16,6 +16,24 @@
     radial-gradient(circle at 10% -10%, #f0e8d8 0%, transparent 45%),
     radial-gradient(circle at 120% 110%, #dfd2bd 0%, transparent 40%),
     var(--bg);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+:host-context(body.dark-theme) {
+  --bg: #1e1e1e;
+  --panel: #252526;
+  --text: #d4d4d4;
+  --muted: #858585;
+  --line: #3f3f46;
+  --accent: #3b82f6; 
+  --accent-strong: #2563eb;
+  --square-light: #525252;
+  --square-dark: #262626;
+
+  background:
+    radial-gradient(circle at 10% -10%, #2a2a2a 0%, transparent 45%),
+    radial-gradient(circle at 120% 110%, #1a1a1a 0%, transparent 40%),
+    var(--bg);
 }
 
 .layout {
@@ -82,4 +100,85 @@
   .resize-handle {
     display: none;
   }
+}
+
+/* --- Focus Mode Styles & Transitions --- */
+
+.animate-layout {
+  transition: grid-template-columns 0.4s cubic-bezier(0.25, 1, 0.5, 1), gap 0.4s ease;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.full-size-board {
+  flex-grow: 1;
+  display: block;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 14px 28px rgba(61, 42, 27, 0.08);
+}
+
+.focus-side-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.tabs {
+  display: flex;
+  padding: 0.35rem 0.35rem 0;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.tab-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  padding: 0.56rem 0.85rem;
+  font: 600 0.86rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &.active {
+    background: var(--panel);
+    color: var(--text);
+    border-color: var(--line);
+    border-bottom-color: var(--panel);
+    transform: translateY(1px); // Cover bottom border
+  }
+}
+
+.tab-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.full-height-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+:host-context(body.dark-theme) .panel {
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.3);
 }

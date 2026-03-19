@@ -1,23 +1,30 @@
-import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild, Input } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { ChessboardComponent } from '../../components/chessboard/chessboard.component';
 import { GamesListComponent } from '../../components/games-list/games-list.component';
 import { GamesTreeComponent } from '../../components/games-tree/games-tree.component';
 import { MoveListComponent } from '../../components/move-list/move-list.component';
+import { EmptyGamesStateComponent } from '../../components/empty-games-state/empty-games-state.component';
+import { FiltersPanelComponent } from '../../components/filters-panel/filters-panel.component';
 
 @Component({
   selector: 'app-explorer-page',
   standalone: true,
-  imports: [ChessboardComponent, GamesTreeComponent, GamesListComponent, MoveListComponent],
+  imports: [CommonModule, ChessboardComponent, GamesTreeComponent, GamesListComponent, MoveListComponent, EmptyGamesStateComponent, FiltersPanelComponent],
   templateUrl: './explorer-page.component.html',
   styleUrl: './explorer-page.component.scss'
 })
 export class ExplorerPageComponent {
+  @Input() isFocusMode = false;
+  
   @ViewChild('layoutRoot', { static: true })
   private readonly layoutRoot!: ElementRef<HTMLElement>;
 
   protected readonly gamesLoaded = false;
   protected isResizing = false;
   protected leftPaneWidth = 620;
+  
+  protected focusRightTab: 'tree' | 'moves' | 'games' | 'filters' = 'tree';
 
   private static readonly minBoardWidth = 320;
   private static readonly minMoveListWidth = 145;
