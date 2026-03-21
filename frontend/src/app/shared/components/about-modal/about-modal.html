@@ -1,19 +1,57 @@
 <div class="modal-overlay" (click)="onClose()">
   <div class="modal-container" (click)="$event.stopPropagation()">
     <button class="close-btn" (click)="onClose()" title="Close">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x">
+        <path d="M18 6 6 18" />
+        <path d="m6 6 12 12" />
+      </svg>
     </button>
-    
+
     <div class="modal-header">
       <h2>About ChessXiv</h2>
       <p>Open Source Attributions</p>
     </div>
 
     <div class="about-content">
-      <div class="info-block">
-        <h3>Chess Pieces Artwork</h3>
-        <p>The graphical chess pieces used in this application are derived from the "Cburnett" set, originally designed by <strong>Colin M.L. Burnett</strong>.</p>
-        <p>They are openly licensed and distributed under the <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank">CC BY-SA 4.0</a> license.</p>
+      <div class="info-block" style="text-align: left;">
+        <h3 style="text-align: center;">Chess Pieces Artwork</h3>
+        <p>The graphical chess pieces used in this application are derived from the "Cburnett" chess set designed by
+          Colin M. L. Burnett.</p>
+        <p>Used under the BSD License.</p>
+
+        <details class="license-details">
+          <summary>
+            <span>View License</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              class="lucide lucide-chevron-down">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </summary>
+          <div class="license-text">
+            <p>Copyright (c) Colin M. L. Burnett<br>All rights reserved.</p>
+            <p>Redistribution and use in source and binary forms, with or without modification, are permitted provided
+              that the following conditions are met:</p>
+            <ol>
+              <li>Redistributions of source code must retain the above copyright notice, this list of conditions and the
+                following disclaimer.</li>
+              <li>Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+                the following disclaimer in the documentation and/or other materials provided with the distribution.
+              </li>
+              <li>Neither the name of the copyright holder nor the names of its contributors may be used to endorse or
+                promote products derived from this software without specific prior written permission.</li>
+            </ol>
+            <p style="text-transform: uppercase;">This software is provided by the copyright holders and contributors
+              "as is" and any express or implied warranties, including, but not limited to, the implied warranties of
+              merchantability and fitness for a particular purpose are disclaimed. In no event shall the copyright
+              holder or contributors be liable for any direct, indirect, incidental, special, exemplary, or
+              consequential damages (including, but not limited to, procurement of substitute goods or services; loss of
+              use, data, or profits; or business interruption) however caused and on any theory of liability, whether in
+              contract, strict liability, or tort (including negligence or otherwise) arising in any way out of the use
+              of this software, even if advised of the possibility of such damage.</p>
+          </div>
+        </details>
       </div>
 
       <button type="button" class="btn-primary" style="width: 100%" (click)="onClose()">Close</button>

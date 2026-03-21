@@ -1,0 +1,30 @@
+<div class="databases-container">
+  <div class="toolbar">
+    <div class="search-box">
+      <input type="text" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)"
+        placeholder="Search by name or owner..." class="search-input" />
+    </div>
+    <button class="sort-btn" (click)="toggleSort()">
+      Sort: {{ sortByCreationDesc() ? 'Newest First' : 'Oldest First' }}
+    </button>
+  </div>
+
+  <div class="databases-list">
+    @for (db of filteredAndSortedDatabases(); track db.id) {
+    <div class="db-card">
+      <div class="db-header">
+        <h3 class="db-name">{{ db.name }}</h3>
+        <span class="db-games-count">{{ db.gamesCount }} games</span>
+      </div>
+      <div class="db-meta">
+        <span class="db-owner"><i class="icon-user"></i> {{ db.owner }}</span>
+        <span class="db-date"><i class="icon-calendar"></i> {{ db.creationDate | date:'mediumDate' }}</span>
+      </div>
+    </div>
+    } @empty {
+    <div class="empty-state">
+      <p>No databases found matching your search.</p>
+    </div>
+    }
+  </div>
+</div>

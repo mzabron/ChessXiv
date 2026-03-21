@@ -1,0 +1,30 @@
+<div class="table-container fade-in">
+  <table class="games-table">
+    <thead>
+      <tr>
+        <th>Year</th>
+        <th>White</th>
+        <th>WhiteElo</th>
+        <th>Result</th>
+        <th>Black</th>
+        <th>BlackElo</th>
+        <th>Eco</th>
+        <th>Event</th>
+        <th>Moves</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let game of games" class="game-row">
+        <td>{{ game.year || '-' }}</td>
+        <td>{{ game.white }}</td>
+        <td>{{ game.whiteElo || '-' }}</td>
+        <td class="result-cell">{{ game.result }}</td>
+        <td>{{ game.black }}</td>
+        <td>{{ game.blackElo || '-' }}</td>
+        <td>{{ game.eco }}</td>
+        <td class="event-cell" [title]="game.event">{{ game.event }}</td>
+        <td>{{ game.moveCount }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

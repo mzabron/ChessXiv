@@ -1,0 +1,63 @@
+.table-container {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.games-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  font-size: 0.85rem;
+  text-align: left;
+  white-space: nowrap;
+
+  th, td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    z-index: 1;
+  }
+
+  .game-row {
+    cursor: pointer;
+    transition: background 0.15s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  .result-cell {
+    font-weight: 600;
+  }
+
+  .event-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 15rem;
+  }
+}
+
+:host-context(body.dark-theme) {
+  .games-table {
+    th {
+      background: var(--panel);
+    }
+  }
+
+  .game-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}

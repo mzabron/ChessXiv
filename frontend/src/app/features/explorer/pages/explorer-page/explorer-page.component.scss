@@ -25,7 +25,7 @@
   --text: #d4d4d4;
   --muted: #858585;
   --line: #3f3f46;
-  --accent: #3b82f6; 
+  --accent: #3b82f6;
   --accent-strong: #2563eb;
   --square-light: #8ca2ad;
   --square-dark: #607382;
@@ -60,7 +60,7 @@
   gap: 0.75rem;
 }
 
-.board-moves-row > * {
+.board-moves-row>* {
   min-width: 0;
 }
 
@@ -113,8 +113,15 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .full-size-board {
@@ -154,7 +161,7 @@
   font: 600 0.86rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
   cursor: pointer;
   transition: all 0.2s;
-  
+
   &.active {
     background: var(--panel);
     color: var(--text);

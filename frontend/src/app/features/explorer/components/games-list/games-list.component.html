@@ -1,42 +1,40 @@
 <article class="panel games-panel">
   <div class="tabs" role="tablist" aria-label="Games panel tabs">
-    <button
-      type="button"
-      role="tab"
-      class="tab-btn"
-      [class.active]="activeTab === 'games'"
-      [attr.aria-selected]="activeTab === 'games'"
-      (click)="selectTab('games')"
-    >
+    <button type="button" role="tab" class="tab-btn" [class.active]="activeTab === 'games'"
+      [attr.aria-selected]="activeTab === 'games'" (click)="selectTab('games')">
       Games
     </button>
-    <button
-      type="button"
-      role="tab"
-      class="tab-btn"
-      [class.active]="activeTab === 'filters'"
-      [attr.aria-selected]="activeTab === 'filters'"
-      (click)="selectTab('filters')"
-    >
+    <button type="button" role="tab" class="tab-btn" [class.active]="activeTab === 'filters'"
+      [attr.aria-selected]="activeTab === 'filters'" (click)="selectTab('filters')">
       Filters
+    </button>
+    <button type="button" role="tab" class="tab-btn" [class.active]="activeTab === 'databases'"
+      [attr.aria-selected]="activeTab === 'databases'" (click)="selectTab('databases')">
+      Databases
     </button>
   </div>
 
-  @if (activeTab === 'games') {
-    <div class="tab-body" role="tabpanel" aria-label="Games tab content">
-      <header class="panel-header">
-        <h2>Games</h2>
-        <p>No games loaded yet.</p>
-      </header>
+  @if (activeTab === 'databases') {
+  <div class="tab-body" role="tabpanel" aria-label="Databases tab content">
+    <app-databases-panel />
+  </div>
+  } @else if (activeTab === 'games') {
+  <div class="tab-body" role="tabpanel" aria-label="Games tab content">
+    <header class="panel-header">
+      <h2>Games</h2>
+      <p>{{ gamesLoaded ? games.length + ' games loaded.' : 'No games loaded yet.' }}</p>
+    </header>
 
-      <app-empty-games-state
-        (importDatabase)="importDatabase.emit()"
-        (searchCommunityDatabase)="searchCommunityDatabase.emit()"
-      />
-    </div>
+    @if (!gamesLoaded) {
+      <app-empty-games-state (importDatabase)="importDatabase.emit()"
+        (searchCommunityDatabase)="selectTab('databases'); searchCommunityDatabase.emit()" />
+    } @else {
+      <app-games-table [games]="games" />
+    }
+  </div>
   } @else {
-    <div class="tab-body" role="tabpanel" aria-label="Filters tab content">
-      <app-filters-panel [gamesLoaded]="gamesLoaded" />
-    </div>
+  <div class="tab-body" role="tabpanel" aria-label="Filters tab content">
+    <app-filters-panel [gamesLoaded]="gamesLoaded" />
+  </div>
   }
 </article>
