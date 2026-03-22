@@ -6,11 +6,15 @@
       @for (row of moveRows; track row.number) {
         <div class="move-row">
           <span class="ply-number">{{ row.number }}.</span>
-          <button
-            type="button"
-            class="move-btn"
-            [class.active]="currentPly === row.whitePly"
-            (click)="selectPly(row.whitePly)">{{ row.white }}</button>
+          @if (row.whitePly !== null) {
+            <button
+              type="button"
+              class="move-btn"
+              [class.active]="currentPly === row.whitePly"
+              (click)="selectPly(row.whitePly)">{{ row.white }}</button>
+          } @else {
+            <span class="move-placeholder text">{{ row.white }}</span>
+          }
           @if (row.black) {
             <button
               type="button"

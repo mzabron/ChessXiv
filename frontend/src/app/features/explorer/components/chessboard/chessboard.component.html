@@ -1,11 +1,28 @@
 <article class="panel board-panel">
-  <div class="player-strip top" aria-label="Black player details">
-    <div class="player-main">
-      <span class="player-name">Hikaru Nakamura</span>
-      <span class="player-rating">2780</span>
+  @if (!isSetupMode) {
+    <div class="player-strip top" aria-label="Black player details">
+      <div class="player-main">
+        <span class="player-name">Hikaru Nakamura</span>
+        <span class="player-rating">2780</span>
+      </div>
+      <span class="player-clock">00:08:42</span>
     </div>
-    <span class="player-clock">00:08:42</span>
-  </div>
+  } @else {
+    <div class="setup-strip top" aria-label="Black setup pieces">
+      <button type="button" class="setup-tool" [class.active]="isSetupToolSelected('hand')" (click)="selectSetupTool('hand')" title="Hand tool" aria-label="Hand tool">
+        <span class="material-symbols-outlined" aria-hidden="true">drag_pan</span>
+      </button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bk')" (click)="selectSetupPiece('bk')"><img [src]="getPieceUrl('bk')" alt="Black king"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bq')" (click)="selectSetupPiece('bq')"><img [src]="getPieceUrl('bq')" alt="Black queen"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('br')" (click)="selectSetupPiece('br')"><img [src]="getPieceUrl('br')" alt="Black rook"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bb')" (click)="selectSetupPiece('bb')"><img [src]="getPieceUrl('bb')" alt="Black bishop"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bn')" (click)="selectSetupPiece('bn')"><img [src]="getPieceUrl('bn')" alt="Black knight"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bp')" (click)="selectSetupPiece('bp')"><img [src]="getPieceUrl('bp')" alt="Black pawn"></button>
+      <button type="button" class="setup-tool danger" [class.active]="isSetupToolSelected('delete')" (click)="selectSetupTool('delete')" title="Delete tool" aria-label="Delete tool">
+        <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+      </button>
+    </div>
+  }
 
   <div class="board" role="img" aria-label="Interactive chessboard">
     <div class="board-grid" #boardGrid>
@@ -46,31 +63,95 @@
     <p class="move-status" aria-live="polite">{{ statusMessage }}</p>
   }
 
-  <div class="player-strip bottom" aria-label="White player details">
-    <div class="player-main">
-      <span class="player-name">Magnus Carlsen</span>
-      <span class="player-rating">2835</span>
+  @if (!isSetupMode) {
+    <div class="player-strip bottom" aria-label="White player details">
+      <div class="player-main">
+        <span class="player-name">Magnus Carlsen</span>
+        <span class="player-rating">2835</span>
+      </div>
+      <span class="player-clock">00:13:28</span>
     </div>
-    <span class="player-clock">00:13:28</span>
-  </div>
+  } @else {
+    <div class="setup-strip bottom" aria-label="White setup pieces">
+      <button type="button" class="setup-tool" [class.active]="isSetupToolSelected('hand')" (click)="selectSetupTool('hand')" title="Hand tool" aria-label="Hand tool">
+        <span class="material-symbols-outlined" aria-hidden="true">drag_pan</span>
+      </button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wk')" (click)="selectSetupPiece('wk')"><img [src]="getPieceUrl('wk')" alt="White king"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wq')" (click)="selectSetupPiece('wq')"><img [src]="getPieceUrl('wq')" alt="White queen"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wr')" (click)="selectSetupPiece('wr')"><img [src]="getPieceUrl('wr')" alt="White rook"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wb')" (click)="selectSetupPiece('wb')"><img [src]="getPieceUrl('wb')" alt="White bishop"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wn')" (click)="selectSetupPiece('wn')"><img [src]="getPieceUrl('wn')" alt="White knight"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wp')" (click)="selectSetupPiece('wp')"><img [src]="getPieceUrl('wp')" alt="White pawn"></button>
+      <button type="button" class="setup-tool danger" [class.active]="isSetupToolSelected('delete')" (click)="selectSetupTool('delete')" title="Delete tool" aria-label="Delete tool">
+        <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+      </button>
+    </div>
+  }
 
   <div class="board-toolbar">
-    <button type="button" class="tool-btn icon-only" (click)="flipBoard()" aria-label="Reverse board">&#8635;</button>
-    <button type="button" class="tool-btn" (click)="setPosition()">Set position</button>
-    <div class="move-controls" aria-label="Move navigation controls">
-      <button type="button" class="icon-btn" (click)="goToGameStart()" aria-label="Go to game start">
-        <span class="icon-double" aria-hidden="true"><span>&#9664;</span><span>&#9664;</span></span>
-      </button>
-      <button type="button" class="icon-btn" (click)="goPreviousMove()" aria-label="Previous move">
-        <span class="icon-single" aria-hidden="true">&#9664;</span>
-      </button>
-      <button type="button" class="icon-btn" (click)="goNextMove()" aria-label="Next move">
-        <span class="icon-single" aria-hidden="true">&#9654;</span>
-      </button>
-      <button type="button" class="icon-btn" (click)="goToGameEnd()" aria-label="Go to game end">
-        <span class="icon-double" aria-hidden="true"><span>&#9654;</span><span>&#9654;</span></span>
-      </button>
-      <button type="button" class="tool-btn clear" (click)="clearPosition()">Clear</button>
-    </div>
+    @if (!isSetupMode) {
+      <button type="button" class="tool-btn icon-only" (click)="flipBoard()" aria-label="Reverse board">&#8635;</button>
+      <button type="button" class="tool-btn" (click)="setPosition()">Set position</button>
+      <div class="move-controls" aria-label="Move navigation controls">
+        <button type="button" class="icon-btn" (click)="goToGameStart()" aria-label="Go to game start">
+          <span class="icon-double" aria-hidden="true"><span>&#9664;</span><span>&#9664;</span></span>
+        </button>
+        <button type="button" class="icon-btn" (click)="goPreviousMove()" aria-label="Previous move">
+          <span class="icon-single" aria-hidden="true">&#9664;</span>
+        </button>
+        <button type="button" class="icon-btn" (click)="goNextMove()" aria-label="Next move">
+          <span class="icon-single" aria-hidden="true">&#9654;</span>
+        </button>
+        <button type="button" class="icon-btn" (click)="goToGameEnd()" aria-label="Go to game end">
+          <span class="icon-double" aria-hidden="true"><span>&#9654;</span><span>&#9654;</span></span>
+        </button>
+        <button type="button" class="tool-btn clear" (click)="clearPosition()">Clear</button>
+      </div>
+    } @else {
+      <div class="setup-controls" aria-label="Position setup controls">
+        <div class="setup-meta">
+          <div class="meta-block">
+            <span class="meta-label">Turn</span>
+            <div class="turn-group" role="group" aria-label="Side to move">
+              <button type="button" class="meta-chip turn" [class.active]="setupSideToMove === 'w'" (click)="setSetupSideToMove('w')">White</button>
+              <button type="button" class="meta-chip turn" [class.active]="setupSideToMove === 'b'" (click)="setSetupSideToMove('b')">Black</button>
+            </div>
+          </div>
+          <div class="meta-block">
+            <span class="meta-label">Castling</span>
+            <div class="castling-group" role="group" aria-label="Castling rights">
+              <div class="castle-side">
+                <span class="castle-label">White</span>
+                <button type="button" class="meta-chip" [class.active]="setupCastling.whiteKingSide" [disabled]="!canSetupCastle('whiteKingSide')" (click)="toggleCastlingRight('whiteKingSide')">K</button>
+                <button type="button" class="meta-chip" [class.active]="setupCastling.whiteQueenSide" [disabled]="!canSetupCastle('whiteQueenSide')" (click)="toggleCastlingRight('whiteQueenSide')">Q</button>
+              </div>
+              <div class="castle-side">
+                <span class="castle-label">Black</span>
+                <button type="button" class="meta-chip" [class.active]="setupCastling.blackKingSide" [disabled]="!canSetupCastle('blackKingSide')" (click)="toggleCastlingRight('blackKingSide')">k</button>
+                <button type="button" class="meta-chip" [class.active]="setupCastling.blackQueenSide" [disabled]="!canSetupCastle('blackQueenSide')" (click)="toggleCastlingRight('blackQueenSide')">q</button>
+              </div>
+            </div>
+          </div>
+          <div class="meta-block">
+            <span class="meta-label">En passant</span>
+            <label class="ep-label">
+              <select [value]="setupEnPassant" (change)="onSetupEnPassantSelected(($any($event.target)).value)">
+                <option value="-">None</option>
+                @for (square of getSetupEnPassantOptions(); track square) {
+                  <option [value]="square">{{ square }}</option>
+                }
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="setup-actions">
+          <button type="button" class="tool-btn icon-only" (click)="flipBoard()" aria-label="Reverse board">&#8635;</button>
+          <button type="button" class="tool-btn" (click)="applyStartingPositionPreset()">Starting position</button>
+          <button type="button" class="tool-btn clear" (click)="clearPosition()">Clear</button>
+          <button type="button" class="tool-btn" (click)="cancelSetupMode()">Cancel</button>
+          <button type="button" class="tool-btn primary" (click)="saveSetupMode()">Save</button>
+        </div>
+      </div>
+    }
   </div>
 </article>

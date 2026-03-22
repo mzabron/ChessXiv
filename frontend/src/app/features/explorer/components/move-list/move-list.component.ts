@@ -4,7 +4,7 @@ export interface MoveRow {
   number: number;
   white: string;
   black: string;
-  whitePly: number;
+  whitePly: number | null;
   blackPly: number | null;
 }
 

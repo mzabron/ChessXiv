@@ -11,6 +11,15 @@ interface ChessPiece {
   y: number;
 }
 
+interface SetupSnapshot {
+  startFen: string;
+  currentFen: string;
+  fenHistory: string[];
+  sanHistory: string[];
+  currentPly: number;
+  pieces: ChessPiece[];
+}
+
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 const PIECE_URLS: Record<string, string> = {
@@ -42,6 +51,8 @@ export class ChessboardComponent implements OnChanges {
 
   protected readonly ranks = [8, 7, 6, 5, 4, 3, 2, 1];
   protected readonly files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+  protected readonly whiteSetupPieces = ['wk', 'wq', 'wr', 'wb', 'wn', 'wp'];
+  protected readonly blackSetupPieces = ['bk', 'bq', 'br', 'bb', 'bn', 'bp'];
 
   @Input() navigationRequest: { ply: number; version: number } | null = null;
 
@@ -52,12 +63,25 @@ export class ChessboardComponent implements OnChanges {
   protected selectedSquare: string | null = null;
   protected statusMessage: string | null = null;
   protected isSubmittingMove = false;
+  protected isSetupMode = false;
+  protected setupTool: 'hand' | 'delete' | 'place' = 'hand';
+  protected setupSelectedPieceType: string | null = null;
+  protected setupCastling = {
+    whiteKingSide: true,
+    whiteQueenSide: true,
+    blackKingSide: true,
+    blackQueenSide: true
+  };
+  protected setupEnPassant = '-';
+  protected setupSideToMove: 'w' | 'b' = 'w';
 
+  private startFen = START_FEN;
   private currentFen = START_FEN;
   private fenHistory: string[] = [START_FEN];
   private sanHistory: string[] = [];
   private currentPly = 0;
   private isFlipped = false;
+  private setupSnapshot: SetupSnapshot | null = null;
   private activeDrag: {
     pieceId: string;
     sourceSquare: string;
@@ -108,11 +132,41 @@ export class ChessboardComponent implements OnChanges {
     }
 
     const square = this.displayCoordsToSquare(fileIndex, rankIndex);
+
+    if (this.isSetupMode) {
+      this.handleSetupSquareClick(square);
+      return;
+    }
+
     this.handleSquareInteraction(square);
   }
 
   protected onPiecePointerDown(piece: ChessPiece, event: PointerEvent): void {
     event.stopPropagation();
+
+    if (this.isSetupMode) {
+      const setupSource = this.coordsToSquare(piece.x, piece.y);
+
+      if (this.setupTool === 'delete') {
+        this.removePieceAtSquare(setupSource);
+        return;
+      }
+
+      if (this.setupTool !== 'hand') {
+        return;
+      }
+
+      this.activeDrag = {
+        pieceId: piece.id,
+        sourceSquare: setupSource,
+        startX: event.clientX,
+        startY: event.clientY,
+        deltaX: 0,
+        deltaY: 0,
+        moved: false
+      };
+      return;
+    }
 
     const sourceSquare = this.coordsToSquare(piece.x, piece.y);
     if (!this.canSelectSquare(sourceSquare) || this.isSubmittingMove) {
@@ -155,6 +209,10 @@ export class ChessboardComponent implements OnChanges {
     this.activeDrag = null;
 
     if (!drag.moved) {
+      if (this.isSetupMode) {
+        return;
+      }
+
       this.handleSquareInteraction(drag.sourceSquare);
       return;
     }
@@ -162,6 +220,11 @@ export class ChessboardComponent implements OnChanges {
     this.suppressNextSquareClick = true;
     const targetSquare = this.getSquareFromClientPoint(event.clientX, event.clientY);
     if (!targetSquare || targetSquare === drag.sourceSquare || this.isSubmittingMove) {
+      return;
+    }
+
+    if (this.isSetupMode) {
+      this.movePiece(drag.sourceSquare, targetSquare);
       return;
     }
 
@@ -191,25 +254,203 @@ export class ChessboardComponent implements OnChanges {
   }
 
   protected goPreviousMove(): void {
+    if (this.isSetupMode) {
+      return;
+    }
+
     this.navigateToPly(this.currentPly - 1);
   }
 
   protected goNextMove(): void {
+    if (this.isSetupMode) {
+      return;
+    }
+
     this.navigateToPly(this.currentPly + 1);
   }
 
   protected goToGameStart(): void {
+    if (this.isSetupMode) {
+      return;
+    }
+
     this.navigateToPly(0);
   }
 
   protected goToGameEnd(): void {
+    if (this.isSetupMode) {
+      return;
+    }
+
     this.navigateToPly(this.sanHistory.length);
   }
 
-  protected setPosition(): void {}
+  protected setPosition(): void {
+    this.startSetupMode();
+  }
 
   protected clearPosition(): void {
+    if (this.isSetupMode) {
+      this.pieces = [];
+      this.normalizeSetupMetadata();
+      return;
+    }
+
     this.resetGame();
+  }
+
+  protected startSetupMode(): void {
+    if (this.isSetupMode) {
+      return;
+    }
+
+    this.setupSnapshot = {
+      startFen: this.startFen,
+      currentFen: this.currentFen,
+      fenHistory: [...this.fenHistory],
+      sanHistory: [...this.sanHistory],
+      currentPly: this.currentPly,
+      pieces: this.pieces.map(piece => ({ ...piece }))
+    };
+
+    this.isSetupMode = true;
+    this.selectedSquare = null;
+    this.statusMessage = null;
+    this.setupTool = 'hand';
+    this.setupSelectedPieceType = null;
+    this.activeDrag = null;
+    this.initializeSetupMetadataFromFen(this.currentFen);
+  }
+
+  protected cancelSetupMode(): void {
+    if (!this.isSetupMode || !this.setupSnapshot) {
+      return;
+    }
+
+    this.startFen = this.setupSnapshot.startFen;
+    this.currentFen = this.setupSnapshot.currentFen;
+    this.fenHistory = [...this.setupSnapshot.fenHistory];
+    this.sanHistory = [...this.setupSnapshot.sanHistory];
+    this.currentPly = this.setupSnapshot.currentPly;
+    this.pieces = this.setupSnapshot.pieces.map(piece => ({ ...piece }));
+
+    this.exitSetupMode();
+    this.emitNavigationState();
+  }
+
+  protected saveSetupMode(): void {
+    if (!this.isSetupMode) {
+      return;
+    }
+
+    const builtFen = this.buildFenFromSetup();
+    this.startFen = builtFen;
+    this.currentFen = builtFen;
+    this.fenHistory = [builtFen];
+    this.sanHistory = [];
+    this.currentPly = 0;
+    this.pieces = this.parseFenToPieces(this.currentFen);
+
+    this.exitSetupMode();
+    this.statusMessage = null;
+    this.emitMoveRows();
+    this.emitNavigationState();
+  }
+
+  protected selectSetupPiece(type: string): void {
+    this.setupTool = 'place';
+    this.setupSelectedPieceType = type;
+  }
+
+  protected selectSetupTool(tool: 'hand' | 'delete'): void {
+    this.setupTool = tool;
+    this.setupSelectedPieceType = null;
+  }
+
+  protected isSetupPieceSelected(type: string): boolean {
+    return this.setupTool === 'place' && this.setupSelectedPieceType === type;
+  }
+
+  protected isSetupToolSelected(tool: 'hand' | 'delete'): boolean {
+    return this.setupTool === tool;
+  }
+
+  protected toggleCastlingRight(key: 'whiteKingSide' | 'whiteQueenSide' | 'blackKingSide' | 'blackQueenSide'): void {
+    if (!this.canSetupCastle(key)) {
+      return;
+    }
+
+    this.setupCastling[key] = !this.setupCastling[key];
+  }
+
+  protected canSetupCastle(key: 'whiteKingSide' | 'whiteQueenSide' | 'blackKingSide' | 'blackQueenSide'): boolean {
+    return this.computeCastleAvailability(key);
+  }
+
+  protected onSetupEnPassantSelected(value: string): void {
+    this.setupEnPassant = value && value !== '-' ? value : '-';
+  }
+
+  protected getSetupEnPassantOptions(): string[] {
+    const options: string[] = [];
+
+    if (this.setupSideToMove === 'w') {
+      for (let file = 0; file < 8; file++) {
+        const blackPawnSquare = this.coordsToSquare(file, 3);
+        const blackPawn = this.getPieceAtSquare(blackPawnSquare);
+        if (!blackPawn || blackPawn.type !== 'bp') {
+          continue;
+        }
+
+        const leftWhite = file > 0 ? this.getPieceAtSquare(this.coordsToSquare(file - 1, 3)) : null;
+        const rightWhite = file < 7 ? this.getPieceAtSquare(this.coordsToSquare(file + 1, 3)) : null;
+        const canCapture = leftWhite?.type === 'wp' || rightWhite?.type === 'wp';
+        if (!canCapture) {
+          continue;
+        }
+
+        options.push(this.coordsToSquare(file, 2));
+      }
+    } else {
+      for (let file = 0; file < 8; file++) {
+        const whitePawnSquare = this.coordsToSquare(file, 4);
+        const whitePawn = this.getPieceAtSquare(whitePawnSquare);
+        if (!whitePawn || whitePawn.type !== 'wp') {
+          continue;
+        }
+
+        const leftBlack = file > 0 ? this.getPieceAtSquare(this.coordsToSquare(file - 1, 4)) : null;
+        const rightBlack = file < 7 ? this.getPieceAtSquare(this.coordsToSquare(file + 1, 4)) : null;
+        const canCapture = leftBlack?.type === 'bp' || rightBlack?.type === 'bp';
+        if (!canCapture) {
+          continue;
+        }
+
+        options.push(this.coordsToSquare(file, 5));
+      }
+    }
+
+    return options;
+  }
+
+  protected setSetupSideToMove(side: 'w' | 'b'): void {
+    this.setupSideToMove = side;
+    this.normalizeSetupEnPassantSelection();
+  }
+
+  protected applyStartingPositionPreset(): void {
+    this.pieces = this.parseFenToPieces(START_FEN);
+    this.setupCastling = {
+      whiteKingSide: true,
+      whiteQueenSide: true,
+      blackKingSide: true,
+      blackQueenSide: true
+    };
+    this.setupEnPassant = '-';
+    this.setupSideToMove = 'w';
+    this.setupTool = 'hand';
+    this.setupSelectedPieceType = null;
+    this.normalizeSetupMetadata();
   }
 
   private handleSquareInteraction(square: string): void {
@@ -284,9 +525,9 @@ export class ChessboardComponent implements OnChanges {
 
   private resetGame(): void {
     this.sanHistory = [];
-    this.fenHistory = [START_FEN];
+    this.fenHistory = [this.startFen];
     this.currentPly = 0;
-    this.currentFen = START_FEN;
+    this.currentFen = this.startFen;
     this.pieces = this.parseFenToPieces(this.currentFen);
     this.selectedSquare = null;
     this.statusMessage = null;
@@ -343,19 +584,309 @@ export class ChessboardComponent implements OnChanges {
   private emitMoveRows(): void {
     const rows: MoveRow[] = [];
 
-    for (let i = 0; i < this.sanHistory.length; i += 2) {
-      const whitePly = i + 1;
-      const blackPly = i + 2;
-      rows.push({
-        number: Math.floor(i / 2) + 1,
-        white: this.sanHistory[i] ?? '',
-        black: this.sanHistory[i + 1] ?? '',
-        whitePly,
-        blackPly: this.sanHistory[i + 1] ? blackPly : null
-      });
+    const startSide = this.getStartSideToMove();
+    let side: 'w' | 'b' = startSide;
+    let moveNumber = 1;
+    let openRow: MoveRow | null = null;
+
+    for (let i = 0; i < this.sanHistory.length; i++) {
+      const san = this.sanHistory[i] ?? '';
+      const ply = i + 1;
+
+      if (side === 'w') {
+        openRow = {
+          number: moveNumber,
+          white: san,
+          black: '',
+          whitePly: ply,
+          blackPly: null
+        };
+        side = 'b';
+        continue;
+      }
+
+      if (!openRow) {
+        rows.push({
+          number: moveNumber,
+          white: '...',
+          black: san,
+          whitePly: null,
+          blackPly: ply
+        });
+      } else {
+        openRow.black = san;
+        openRow.blackPly = ply;
+        rows.push(openRow);
+      }
+
+      moveNumber++;
+      openRow = null;
+      side = 'w';
+    }
+
+    if (openRow) {
+      rows.push(openRow);
     }
 
     this.moveRowsChanged.emit(rows);
+  }
+
+  private getStartSideToMove(): 'w' | 'b' {
+    const parts = this.startFen.split(' ');
+    return parts[1] === 'b' ? 'b' : 'w';
+  }
+
+  private handleSetupSquareClick(square: string): void {
+    if (this.setupTool === 'delete') {
+      this.removePieceAtSquare(square);
+      return;
+    }
+
+    if (this.setupTool === 'place' && this.setupSelectedPieceType) {
+      this.placePiece(square, this.setupSelectedPieceType);
+    }
+  }
+
+  private placePiece(square: string, type: string): void {
+    if (!this.isValidPieceType(type)) {
+      return;
+    }
+
+    this.removePieceAtSquare(square);
+    const coords = this.squareToCoords(square);
+    if (!coords) {
+      return;
+    }
+
+    this.pieces = [
+      ...this.pieces,
+      {
+        id: `${type}-${square}`,
+        type,
+        x: coords.x,
+        y: coords.y
+      }
+    ];
+
+    this.normalizeSetupMetadata();
+  }
+
+  private removePieceAtSquare(square: string): void {
+    this.pieces = this.pieces.filter(piece => this.coordsToSquare(piece.x, piece.y) !== square);
+    this.normalizeSetupMetadata();
+  }
+
+  private movePiece(fromSquare: string, toSquare: string): void {
+    if (fromSquare === toSquare) {
+      return;
+    }
+
+    const movingPiece = this.getPieceAtSquare(fromSquare);
+    if (!movingPiece) {
+      return;
+    }
+
+    this.removePieceAtSquare(toSquare);
+    const coords = this.squareToCoords(toSquare);
+    if (!coords) {
+      return;
+    }
+
+    this.pieces = this.pieces.map(piece => {
+      if (piece.id !== movingPiece.id) {
+        return piece;
+      }
+
+      return {
+        ...piece,
+        id: `${piece.type}-${toSquare}`,
+        x: coords.x,
+        y: coords.y
+      };
+    });
+
+    this.normalizeSetupMetadata();
+  }
+
+  private initializeSetupMetadataFromFen(fen: string): void {
+    const parts = fen.trim().split(' ');
+    const sideToMove = parts[1] ?? 'w';
+    const castling = parts[2] ?? '-';
+    const enPassant = parts[3] ?? '-';
+
+    this.setupCastling = {
+      whiteKingSide: castling.includes('K'),
+      whiteQueenSide: castling.includes('Q'),
+      blackKingSide: castling.includes('k'),
+      blackQueenSide: castling.includes('q')
+    };
+
+    this.setupEnPassant = this.isValidSquareNotation(enPassant) ? enPassant : '-';
+    this.setupSideToMove = sideToMove === 'b' ? 'b' : 'w';
+    this.normalizeSetupMetadata();
+  }
+
+  private buildFenFromSetup(): string {
+    const board: string[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => ''));
+
+    for (const piece of this.pieces) {
+      const fenChar = this.pieceTypeToFenChar(piece.type);
+      if (!fenChar) {
+        continue;
+      }
+
+      const rank = 7 - piece.y;
+      const file = piece.x;
+      if (rank < 0 || rank > 7 || file < 0 || file > 7) {
+        continue;
+      }
+
+      board[rank][file] = fenChar;
+    }
+
+    const placementParts: string[] = [];
+    for (let rank = 7; rank >= 0; rank--) {
+      let row = '';
+      let empties = 0;
+
+      for (let file = 0; file < 8; file++) {
+        const piece = board[rank][file];
+        if (!piece) {
+          empties++;
+          continue;
+        }
+
+        if (empties > 0) {
+          row += String(empties);
+          empties = 0;
+        }
+
+        row += piece;
+      }
+
+      if (empties > 0) {
+        row += String(empties);
+      }
+
+      placementParts.push(row);
+    }
+
+    const castling =
+      `${this.setupCastling.whiteKingSide ? 'K' : ''}` +
+      `${this.setupCastling.whiteQueenSide ? 'Q' : ''}` +
+      `${this.setupCastling.blackKingSide ? 'k' : ''}` +
+      `${this.setupCastling.blackQueenSide ? 'q' : ''}`;
+
+    const sideToMove = this.setupSideToMove;
+    const fenCastling = castling || '-';
+    const fenEnPassant = this.isValidSquareNotation(this.setupEnPassant) ? this.setupEnPassant : '-';
+
+    return `${placementParts.join('/')} ${sideToMove} ${fenCastling} ${fenEnPassant} 0 1`;
+  }
+
+  private pieceTypeToFenChar(type: string): string | null {
+    const map: Record<string, string> = {
+      wk: 'K',
+      wq: 'Q',
+      wr: 'R',
+      wb: 'B',
+      wn: 'N',
+      wp: 'P',
+      bk: 'k',
+      bq: 'q',
+      br: 'r',
+      bb: 'b',
+      bn: 'n',
+      bp: 'p'
+    };
+
+    return map[type] ?? null;
+  }
+
+  private squareToCoords(square: string): { x: number; y: number } | null {
+    if (!this.isValidSquareNotation(square)) {
+      return null;
+    }
+
+    const x = square.charCodeAt(0) - 'a'.charCodeAt(0);
+    const rank = Number(square[1]);
+    return { x, y: 8 - rank };
+  }
+
+  private isValidSquareNotation(value: string): boolean {
+    return /^[a-h][1-8]$/.test(value);
+  }
+
+  private isValidPieceType(value: string): boolean {
+    return Object.hasOwn(PIECE_URLS, value);
+  }
+
+  private normalizeSetupEnPassantSelection(): void {
+    const options = this.getSetupEnPassantOptions();
+    if (this.setupEnPassant === '-') {
+      return;
+    }
+
+    if (!options.includes(this.setupEnPassant)) {
+      this.setupEnPassant = '-';
+    }
+  }
+
+  private normalizeSetupCastlingAvailability(): void {
+    if (!this.computeCastleAvailability('whiteKingSide')) {
+      this.setupCastling.whiteKingSide = false;
+    }
+
+    if (!this.computeCastleAvailability('whiteQueenSide')) {
+      this.setupCastling.whiteQueenSide = false;
+    }
+
+    if (!this.computeCastleAvailability('blackKingSide')) {
+      this.setupCastling.blackKingSide = false;
+    }
+
+    if (!this.computeCastleAvailability('blackQueenSide')) {
+      this.setupCastling.blackQueenSide = false;
+    }
+  }
+
+  private normalizeSetupMetadata(): void {
+    this.normalizeSetupCastlingAvailability();
+    this.normalizeSetupEnPassantSelection();
+  }
+
+  private computeCastleAvailability(key: 'whiteKingSide' | 'whiteQueenSide' | 'blackKingSide' | 'blackQueenSide'): boolean {
+    const whiteKingOnE1 = this.getPieceTypeAtSquare('e1') === 'wk';
+    const blackKingOnE8 = this.getPieceTypeAtSquare('e8') === 'bk';
+
+    if (key === 'whiteKingSide') {
+      return whiteKingOnE1 && this.getPieceTypeAtSquare('h1') === 'wr';
+    }
+
+    if (key === 'whiteQueenSide') {
+      return whiteKingOnE1 && this.getPieceTypeAtSquare('a1') === 'wr';
+    }
+
+    if (key === 'blackKingSide') {
+      return blackKingOnE8 && this.getPieceTypeAtSquare('h8') === 'br';
+    }
+
+    return blackKingOnE8 && this.getPieceTypeAtSquare('a8') === 'br';
+  }
+
+  private getPieceTypeAtSquare(square: string): string | null {
+    return this.getPieceAtSquare(square)?.type ?? null;
+  }
+
+  private exitSetupMode(): void {
+    this.isSetupMode = false;
+    this.setupSnapshot = null;
+    this.setupTool = 'hand';
+    this.setupSelectedPieceType = null;
+    this.setupEnPassant = '-';
+    this.setupSideToMove = 'w';
+    this.activeDrag = null;
+    this.selectedSquare = null;
   }
 
   private canSelectSquare(square: string): boolean {

@@ -44,6 +44,55 @@
   font: 600 0.8rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
 }
 
+.setup-strip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.2rem;
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid #dbcdb6;
+  background: #f4efe3;
+}
+
+.setup-strip.bottom {
+  border-top: 1px solid #dbcdb6;
+  border-bottom: 0;
+}
+
+.setup-piece,
+.setup-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  border: 1px solid #d5c6ad;
+  border-radius: 8px;
+  background: #efe7d8;
+  cursor: pointer;
+  padding: 0.12rem;
+}
+
+.setup-piece img {
+  width: 1.8rem;
+  height: 1.8rem;
+}
+
+.setup-tool {
+  color: #4c3827;
+}
+
+.setup-tool .material-symbols-outlined {
+  font-size: 1.5rem;
+  line-height: 1;
+  font-variation-settings: 'OPSZ' 24, 'wght' 450, 'FILL' 0, 'GRAD' 0;
+}
+
+.setup-piece.active,
+.setup-tool.active {
+  border-color: #9f7f55;
+  box-shadow: inset 0 0 0 2px #c5a571;
+  background: #e8dcc7;
+}
+
 .board-toolbar {
   display: flex;
   justify-content: space-between;
@@ -65,6 +114,11 @@
 
 .tool-btn {
   padding: 0.4rem 0.62rem;
+}
+
+.tool-btn.primary {
+  background: #d9c39e;
+  border-color: #bea073;
 }
 
 .move-controls {
@@ -171,6 +225,109 @@
   color: #5e4b39;
 }
 
+.setup-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.setup-meta,
+.setup-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.setup-meta {
+  flex-wrap: wrap;
+}
+
+.meta-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.08rem 0.15rem;
+  border-radius: 7px;
+}
+
+.meta-label {
+  color: #6a5541;
+  font: 700 0.66rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.turn-group {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-right: 0.08rem;
+}
+
+.meta-chip.turn {
+  min-width: 2.55rem;
+}
+
+.castling-group {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.castle-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.castle-label {
+  color: #6a5541;
+  font: 700 0.65rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.meta-chip {
+  min-width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid #cfbfa5;
+  border-radius: 7px;
+  background: #eee5d6;
+  color: #4a3828;
+  font: 700 0.76rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
+  cursor: pointer;
+}
+
+.meta-chip.active {
+  background: #ddc4a0;
+  border-color: #b69669;
+}
+
+.meta-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ep-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.ep-label select {
+  width: 4.2rem;
+  height: 1.7rem;
+  border: 1px solid #cfbfa5;
+  border-radius: 7px;
+  background: #f4ecde;
+  text-align: center;
+  font: 700 0.75rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  color: #3f2f23;
+  padding: 0 0.25rem;
+}
+
 .square {
   position: relative;
   cursor: pointer;
@@ -210,17 +367,52 @@
   .board-grid {
     margin: 0 auto;
   }
+
+  .setup-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 :host-context(body.dark-theme) {
   .player-strip { color: var(--text); }
   .player-rating { color: var(--muted); }
   .player-clock { color: #a1a1aa; }
+  .setup-strip {
+    background: #1f2937;
+    border-color: #374151;
+  }
+  .setup-piece,
+  .setup-tool {
+    border-color: #4b5563;
+    background: #111827;
+  }
+  .setup-piece.active,
+  .setup-tool.active {
+    border-color: #ca8a04;
+    box-shadow: inset 0 0 0 2px #a16207;
+    background: #2f2a1a;
+  }
+  .setup-tool { color: #e5e7eb; }
+  .meta-block { background: transparent; }
+  .meta-label { color: #a1a1aa; }
   .tool-btn,
   .icon-btn { border-color: var(--line); background: var(--panel); color: var(--accent-strong); }
+  .tool-btn.primary { background: #3f3f46; border-color: #52525b; }
   .icon-single,
   .icon-double { color: var(--text); }
   .tool-btn.clear { background: var(--line); color: var(--text); }
+  .meta-chip,
+  .ep-label select {
+    border-color: #52525b;
+    background: #18181b;
+    color: #e4e4e7;
+  }
+  .castle-label { color: #a1a1aa; }
+  .meta-chip.active {
+    background: #3f3f46;
+    border-color: #a16207;
+  }
+  .ep-label { color: #cbd5e1; }
   .file-label,
   .rank-label { color: rgba(255, 255, 255, 0.45); }
   .square.selected { box-shadow: inset 0 0 0 3px #facc15; }
