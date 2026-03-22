@@ -17,11 +17,11 @@
             [class.dark]="(rankIndex + fileIndex) % 2 !== 0"
             [class.selected]="isSelectedDisplaySquare(fileIndex, rankIndex)"
             (click)="onSquareClick(fileIndex, rankIndex)">
-            @if (rank === 1) {
-              <span class="file-label">{{ file }}</span>
+            @if (rankIndex === 7) {
+              <span class="file-label">{{ getDisplayedFileLabel(fileIndex) }}</span>
             }
-            @if (file === 'a') {
-              <span class="rank-label">{{ rank }}</span>
+            @if (fileIndex === 0) {
+              <span class="rank-label">{{ getDisplayedRankLabel(rankIndex) }}</span>
             }
           </div>
         }

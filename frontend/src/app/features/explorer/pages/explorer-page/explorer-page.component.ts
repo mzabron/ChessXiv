@@ -25,7 +25,9 @@ export class ExplorerPageComponent {
 
   protected gamesLoaded = false;
   protected moveRows: MoveRow[] = [];
-  protected plyCount = 0;
+  protected currentPly = 0;
+  protected navigationRequest: { ply: number; version: number } | null = null;
+  private navigationVersion = 0;
   protected mockGames: any[] = [
     {
       year: 2023,
@@ -120,46 +122,16 @@ export class ExplorerPageComponent {
     console.log('Search database (community database)');
   }
 
-  protected onMoveApplied(san: string): void {
-    const whiteToMove = this.plyCount % 2 === 0;
-
-    if (whiteToMove) {
-      this.moveRows = [
-        ...this.moveRows,
-        {
-          number: this.moveRows.length + 1,
-          white: san,
-          black: ''
-        }
-      ];
-      this.plyCount++;
-      return;
-    }
-
-    const lastRow = this.moveRows.at(-1);
-    if (!lastRow) {
-      this.moveRows = [
-        {
-          number: 1,
-          white: san,
-          black: ''
-        }
-      ];
-      return;
-    }
-
-    this.moveRows = [
-      ...this.moveRows.slice(0, -1),
-      {
-        ...lastRow,
-        black: san
-      }
-    ];
-    this.plyCount++;
+  protected onMoveRowsChanged(moveRows: MoveRow[]): void {
+    this.moveRows = moveRows;
   }
 
-  protected clearMoveHistory(): void {
-    this.moveRows = [];
-    this.plyCount = 0;
+  protected onCurrentPlyChanged(ply: number): void {
+    this.currentPly = ply;
+  }
+
+  protected onPlySelected(ply: number): void {
+    this.navigationVersion++;
+    this.navigationRequest = { ply, version: this.navigationVersion };
   }
 }

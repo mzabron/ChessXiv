@@ -1,7 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, ElementRef, EventEmitter, HostListener, Output, ViewChild, inject } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, OnChanges, Output, SimpleChanges, ViewChild, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ExplorerBoardApiService } from '../../services/explorer-board-api.service';
+import { MoveRow } from '../move-list/move-list.component';
 
 interface ChessPiece {
   id: string;
@@ -33,7 +34,7 @@ const PIECE_URLS: Record<string, string> = {
   templateUrl: './chessboard.component.html',
   styleUrl: './chessboard.component.scss'
 })
-export class ChessboardComponent {
+export class ChessboardComponent implements OnChanges {
   private readonly boardApi = inject(ExplorerBoardApiService);
 
   @ViewChild('boardGrid', { static: true })
@@ -42,8 +43,10 @@ export class ChessboardComponent {
   protected readonly ranks = [8, 7, 6, 5, 4, 3, 2, 1];
   protected readonly files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 
-  @Output() readonly moveApplied = new EventEmitter<string>();
-  @Output() readonly historyCleared = new EventEmitter<void>();
+  @Input() navigationRequest: { ply: number; version: number } | null = null;
+
+  @Output() readonly moveRowsChanged = new EventEmitter<MoveRow[]>();
+  @Output() readonly currentPlyChanged = new EventEmitter<number>();
 
   pieces: ChessPiece[] = [];
   protected selectedSquare: string | null = null;
@@ -51,6 +54,9 @@ export class ChessboardComponent {
   protected isSubmittingMove = false;
 
   private currentFen = START_FEN;
+  private fenHistory: string[] = [START_FEN];
+  private sanHistory: string[] = [];
+  private currentPly = 0;
   private isFlipped = false;
   private activeDrag: {
     pieceId: string;
@@ -65,6 +71,12 @@ export class ChessboardComponent {
 
   constructor() {
     this.pieces = this.parseFenToPieces(this.currentFen);
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if ('navigationRequest' in changes && this.navigationRequest) {
+      this.navigateToPly(this.navigationRequest.ply);
+    }
   }
 
   getPieceUrl(type: string): string {
@@ -170,13 +182,32 @@ export class ChessboardComponent {
     return this.displayCoordsToSquare(fileIndex, rankIndex) === this.selectedSquare;
   }
 
-  protected goPreviousMove(): void {}
-  protected goNextMove(): void {}
-  protected goToGameStart(): void {
-    this.resetGame();
+  protected getDisplayedFileLabel(fileIndex: number): string {
+    return this.files[this.isFlipped ? 7 - fileIndex : fileIndex] ?? '';
   }
-  protected goToGameEnd(): void {}
+
+  protected getDisplayedRankLabel(rankIndex: number): number {
+    return this.isFlipped ? rankIndex + 1 : 8 - rankIndex;
+  }
+
+  protected goPreviousMove(): void {
+    this.navigateToPly(this.currentPly - 1);
+  }
+
+  protected goNextMove(): void {
+    this.navigateToPly(this.currentPly + 1);
+  }
+
+  protected goToGameStart(): void {
+    this.navigateToPly(0);
+  }
+
+  protected goToGameEnd(): void {
+    this.navigateToPly(this.sanHistory.length);
+  }
+
   protected setPosition(): void {}
+
   protected clearPosition(): void {
     this.resetGame();
   }
@@ -225,11 +256,7 @@ export class ChessboardComponent {
         return;
       }
 
-      this.currentFen = response.fen;
-      this.pieces = this.parseFenToPieces(this.currentFen);
-      if (response.san) {
-        this.moveApplied.emit(response.san);
-      }
+      this.applySuccessfulMove(response.fen, response.san ?? `${from}${to}`);
     } catch (error) {
       this.statusMessage = this.resolveBackendErrorMessage(error);
     } finally {
@@ -256,11 +283,79 @@ export class ChessboardComponent {
   }
 
   private resetGame(): void {
+    this.sanHistory = [];
+    this.fenHistory = [START_FEN];
+    this.currentPly = 0;
     this.currentFen = START_FEN;
     this.pieces = this.parseFenToPieces(this.currentFen);
     this.selectedSquare = null;
     this.statusMessage = null;
-    this.historyCleared.emit();
+    this.emitNavigationState();
+    this.emitMoveRows();
+  }
+
+  private applySuccessfulMove(nextFen: string, san: string): void {
+    const continuationFen = this.fenHistory[this.currentPly + 1];
+    if (this.currentPly < this.sanHistory.length && continuationFen === nextFen) {
+      this.currentPly++;
+      this.currentFen = nextFen;
+      this.pieces = this.parseFenToPieces(this.currentFen);
+      this.emitNavigationState();
+      return;
+    }
+
+    if (this.currentPly < this.sanHistory.length) {
+      this.sanHistory = this.sanHistory.slice(0, this.currentPly);
+      this.fenHistory = this.fenHistory.slice(0, this.currentPly + 1);
+    }
+
+    this.sanHistory = [...this.sanHistory, san];
+    this.fenHistory = [...this.fenHistory, nextFen];
+    this.currentPly = this.sanHistory.length;
+    this.currentFen = nextFen;
+    this.pieces = this.parseFenToPieces(this.currentFen);
+    this.emitMoveRows();
+    this.emitNavigationState();
+  }
+
+  private navigateToPly(targetPly: number): void {
+    if (!Number.isFinite(targetPly)) {
+      return;
+    }
+
+    const clamped = Math.max(0, Math.min(Math.trunc(targetPly), this.sanHistory.length));
+    if (clamped === this.currentPly) {
+      return;
+    }
+
+    this.currentPly = clamped;
+    this.currentFen = this.fenHistory[this.currentPly] ?? START_FEN;
+    this.pieces = this.parseFenToPieces(this.currentFen);
+    this.selectedSquare = null;
+    this.statusMessage = null;
+    this.emitNavigationState();
+  }
+
+  private emitNavigationState(): void {
+    this.currentPlyChanged.emit(this.currentPly);
+  }
+
+  private emitMoveRows(): void {
+    const rows: MoveRow[] = [];
+
+    for (let i = 0; i < this.sanHistory.length; i += 2) {
+      const whitePly = i + 1;
+      const blackPly = i + 2;
+      rows.push({
+        number: Math.floor(i / 2) + 1,
+        white: this.sanHistory[i] ?? '',
+        black: this.sanHistory[i + 1] ?? '',
+        whitePly,
+        blackPly: this.sanHistory[i + 1] ? blackPly : null
+      });
+    }
+
+    this.moveRowsChanged.emit(rows);
   }
 
   private canSelectSquare(square: string): boolean {
