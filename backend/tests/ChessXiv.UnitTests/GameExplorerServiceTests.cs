@@ -145,6 +145,35 @@ public class GameExplorerServiceTests
     }
 
     [Fact]
+    public async Task SearchAsync_ReturnsData_WhenUserDatabaseIsPublic()
+    {
+        var playerRepository = new FakePlayerRepository();
+        var explorerRepository = new FakeGameExplorerRepository
+        {
+            AccessStatus = UserDatabaseAccessStatus.Accessible,
+            Response = new PagedResult<GameExplorerItemDto>
+            {
+                TotalCount = 1,
+                Items = [new GameExplorerItemDto { GameId = Guid.NewGuid(), White = "Public", Black = "Database", Result = "1-0" }]
+            }
+        };
+
+        var service = new GameExplorerService(
+            explorerRepository,
+            playerRepository,
+            new FakeBoardStateSerializer(),
+            new FakePositionHasher());
+
+        var result = await service.SearchAsync(new GameExplorerSearchRequest
+        {
+            UserDatabaseId = Guid.NewGuid()
+        }, "user-a");
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, explorerRepository.CallCount);
+    }
+
+    [Fact]
     public async Task SearchAsync_GuestWithoutUserDatabaseId_DelegatesToRepository()
     {
         var playerRepository = new FakePlayerRepository();

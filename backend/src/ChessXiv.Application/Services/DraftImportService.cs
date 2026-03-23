@@ -49,38 +49,48 @@ public sealed class DraftImportService(
         var batch = new List<StagingGame>(batchSize);
         var remainingCapacity = maxDraftImportGames - existingCount;
 
-        await foreach (var parsedGame in pgnParser.ParsePgnAsync(reader, cancellationToken))
+        await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+
+        try
         {
-            parsedCount++;
-            if (string.IsNullOrWhiteSpace(parsedGame.White) || string.IsNullOrWhiteSpace(parsedGame.Black))
+            await foreach (var parsedGame in pgnParser.ParsePgnAsync(reader, cancellationToken))
             {
-                skippedCount++;
-                continue;
+                parsedCount++;
+                if (string.IsNullOrWhiteSpace(parsedGame.White) || string.IsNullOrWhiteSpace(parsedGame.Black))
+                {
+                    skippedCount++;
+                    continue;
+                }
+
+                if (importedCount >= remainingCapacity)
+                {
+                    throw new InvalidOperationException($"Import exceeds allowed draft quota ({maxDraftImportGames} games). No games were imported.");
+                }
+
+                var stagingGame = MapToStagingGame(parsedGame, session.Id, ownerUserId);
+                batch.Add(stagingGame);
+                importedCount++;
+
+                if (batch.Count >= batchSize)
+                {
+                    await PersistBatchAsync(batch, cancellationToken);
+                    batch.Clear();
+                }
             }
 
-            if (importedCount >= remainingCapacity)
-            {
-                skippedCount++;
-                break;
-            }
-
-            var stagingGame = MapToStagingGame(parsedGame, session.Id, ownerUserId);
-            batch.Add(stagingGame);
-            importedCount++;
-
-            if (batch.Count >= batchSize)
+            if (batch.Count > 0)
             {
                 await PersistBatchAsync(batch, cancellationToken);
-                batch.Clear();
             }
-        }
 
-        if (batch.Count > 0)
+            await transaction.CommitAsync(cancellationToken);
+            return new DraftImportResult(session.Id, parsedCount, importedCount, skippedCount, session.ExpiresAtUtc);
+        }
+        catch
         {
-            await PersistBatchAsync(batch, cancellationToken);
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
         }
-
-        return new DraftImportResult(session.Id, parsedCount, importedCount, skippedCount, session.ExpiresAtUtc);
     }
 
     private async Task<StagingImportSession> GetOrCreateSessionAsync(

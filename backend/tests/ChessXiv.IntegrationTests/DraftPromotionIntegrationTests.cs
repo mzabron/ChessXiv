@@ -17,6 +17,23 @@ namespace ChessXiv.IntegrationTests;
 public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
 {
     [Fact]
+    public async Task DraftImport_WhenQuotaExceeded_ImportsNothing_AndThrowsLimitMessage()
+    {
+        await fixture.ResetDatabaseAsync();
+
+        await using var dbContext = fixture.CreateDbContext();
+        var (ownerId, _) = await CreateOwnerAndDatabaseAsync(dbContext, "quota-user");
+        var importService = CreateDraftImportService(dbContext, quota: 10);
+
+        using var reader = new StringReader(BuildPgnGames(15));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            importService.ImportAsync(reader, ownerId, batchSize: 5));
+
+        Assert.Contains("10", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, await dbContext.StagingGames.CountAsync());
+    }
+
+    [Fact]
     public async Task DraftImport_NewSession_ClearsPreviousUnpromotedDraftData()
     {
         await fixture.ResetDatabaseAsync();
@@ -311,7 +328,7 @@ public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
         Assert.Equal(1001, await dbContext.UserDatabaseGames.CountAsync());
     }
 
-    private static DraftImportService CreateDraftImportService(ChessXivDbContext dbContext)
+    private static DraftImportService CreateDraftImportService(ChessXivDbContext dbContext, int quota = 200_000)
     {
         var parser = new PgnService();
         var serializer = new FenBoardStateSerializer();
@@ -320,7 +337,7 @@ public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
         var hasher = new ZobristPositionHasher();
         var positionCoordinator = new PositionImportCoordinator(factory, serializer, transition, hasher);
         var repo = new DraftImportRepository(dbContext);
-        var quotaService = new StubQuotaService(200_000);
+        var quotaService = new StubQuotaService(quota);
         var uow = new EfUnitOfWork(dbContext);
 
         return new DraftImportService(parser, positionCoordinator, repo, quotaService, uow);
@@ -540,7 +557,7 @@ public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
 
     private sealed class StubQuotaService(int maxDraftImportGames) : IQuotaService
     {
-        public Task<int> GetMaxDraftImportGamesAsync(string ownerUserId, CancellationToken cancellationToken = default)
+        public Task<int> GetMaxDraftImportGamesAsync(string? ownerUserId, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(maxDraftImportGames);
         }
