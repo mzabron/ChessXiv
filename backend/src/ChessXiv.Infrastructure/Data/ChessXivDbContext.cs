@@ -31,6 +31,7 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
         {
             entity.HasIndex(u => u.Email).IsUnique();
             entity.Property(u => u.CreatedAtUtc).IsRequired();
+            entity.Property(u => u.UserTier).HasMaxLength(32).IsRequired();
         });
 
         modelBuilder.Entity<Player>(entity =>
@@ -71,6 +72,7 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
         modelBuilder.Entity<Position>(entity =>
         {
             entity.HasIndex(p => p.FenHash);
+            entity.HasIndex(p => p.Fen);
             entity.HasIndex(p => new {p.GameId, p.PlyCount });
             entity
                 .HasOne(p => p.Game)

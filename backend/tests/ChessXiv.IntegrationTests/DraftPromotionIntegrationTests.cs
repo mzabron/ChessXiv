@@ -17,6 +17,41 @@ namespace ChessXiv.IntegrationTests;
 public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
 {
     [Fact]
+    public async Task DraftImport_NewSession_ClearsPreviousUnpromotedDraftData()
+    {
+        await fixture.ResetDatabaseAsync();
+
+        await using var dbContext = fixture.CreateDbContext();
+        var (ownerId, _) = await CreateOwnerAndDatabaseAsync(dbContext, "replace-draft-user");
+        var importService = CreateDraftImportService(dbContext);
+
+        using (var firstReader = new StringReader(BuildPgnGames(4)))
+        {
+            var first = await importService.ImportAsync(firstReader, ownerId, batchSize: 2);
+            Assert.Equal(4, first.ImportedCount);
+            Assert.Equal(4, await dbContext.StagingGames.CountAsync());
+        }
+
+        using (var secondReader = new StringReader(BuildPgnGames(2)))
+        {
+            var second = await importService.ImportAsync(secondReader, ownerId, batchSize: 2);
+            Assert.Equal(2, second.ImportedCount);
+
+            var sessions = await dbContext.StagingImportSessions
+                .AsNoTracking()
+                .Where(s => s.OwnerUserId == ownerId)
+                .ToListAsync();
+
+            Assert.Single(sessions);
+            Assert.Equal(second.ImportSessionId, sessions[0].Id);
+            Assert.Equal(2, await dbContext.StagingGames.CountAsync());
+            Assert.All(
+                await dbContext.StagingGames.AsNoTracking().ToListAsync(),
+                game => Assert.Equal(second.ImportSessionId, game.ImportSessionId));
+        }
+    }
+
+    [Fact]
     public async Task HappyPath_ImportThenPromote_MovesRowsToMainTables()
     {
         await fixture.ResetDatabaseAsync();
@@ -285,9 +320,10 @@ public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
         var hasher = new ZobristPositionHasher();
         var positionCoordinator = new PositionImportCoordinator(factory, serializer, transition, hasher);
         var repo = new DraftImportRepository(dbContext);
+        var quotaService = new StubQuotaService(200_000);
         var uow = new EfUnitOfWork(dbContext);
 
-        return new DraftImportService(parser, positionCoordinator, repo, uow);
+        return new DraftImportService(parser, positionCoordinator, repo, quotaService, uow);
     }
 
     private static DraftPromotionService CreateDraftPromotionService(ChessXivDbContext dbContext, IUnitOfWork unitOfWork)
@@ -499,6 +535,14 @@ public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
         public Task MarkSessionPromotedAsync(Guid importSessionId, string ownerUserId, DateTime promotedAtUtc, CancellationToken cancellationToken = default)
         {
             return inner.MarkSessionPromotedAsync(importSessionId, ownerUserId, promotedAtUtc, cancellationToken);
+        }
+    }
+
+    private sealed class StubQuotaService(int maxDraftImportGames) : IQuotaService
+    {
+        public Task<int> GetMaxDraftImportGamesAsync(string ownerUserId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(maxDraftImportGames);
         }
     }
 }

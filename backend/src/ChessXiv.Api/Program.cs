@@ -10,6 +10,7 @@ using ChessXiv.Domain.Engine.Serialization;
 using ChessXiv.Domain.Engine.Services;
 using ChessXiv.Infrastructure.Data;
 using ChessXiv.Infrastructure.Repositories;
+using ChessXiv.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
@@ -91,6 +92,7 @@ builder.Services.AddScoped<IDraftImportService, DraftImportService>();
 builder.Services.AddScoped<IDraftPromotionService, DraftPromotionService>();
 builder.Services.AddScoped<IGameExplorerService, GameExplorerService>();
 builder.Services.AddScoped<IPositionPlayService, PositionPlayService>();
+builder.Services.AddScoped<IQuotaService, UserQuotaService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
 

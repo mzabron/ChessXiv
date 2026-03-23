@@ -2,6 +2,8 @@ namespace ChessXiv.Application.Contracts;
 
 public class GameExplorerSearchRequest
 {
+    public Guid? UserDatabaseId { get; set; }
+
     public string? WhiteFirstName { get; set; }
     public string? WhiteLastName { get; set; }
     public string? BlackFirstName { get; set; }

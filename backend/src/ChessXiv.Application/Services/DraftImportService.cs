@@ -9,6 +9,7 @@ public sealed class DraftImportService(
     IPgnParser pgnParser,
     IPositionImportCoordinator positionImportCoordinator,
     IDraftImportRepository draftImportRepository,
+    IQuotaService quotaService,
     IUnitOfWork unitOfWork) : IDraftImportService
 {
     private static readonly TimeSpan DefaultDraftTtl = TimeSpan.FromDays(7);
@@ -34,11 +35,19 @@ public sealed class DraftImportService(
 
         var now = DateTime.UtcNow;
         var session = await GetOrCreateSessionAsync(ownerUserId, importSessionId, now, cancellationToken);
+        var maxDraftImportGames = await quotaService.GetMaxDraftImportGamesAsync(ownerUserId, cancellationToken);
+        var existingCount = await draftImportRepository.CountStagingGamesAsync(session.Id, ownerUserId, cancellationToken);
+
+        if (existingCount >= maxDraftImportGames)
+        {
+            return new DraftImportResult(session.Id, 0, 0, 0, session.ExpiresAtUtc);
+        }
 
         var parsedCount = 0;
         var importedCount = 0;
         var skippedCount = 0;
         var batch = new List<StagingGame>(batchSize);
+        var remainingCapacity = maxDraftImportGames - existingCount;
 
         await foreach (var parsedGame in pgnParser.ParsePgnAsync(reader, cancellationToken))
         {
@@ -47,6 +56,12 @@ public sealed class DraftImportService(
             {
                 skippedCount++;
                 continue;
+            }
+
+            if (importedCount >= remainingCapacity)
+            {
+                skippedCount++;
+                break;
             }
 
             var stagingGame = MapToStagingGame(parsedGame, session.Id, ownerUserId);
@@ -105,6 +120,7 @@ public sealed class DraftImportService(
             ExpiresAtUtc = now.Add(DefaultDraftTtl)
         };
 
+        await draftImportRepository.DeleteUnpromotedSessionsByOwnerAsync(ownerUserId, cancellationToken);
         await draftImportRepository.AddImportSessionAsync(session, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

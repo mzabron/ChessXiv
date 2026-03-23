@@ -1,5 +1,6 @@
 using ChessXiv.Application.Abstractions.Repositories;
 using ChessXiv.Application.Contracts;
+using ChessXiv.Application.Exceptions;
 using ChessXiv.Application.Services;
 using ChessXiv.Domain.Engine.Abstractions;
 using ChessXiv.Domain.Engine.Models;
@@ -34,11 +35,12 @@ public class GameExplorerServiceTests
 
         var request = new GameExplorerSearchRequest
         {
+            UserDatabaseId = Guid.NewGuid(),
             WhiteFirstName = "  MAGNUS ",
             WhiteLastName = "CARLSEN"
         };
 
-        var result = await service.SearchAsync(request);
+        var result = await service.SearchAsync(request, "user-1");
 
         Assert.Equal(1, result.TotalCount);
         Assert.Equal("magnus", playerRepository.LastFirstName);
@@ -61,10 +63,11 @@ public class GameExplorerServiceTests
 
         await service.SearchAsync(new GameExplorerSearchRequest
         {
+            UserDatabaseId = Guid.NewGuid(),
             SearchByPosition = true,
             PositionMode = PositionSearchMode.Exact,
             Fen = fen
-        });
+        }, "user-1");
 
         Assert.Equal(fen, serializer.LastFenInput);
         Assert.Equal(unchecked((long)42UL), explorerRepository.LastFenHash);
@@ -88,12 +91,82 @@ public class GameExplorerServiceTests
 
         var result = await service.SearchAsync(new GameExplorerSearchRequest
         {
+            UserDatabaseId = Guid.NewGuid(),
             WhiteLastName = "Carlsen"
-        });
+        }, "user-1");
 
         Assert.Equal(0, result.TotalCount);
         Assert.Empty(result.Items);
         Assert.Equal(0, explorerRepository.CallCount);
+    }
+
+    [Fact]
+    public async Task SearchAsync_ThrowsForbidden_WhenUserDatabaseIsNotAccessible()
+    {
+        var playerRepository = new FakePlayerRepository();
+        var explorerRepository = new FakeGameExplorerRepository
+        {
+            AccessStatus = UserDatabaseAccessStatus.Forbidden
+        };
+
+        var service = new GameExplorerService(
+            explorerRepository,
+            playerRepository,
+            new FakeBoardStateSerializer(),
+            new FakePositionHasher());
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            service.SearchAsync(new GameExplorerSearchRequest
+            {
+                UserDatabaseId = Guid.NewGuid()
+            }, null));
+    }
+
+    [Fact]
+    public async Task SearchAsync_ThrowsNotFound_WhenUserDatabaseDoesNotExist()
+    {
+        var playerRepository = new FakePlayerRepository();
+        var explorerRepository = new FakeGameExplorerRepository
+        {
+            AccessStatus = UserDatabaseAccessStatus.NotFound
+        };
+
+        var service = new GameExplorerService(
+            explorerRepository,
+            playerRepository,
+            new FakeBoardStateSerializer(),
+            new FakePositionHasher());
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.SearchAsync(new GameExplorerSearchRequest
+            {
+                UserDatabaseId = Guid.NewGuid()
+            }, null));
+    }
+
+    [Fact]
+    public async Task SearchAsync_GuestWithoutUserDatabaseId_DelegatesToRepository()
+    {
+        var playerRepository = new FakePlayerRepository();
+        var explorerRepository = new FakeGameExplorerRepository
+        {
+            Response = new PagedResult<GameExplorerItemDto>
+            {
+                TotalCount = 1,
+                Items = [new GameExplorerItemDto { GameId = Guid.NewGuid(), White = "Alpha", Black = "Beta", Result = "*" }]
+            }
+        };
+
+        var service = new GameExplorerService(
+            explorerRepository,
+            playerRepository,
+            new FakeBoardStateSerializer(),
+            new FakePositionHasher());
+
+        var result = await service.SearchAsync(new GameExplorerSearchRequest(), null);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, explorerRepository.CallCount);
     }
 
     [Fact]
@@ -204,13 +277,23 @@ public class GameExplorerServiceTests
         public long? LastFenHash { get; private set; }
         public PagedResult<GameExplorerItemDto> Response { get; set; } = new();
         public MoveTreeResponse MoveTreeResponse { get; set; } = new();
+        public UserDatabaseAccessStatus AccessStatus { get; set; } = UserDatabaseAccessStatus.Accessible;
         public MoveTreeRequest? LastMoveTreeRequest { get; private set; }
         public string? LastMoveTreeOwnerUserId { get; private set; }
         public string? LastMoveTreeNormalizedFen { get; private set; }
         public long? LastMoveTreeFenHash { get; private set; }
 
+        public Task<UserDatabaseAccessStatus> GetUserDatabaseAccessStatusAsync(
+            Guid userDatabaseId,
+            string? ownerUserId,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(AccessStatus);
+        }
+
         public Task<PagedResult<GameExplorerItemDto>> SearchAsync(
             GameExplorerSearchRequest request,
+            string? ownerUserId,
             IReadOnlyCollection<Guid>? whitePlayerIds,
             IReadOnlyCollection<Guid>? blackPlayerIds,
             string? normalizedFen,

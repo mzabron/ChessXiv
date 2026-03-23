@@ -4,8 +4,14 @@ namespace ChessXiv.Application.Abstractions.Repositories;
 
 public interface IGameExplorerRepository
 {
+    Task<UserDatabaseAccessStatus> GetUserDatabaseAccessStatusAsync(
+        Guid userDatabaseId,
+        string? ownerUserId,
+        CancellationToken cancellationToken = default);
+
     Task<PagedResult<GameExplorerItemDto>> SearchAsync(
         GameExplorerSearchRequest request,
+        string? ownerUserId,
         IReadOnlyCollection<Guid>? whitePlayerIds,
         IReadOnlyCollection<Guid>? blackPlayerIds,
         string? normalizedFen,

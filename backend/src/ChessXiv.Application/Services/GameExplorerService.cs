@@ -1,6 +1,7 @@
 using ChessXiv.Application.Abstractions;
 using ChessXiv.Application.Abstractions.Repositories;
 using ChessXiv.Application.Contracts;
+using ChessXiv.Application.Exceptions;
 using ChessXiv.Domain.Engine.Abstractions;
 
 namespace ChessXiv.Application.Services;
@@ -11,9 +12,31 @@ public class GameExplorerService(
     IBoardStateSerializer boardStateSerializer,
     IPositionHasher positionHasher) : IGameExplorerService
 {
-    public async Task<PagedResult<GameExplorerItemDto>> SearchAsync(GameExplorerSearchRequest request, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<GameExplorerItemDto>> SearchAsync(
+        GameExplorerSearchRequest request,
+        string? ownerUserId,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+
+        if (request.UserDatabaseId.HasValue && request.UserDatabaseId != Guid.Empty)
+        {
+            var userDatabaseId = request.UserDatabaseId.Value;
+            var accessStatus = await gameExplorerRepository.GetUserDatabaseAccessStatusAsync(
+                userDatabaseId,
+                ownerUserId,
+                cancellationToken);
+
+            if (accessStatus == UserDatabaseAccessStatus.NotFound)
+            {
+                throw new KeyNotFoundException("User database was not found.");
+            }
+
+            if (accessStatus == UserDatabaseAccessStatus.Forbidden)
+            {
+                throw new ForbiddenException("You do not have access to this user database.");
+            }
+        }
 
         request.Page = request.Page <= 0 ? 1 : request.Page;
         request.PageSize = request.PageSize <= 0 ? 50 : Math.Min(request.PageSize, 200);
@@ -67,6 +90,7 @@ public class GameExplorerService(
 
         return await gameExplorerRepository.SearchAsync(
             request,
+            ownerUserId,
             whitePlayerIds,
             blackPlayerIds,
             normalizedFen,

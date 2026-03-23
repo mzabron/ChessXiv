@@ -8,15 +8,74 @@ namespace ChessXiv.Infrastructure.Repositories;
 
 public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorerRepository
 {
+    public async Task<UserDatabaseAccessStatus> GetUserDatabaseAccessStatusAsync(
+        Guid userDatabaseId,
+        string? ownerUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var dbAccess = await dbContext.UserDatabases
+            .AsNoTracking()
+            .Where(d => d.Id == userDatabaseId)
+            .Select(d => new { d.OwnerUserId, d.IsPublic })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (dbAccess is null)
+        {
+            return UserDatabaseAccessStatus.NotFound;
+        }
+
+        if (dbAccess.IsPublic)
+        {
+            return UserDatabaseAccessStatus.Accessible;
+        }
+
+        if (!string.IsNullOrWhiteSpace(ownerUserId)
+            && string.Equals(dbAccess.OwnerUserId, ownerUserId, StringComparison.Ordinal))
+        {
+            return UserDatabaseAccessStatus.Accessible;
+        }
+
+        return UserDatabaseAccessStatus.Forbidden;
+    }
+
     public async Task<PagedResult<GameExplorerItemDto>> SearchAsync(
         GameExplorerSearchRequest request,
+        string? ownerUserId,
         IReadOnlyCollection<Guid>? whitePlayerIds,
         IReadOnlyCollection<Guid>? blackPlayerIds,
         string? normalizedFen,
         long? fenHash,
         CancellationToken cancellationToken = default)
     {
-        var query = dbContext.Games.AsNoTracking().AsQueryable();
+        IQueryable<Game> query;
+
+        if (request.UserDatabaseId.HasValue && request.UserDatabaseId != Guid.Empty)
+        {
+            var userDatabaseId = request.UserDatabaseId.Value;
+            var accessStatus = await GetUserDatabaseAccessStatusAsync(userDatabaseId, ownerUserId, cancellationToken);
+            if (accessStatus != UserDatabaseAccessStatus.Accessible)
+            {
+                return new PagedResult<GameExplorerItemDto>();
+            }
+
+            query =
+                from link in dbContext.UserDatabaseGames.AsNoTracking()
+                join game in dbContext.Games.AsNoTracking() on link.GameId equals game.Id
+                where link.UserDatabaseId == userDatabaseId
+                select game;
+        }
+        else
+        {
+            var currentUserId = ownerUserId;
+            query = (
+                from link in dbContext.UserDatabaseGames.AsNoTracking()
+                join userDatabase in dbContext.UserDatabases.AsNoTracking() on link.UserDatabaseId equals userDatabase.Id
+                join game in dbContext.Games.AsNoTracking() on link.GameId equals game.Id
+                where userDatabase.IsPublic
+                      || (!string.IsNullOrWhiteSpace(currentUserId) && userDatabase.OwnerUserId == currentUserId)
+                select game)
+                .Distinct();
+        }
 
         query = ApplyPlayerFilters(query, request.IgnoreColors, whitePlayerIds, blackPlayerIds);
         query = ApplyScalarFilters(query, request);

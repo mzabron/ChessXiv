@@ -1,5 +1,6 @@
 using ChessXiv.Application.Abstractions;
 using ChessXiv.Application.Contracts;
+using ChessXiv.Application.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -12,6 +13,7 @@ public class GameExplorerController(
     IGameExplorerService gameExplorerService,
     IPositionPlayService positionPlayService) : ControllerBase
 {
+    [AllowAnonymous]
     [HttpPost("search")]
     public async Task<IActionResult> Search([FromBody] GameExplorerSearchRequest request, CancellationToken cancellationToken)
     {
@@ -20,8 +22,21 @@ public class GameExplorerController(
             return BadRequest("Request body is required.");
         }
 
-        var result = await gameExplorerService.SearchAsync(request, cancellationToken);
-        return Ok(result);
+        var userId = GetCurrentUserId();
+
+        try
+        {
+            var result = await gameExplorerService.SearchAsync(request, userId, cancellationToken);
+            return Ok(result);
+        }
+        catch (ForbiddenException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound("User database was not found.");
+        }
     }
 
     [HttpPost("position/move")]
