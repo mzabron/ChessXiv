@@ -18,8 +18,11 @@ interface Database {
   styleUrl: './databases-panel.component.scss'
 })
 export class DatabasesPanelComponent {
+  private readonly currentUser = 'max';
+
   searchQuery = signal('');
   sortByCreationDesc = signal(true);
+  myDatabasesOnly = signal(false);
 
   databases = signal<Database[]>([
     { id: '1', name: 'My White Repertoire', owner: 'max', creationDate: new Date('2026-01-10'), gamesCount: 154 },
@@ -31,6 +34,10 @@ export class DatabasesPanelComponent {
   filteredAndSortedDatabases = computed(() => {
     let result = this.databases();
     const query = this.searchQuery().toLowerCase().trim();
+
+    if (this.myDatabasesOnly()) {
+      result = result.filter(db => db.owner === this.currentUser);
+    }
 
     if (query) {
       result = result.filter(db =>
@@ -50,5 +57,34 @@ export class DatabasesPanelComponent {
 
   toggleSort() {
     this.sortByCreationDesc.update(val => !val);
+  }
+
+  toggleMyDatabases(): void {
+    this.myDatabasesOnly.update(value => !value);
+  }
+
+  createNewDatabase(): void {
+    const name = window.prompt('Database name');
+    if (!name || !name.trim()) {
+      return;
+    }
+
+    const newDatabase: Database = {
+      id: this.generateId(),
+      name: name.trim(),
+      owner: this.currentUser,
+      creationDate: new Date(),
+      gamesCount: 0
+    };
+
+    this.databases.update(existing => [newDatabase, ...existing]);
+  }
+
+  private generateId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+
+    return `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
   }
 }

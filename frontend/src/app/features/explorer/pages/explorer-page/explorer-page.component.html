@@ -29,8 +29,18 @@
 
   <!-- RIGHT COLUMN -->
   <section class="right-column fade-in" aria-label="Games list">
-    <app-games-list *ngIf="!isFocusMode" [gamesLoaded]="gamesLoaded" [games]="mockGames" (importDatabase)="importDatabase()"
-      (searchCommunityDatabase)="searchCommunityDatabase()" />
+    <app-games-list
+      *ngIf="!isFocusMode"
+      [gamesLoaded]="gamesLoaded"
+      [games]="mockGames"
+      [databaseName]="currentDatabaseName"
+      [sourceType]="currentGamesSource"
+      [myDatabases]="myDatabases"
+      (importDatabase)="importDatabase()"
+      (searchCommunityDatabase)="searchCommunityDatabase()"
+      (saveDatabase)="saveCurrentDatabase()"
+      (saveDatabaseRequest)="onSaveDatabaseRequest($event)"
+      (addBookmark)="addCurrentDatabaseBookmark()" />
 
     <!-- Focus Mode Side Panel -->
     <div class="focus-side-panel panel fade-in" *ngIf="isFocusMode">

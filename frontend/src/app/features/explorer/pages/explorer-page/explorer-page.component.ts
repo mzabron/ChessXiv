@@ -24,6 +24,13 @@ export class ExplorerPageComponent {
   private readonly layoutRoot!: ElementRef<HTMLElement>;
 
   protected gamesLoaded = false;
+  protected currentDatabaseName = 'Games';
+  protected currentGamesSource: 'imported' | 'external' = 'imported';
+  protected myDatabases = [
+    { id: 'db-1', name: 'My White Repertoire' },
+    { id: 'db-2', name: 'Rapid Practice' },
+    { id: 'db-3', name: 'Endgames Lab' }
+  ];
   protected moveRows: MoveRow[] = [];
   protected currentPly = 0;
   protected navigationRequest: { ply: number; version: number } | null = null;
@@ -115,11 +122,43 @@ export class ExplorerPageComponent {
     // Placeholder action for opening a local PGN file picker.
     console.log('Import database (.pgn)');
     this.gamesLoaded = true;
+    this.currentDatabaseName = 'Imported Games';
+    this.currentGamesSource = 'imported';
   }
 
   protected searchCommunityDatabase(): void {
     // Placeholder action for searching a remote community database.
     console.log('Search database (community database)');
+    this.gamesLoaded = true;
+    this.currentDatabaseName = 'Community Database';
+    this.currentGamesSource = 'external';
+  }
+
+  protected saveCurrentDatabase(): void {
+    console.log('Save current imported games as database');
+  }
+
+  protected onSaveDatabaseRequest(payload: {
+    mode: 'merge' | 'create';
+    targetDatabaseId?: string;
+    newDatabaseName?: string;
+    visibility: 'private' | 'public';
+  }): void {
+    console.log('Save database modal submit', payload);
+
+    if (payload.mode === 'create' && payload.newDatabaseName) {
+      this.myDatabases = [
+        {
+          id: `db-${Date.now()}`,
+          name: payload.newDatabaseName
+        },
+        ...this.myDatabases
+      ];
+    }
+  }
+
+  protected addCurrentDatabaseBookmark(): void {
+    console.log('Bookmark external user database');
   }
 
   protected onMoveRowsChanged(moveRows: MoveRow[]): void {

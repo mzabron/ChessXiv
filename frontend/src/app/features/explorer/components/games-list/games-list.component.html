@@ -20,10 +20,26 @@
   </div>
   } @else if (activeTab === 'games') {
   <div class="tab-body" role="tabpanel" aria-label="Games tab content">
-    <header class="panel-header">
-      <h2>Games</h2>
-      <p>{{ gamesLoaded ? games.length + ' games loaded.' : 'No games loaded yet.' }}</p>
-    </header>
+    @if (gamesLoaded) {
+      <header class="panel-header db-summary">
+        <div class="db-summary-main">
+          <h2>{{ databaseName }}</h2>
+          <p>{{ games.length }} games</p>
+        </div>
+        <div class="db-summary-actions">
+          @if (sourceType === 'imported') {
+            <button type="button" class="summary-btn" (click)="openSaveDatabaseModal()">Save to database</button>
+          } @else {
+            <button type="button" class="summary-btn" (click)="addBookmark.emit()">Add bookmark</button>
+          }
+        </div>
+      </header>
+    } @else {
+      <header class="panel-header">
+        <h2>Games</h2>
+        <p>No games loaded yet.</p>
+      </header>
+    }
 
     @if (!gamesLoaded) {
       <app-empty-games-state (importDatabase)="importDatabase.emit()"
@@ -36,5 +52,49 @@
   <div class="tab-body" role="tabpanel" aria-label="Filters tab content">
     <app-filters-panel [gamesLoaded]="gamesLoaded" />
   </div>
+  }
+
+  @if (isSaveModalOpen) {
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Save database options">
+      <div class="save-modal">
+        <header class="save-modal-header">
+          <h3>Save Imported Games</h3>
+          <button type="button" class="close-btn" (click)="closeSaveDatabaseModal()" aria-label="Close">&times;</button>
+        </header>
+
+        <div class="save-mode-switch" role="group" aria-label="Save mode">
+          <button type="button" class="mode-btn" [class.active]="saveMode === 'merge'" (click)="saveMode = 'merge'">Merge Into Existing</button>
+          <button type="button" class="mode-btn" [class.active]="saveMode === 'create'" (click)="saveMode = 'create'">Create New</button>
+        </div>
+
+        @if (saveMode === 'merge') {
+          <label class="field-label" for="merge-target">Choose database</label>
+          <select id="merge-target" class="field-input" [(ngModel)]="selectedTargetDatabaseId">
+            <option value="" disabled>Select one...</option>
+            @for (db of myDatabases; track db.id) {
+              <option [value]="db.id">{{ db.name }}</option>
+            }
+          </select>
+        } @else {
+          <label class="field-label" for="new-db-name">Database name</label>
+          <input id="new-db-name" class="field-input" type="text" [(ngModel)]="newDatabaseName" placeholder="My Opening Prep" />
+
+          <label class="field-label" for="new-db-visibility">Visibility</label>
+          <select id="new-db-visibility" class="field-input" [(ngModel)]="newDatabaseVisibility">
+            <option value="private">Private</option>
+            <option value="public">Public</option>
+          </select>
+        }
+
+        @if (saveModalError) {
+          <p class="modal-error">{{ saveModalError }}</p>
+        }
+
+        <div class="save-modal-actions">
+          <button type="button" class="summary-btn" (click)="closeSaveDatabaseModal()">Cancel</button>
+          <button type="button" class="summary-btn primary" (click)="confirmSaveDatabase()">Save</button>
+        </div>
+      </div>
+    </div>
   }
 </article>

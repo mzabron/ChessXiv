@@ -47,6 +47,43 @@
       opacity: 0.8;
     }
   }
+
+  .action-btn {
+    padding: 0.5rem 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background 0.2s, opacity 0.2s;
+
+    &:hover {
+      opacity: 0.85;
+    }
+
+    &.active {
+      background: #e8dcc7;
+      border-color: #c8ae88;
+    }
+
+    &.primary {
+      background: #d9c39e;
+      border-color: #bea073;
+      color: #3f2f23;
+    }
+  }
+}
+
+@media (max-width: 980px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .toolbar .search-box {
+    min-width: 100%;
+  }
 }
 
 .databases-list {
@@ -116,5 +153,16 @@
 }
 
 :host-context(body.dark-theme) {
+  .action-btn.active {
+    background: #3f3f46;
+    border-color: #52525b;
+  }
+
+  .action-btn.primary {
+    background: #3f3f46;
+    border-color: #52525b;
+    color: var(--text);
+  }
+
   .db-card:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
 }

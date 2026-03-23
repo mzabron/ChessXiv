@@ -7,6 +7,8 @@
     <button class="sort-btn" (click)="toggleSort()">
       Sort: {{ sortByCreationDesc() ? 'Newest First' : 'Oldest First' }}
     </button>
+    <button class="action-btn" [class.active]="myDatabasesOnly()" (click)="toggleMyDatabases()">My Databases</button>
+    <button class="action-btn primary" (click)="createNewDatabase()">Create New</button>
   </div>
 
   <div class="databases-list">
