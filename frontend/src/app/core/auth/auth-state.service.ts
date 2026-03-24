@@ -6,6 +6,7 @@ import {
   AuthLoginRequest,
   AuthRegisterResponse,
   AuthRegisterRequest,
+  ChangePendingEmailRequest,
   ConfirmEmailRequest,
   AuthTokenResponse,
   AuthUser,
@@ -58,6 +59,10 @@ export class AuthStateService {
 
   resendConfirmation(request: ResendEmailConfirmationRequest): Observable<string> {
     return this.authApi.resendConfirmation(request);
+  }
+
+  changePendingEmail(request: ChangePendingEmailRequest): Observable<string> {
+    return this.authApi.changePendingEmail(request);
   }
 
   confirmEmail(request: ConfirmEmailRequest): Observable<AuthUser> {

@@ -33,6 +33,12 @@ export interface ConfirmEmailRequest {
   token: string;
 }
 
+export interface ChangePendingEmailRequest {
+  usernameOrEmail: string;
+  password: string;
+  newEmail: string;
+}
+
 export interface ResetPasswordRequest {
   email: string;
   token: string;

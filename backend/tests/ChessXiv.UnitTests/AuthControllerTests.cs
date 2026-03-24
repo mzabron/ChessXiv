@@ -209,6 +209,37 @@ public class AuthControllerTests
         Assert.Equal("Invalid credentials.", unauthorized.Value);
     }
 
+    [Fact]
+    public async Task ChangePendingEmail_ReturnsOk_AndSendsConfirmation_WhenCredentialsValid()
+    {
+        var user = new ApplicationUser
+        {
+            Id = "user-2",
+            UserName = "pending-user",
+            Email = "old@example.com",
+            EmailConfirmed = false
+        };
+
+        var userManager = new TestUserManager
+        {
+            FindByNameAsyncHandler = _ => Task.FromResult<ApplicationUser?>(user),
+            CheckPasswordAsyncHandler = (_, _) => Task.FromResult(true),
+            SetEmailAsyncHandler = (_, _) => Task.FromResult(IdentityResult.Success),
+            GenerateEmailConfirmationTokenAsyncHandler = _ => Task.FromResult("changed-email-confirm-token")
+        };
+
+        var emailSender = new FakeEmailSender();
+        var controller = CreateController(userManager, new FakeJwtTokenService(), emailSender);
+
+        var request = new ChangePendingEmailRequest("pending-user", "Password123", "new@example.com");
+        var actionResult = await controller.ChangePendingEmail(request, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(actionResult);
+        Assert.Equal("Email address updated. Please confirm your email address before signing in.", ok.Value);
+        Assert.Equal("new@example.com", userManager.LastSetEmailValue);
+        Assert.Equal("new@example.com", emailSender.LastToEmail);
+    }
+
     private sealed class FakeJwtTokenService : IJwtTokenService
     {
         public string AccessToken { get; init; } = "token";
@@ -240,9 +271,11 @@ public class AuthControllerTests
         public Func<string, Task<ApplicationUser?>>? FindByNameAsyncHandler { get; init; }
         public Func<string, Task<ApplicationUser?>>? FindByEmailAsyncHandler { get; init; }
         public Func<ApplicationUser, string, Task<bool>>? CheckPasswordAsyncHandler { get; init; }
+        public Func<ApplicationUser, string, Task<IdentityResult>>? SetEmailAsyncHandler { get; init; }
         public Func<ApplicationUser, Task<string>>? GenerateEmailConfirmationTokenAsyncHandler { get; init; }
         public ApplicationUser? LastCreatedUser { get; private set; }
         public string? LastCreatedPassword { get; private set; }
+        public string? LastSetEmailValue { get; private set; }
 
         public TestUserManager()
             : base(
@@ -282,6 +315,19 @@ public class AuthControllerTests
         {
             return CheckPasswordAsyncHandler?.Invoke(user, password)
                 ?? Task.FromResult(false);
+        }
+
+        public override Task<IdentityResult> SetEmailAsync(ApplicationUser user, string? email)
+        {
+            LastSetEmailValue = email;
+
+            if (email is not null)
+            {
+                user.Email = email;
+            }
+
+            return SetEmailAsyncHandler?.Invoke(user, email ?? string.Empty)
+                ?? Task.FromResult(IdentityResult.Success);
         }
 
         public override Task<string> GenerateEmailConfirmationTokenAsync(ApplicationUser user)

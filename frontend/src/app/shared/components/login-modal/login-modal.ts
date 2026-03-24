@@ -29,6 +29,8 @@ export class LoginModal implements OnInit {
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly infoMessage = signal<string | null>(null);
   protected readonly pendingConfirmationIdentifier = signal('');
+  protected readonly showChangePendingEmail = signal(false);
+  protected readonly pendingEmailChangePassword = signal('');
 
   protected readonly loginForm = this.fb.nonNullable.group({
     username: ['', [Validators.required]],
@@ -53,6 +55,11 @@ export class LoginModal implements OnInit {
     confirmPassword: ['', [Validators.required]]
   });
 
+  protected readonly changePendingEmailForm = this.fb.nonNullable.group({
+    newEmail: ['', [Validators.required, Validators.email]],
+    password: ['']
+  });
+
   ngOnInit(): void {
     this.mode.set(this.initialMode);
 
@@ -75,6 +82,11 @@ export class LoginModal implements OnInit {
     this.mode.set(nextMode);
     this.errorMessage.set(null);
     this.infoMessage.set(null);
+
+    if (nextMode !== 'verify-email') {
+      this.showChangePendingEmail.set(false);
+      this.pendingEmailChangePassword.set('');
+    }
   }
 
   protected submitLogin(): void {
@@ -98,7 +110,14 @@ export class LoginModal implements OnInit {
         error: (error) => {
           const errorCode = this.extractErrorCode(error);
           if (errorCode === 'EMAIL_NOT_CONFIRMED') {
-            this.pendingConfirmationIdentifier.set(this.extractPendingIdentifier(error) || raw.username.trim());
+            const pendingIdentifier = this.extractPendingIdentifier(error) || raw.username.trim();
+            this.pendingConfirmationIdentifier.set(pendingIdentifier);
+            this.changePendingEmailForm.patchValue({
+              newEmail: this.extractPendingIdentifier(error) || '',
+              password: ''
+            });
+            this.pendingEmailChangePassword.set(raw.password);
+            this.showChangePendingEmail.set(false);
             this.switchMode('verify-email');
             this.infoMessage.set(LoginModal.verifyEmailMessage);
             return;
@@ -132,7 +151,14 @@ export class LoginModal implements OnInit {
       .subscribe({
         next: (response) => {
           if (response.requiresEmailConfirmation) {
-            this.pendingConfirmationIdentifier.set(response.email || raw.email.trim());
+            const pendingIdentifier = response.email || raw.email.trim();
+            this.pendingConfirmationIdentifier.set(pendingIdentifier);
+            this.changePendingEmailForm.patchValue({
+              newEmail: pendingIdentifier,
+              password: ''
+            });
+            this.pendingEmailChangePassword.set(raw.password);
+            this.showChangePendingEmail.set(false);
             this.switchMode('verify-email');
             this.infoMessage.set(LoginModal.verifyEmailMessage);
             return;
@@ -211,27 +237,69 @@ export class LoginModal implements OnInit {
     }
   }
 
-  protected resendConfirmationEmail(): void {
+  protected submitChangePendingEmail(): void {
+    if (this.changePendingEmailForm.invalid) {
+      this.changePendingEmailForm.markAllAsTouched();
+      return;
+    }
+
     const identifier = this.pendingConfirmationIdentifier().trim();
     if (!identifier) {
-      this.errorMessage.set('Missing email or username for resending confirmation.');
+      this.errorMessage.set('Missing email or username for changing email address.');
+      return;
+    }
+
+    const raw = this.changePendingEmailForm.getRawValue();
+    const password = this.pendingEmailChangePassword() || raw.password;
+
+    if (!password.trim()) {
+      this.errorMessage.set('Please sign in again before changing your email address.');
       return;
     }
 
     this.startSubmitting();
-    this.authState.resendConfirmation({
-      usernameOrEmail: identifier
+    this.authState.changePendingEmail({
+      usernameOrEmail: identifier,
+      password,
+      newEmail: raw.newEmail.trim()
     })
       .pipe(finalize(() => this.isSubmitting.set(false)))
       .subscribe({
         next: () => {
+          this.pendingConfirmationIdentifier.set(raw.newEmail.trim());
+          this.changePendingEmailForm.patchValue({
+            newEmail: raw.newEmail.trim(),
+            password: ''
+          });
+          this.pendingEmailChangePassword.set(password);
+          this.showChangePendingEmail.set(false);
           this.infoMessage.set(LoginModal.verifyEmailMessage);
           this.errorMessage.set(null);
         },
         error: (error) => {
-          this.errorMessage.set(this.extractErrorMessage(error, 'Unable to resend confirmation email.'));
+          if (this.extractHttpStatus(error) === 401) {
+            this.pendingEmailChangePassword.set('');
+            this.errorMessage.set('Please enter your password to confirm email change.');
+            return;
+          }
+
+          this.errorMessage.set(this.extractErrorMessage(error, 'Unable to update email address.'));
         }
       });
+  }
+
+  protected openChangePendingEmail(): void {
+    this.showChangePendingEmail.set(true);
+  }
+
+  protected cancelChangePendingEmail(): void {
+    this.showChangePendingEmail.set(false);
+    this.changePendingEmailForm.patchValue({ password: '' });
+    this.errorMessage.set(null);
+  }
+
+  protected requiresPasswordInputForPendingEmailChange(): boolean {
+    return this.pendingEmailChangePassword().trim().length === 0;
   }
 
   protected shouldShowRegisterEmailError(): boolean {
@@ -311,6 +379,21 @@ export class LoginModal implements OnInit {
       const email = (payload as { email?: unknown }).email;
       if (typeof email === 'string' && email.trim().length > 0) {
         return email;
+      }
+    }
+
+    return null;
+  }
+
+  private extractHttpStatus(error: unknown): number | null {
+    if (typeof error !== 'object' || error === null) {
+      return null;
+    }
+
+    if ('status' in error) {
+      const status = (error as { status?: unknown }).status;
+      if (typeof status === 'number') {
+        return status;
       }
     }
 

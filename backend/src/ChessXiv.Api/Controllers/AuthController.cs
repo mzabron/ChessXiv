@@ -153,6 +153,52 @@ public class AuthController(
         return Ok("If the account exists and is not confirmed, a confirmation email has been sent.");
     }
 
+    [HttpPost("change-pending-email")]
+    [EnableRateLimiting("AuthForgotPassword")]
+    public async Task<IActionResult> ChangePendingEmail([FromBody] ChangePendingEmailRequest request, CancellationToken cancellationToken)
+    {
+        if (request is null
+            || string.IsNullOrWhiteSpace(request.UsernameOrEmail)
+            || string.IsNullOrWhiteSpace(request.Password)
+            || string.IsNullOrWhiteSpace(request.NewEmail))
+        {
+            return BadRequest("Username/email, password and new email are required.");
+        }
+
+        var identifier = request.UsernameOrEmail.Trim();
+        var newEmail = request.NewEmail.Trim();
+        var user = await userManager.FindByNameAsync(identifier) ?? await userManager.FindByEmailAsync(identifier);
+
+        if (user is null || user.EmailConfirmed)
+        {
+            return BadRequest("Only unconfirmed accounts can change email address.");
+        }
+
+        var isPasswordValid = await userManager.CheckPasswordAsync(user, request.Password);
+        if (!isPasswordValid)
+        {
+            return Unauthorized("Invalid credentials.");
+        }
+
+        if (string.Equals(user.Email, newEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest("Please enter a different email address.");
+        }
+
+        user.EmailConfirmed = false;
+        var setEmailResult = await userManager.SetEmailAsync(user, newEmail);
+        if (!setEmailResult.Succeeded)
+        {
+            return BadRequest(new
+            {
+                Errors = setEmailResult.Errors.Select(e => e.Description).ToArray()
+            });
+        }
+
+        await SendEmailConfirmationAsync(user, cancellationToken);
+        return Ok("Email address updated. Please confirm your email address before signing in.");
+    }
+
     [HttpPost("forgot-password")]
     [EnableRateLimiting("AuthForgotPassword")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)

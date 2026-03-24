@@ -82,10 +82,38 @@
       <div class="verify-email-block">
         <h3>Confirm your email</h3>
         <p>We sent a confirmation link to <strong>{{ pendingConfirmationIdentifier() }}</strong>.</p>
-        <p>Please confirm your account to continue. You can close this dialog, but you will stay signed out until confirmation is complete.</p>
-        <button type="button" class="btn-primary" [disabled]="isSubmitting()" (click)="resendConfirmationEmail()">
-          {{ isSubmitting() ? 'Resending...' : 'Resend confirmation email' }}
-        </button>
+        <p>Please confirm your account to continue.</p>
+
+        <div class="verify-email-help-card">
+          <p class="verify-email-hint-title">Not receiving it?</p>
+          <p class="verify-email-hint">
+            Make sure your address is correct:
+            <strong>{{ pendingConfirmationIdentifier() }}</strong>.
+            <button type="button" class="inline-action" (click)="openChangePendingEmail()">Change it</button>
+          </p>
+        </div>
+
+        @if (showChangePendingEmail()) {
+          <form class="login-form verify-email-change-form" [formGroup]="changePendingEmailForm" (ngSubmit)="submitChangePendingEmail()">
+            <div class="form-group">
+              <label for="change-pending-email">New email address</label>
+              <input id="change-pending-email" type="email" formControlName="newEmail" placeholder="Enter corrected email" />
+            </div>
+
+            @if (requiresPasswordInputForPendingEmailChange()) {
+              <div class="form-group">
+                <label for="change-pending-password">Password</label>
+                <input id="change-pending-password" type="password" formControlName="password" placeholder="Enter your password" />
+                <small class="field-hint">Required only when your session password is unavailable.</small>
+              </div>
+            }
+
+            <button type="submit" class="btn-primary" [disabled]="isSubmitting()">
+              {{ isSubmitting() ? 'Updating...' : 'Update email and send confirmation' }}
+            </button>
+            <button type="button" class="btn-text" (click)="cancelChangePendingEmail()">Cancel</button>
+          </form>
+        }
       </div>
     }
 

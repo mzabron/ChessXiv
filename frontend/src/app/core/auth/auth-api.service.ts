@@ -6,6 +6,7 @@ import {
   AuthLoginRequest,
   AuthRegisterRequest,
   AuthTokenResponse,
+  ChangePendingEmailRequest,
   ConfirmEmailRequest,
   ForgotPasswordRequest,
   ResendEmailConfirmationRequest,
@@ -39,6 +40,12 @@ export class AuthApiService {
 
   resendConfirmation(request: ResendEmailConfirmationRequest): Observable<string> {
     return this.http.post(`${this.baseUrl}/auth/resend-confirmation`, request, {
+      responseType: 'text'
+    });
+  }
+
+  changePendingEmail(request: ChangePendingEmailRequest): Observable<string> {
+    return this.http.post(`${this.baseUrl}/auth/change-pending-email`, request, {
       responseType: 'text'
     });
   }
