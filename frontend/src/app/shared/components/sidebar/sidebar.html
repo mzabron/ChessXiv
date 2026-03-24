@@ -1,12 +1,23 @@
 <aside class="sidebar">
   <div class="sidebar-top">
-    <!-- User Login Icon -->
-    <button class="icon-btn" (click)="onLoginClick()" title="Login">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user">
-        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
-        <circle cx="12" cy="7" r="4"/>
-      </svg>
-    </button>
+    <div class="user-control" [class.open]="isUserMenuOpen">
+      <button class="icon-btn user-btn" (click)="onUserButtonClick($event)" [title]="isAuthenticated ? userName : 'Sign in'">
+        @if (isAuthenticated) {
+          <span class="user-initial">{{ userInitial }}</span>
+        } @else {
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user">
+            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        }
+      </button>
+
+      @if (isAuthenticated && isUserMenuOpen) {
+        <div class="user-menu" (click)="$event.stopPropagation()">
+          <button type="button" class="signout-btn" (click)="onSignOutClick($event)">Sign out</button>
+        </div>
+      }
+    </div>
     
     <!-- Focus Layout Icon -->
     <button class="icon-btn" (click)="onToggleLayout()" title="Toggle Focus Mode">

@@ -28,12 +28,12 @@ export class LoginModal implements OnInit {
   protected readonly infoMessage = signal<string | null>(null);
 
   protected readonly loginForm = this.fb.nonNullable.group({
-    login: ['', [Validators.required]],
+    username: ['', [Validators.required]],
     password: ['', [Validators.required]]
   });
 
   protected readonly registerForm = this.fb.nonNullable.group({
-    login: ['', [Validators.required, Validators.minLength(3)]],
+    username: ['', [Validators.required, Validators.minLength(3)]],
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(8)]],
     confirmPassword: ['', [Validators.required]]
@@ -84,7 +84,7 @@ export class LoginModal implements OnInit {
     this.startSubmitting();
 
     this.authState.login({
-      login: raw.login.trim(),
+      login: raw.username.trim(),
       password: raw.password
     })
       .pipe(finalize(() => this.isSubmitting.set(false)))
@@ -113,7 +113,7 @@ export class LoginModal implements OnInit {
     this.startSubmitting();
 
     this.authState.register({
-      login: raw.login.trim(),
+      login: raw.username.trim(),
       email: raw.email.trim(),
       password: raw.password
     })
@@ -176,12 +176,40 @@ export class LoginModal implements OnInit {
           this.infoMessage.set(message || 'Password has been reset. You can now sign in.');
           this.errorMessage.set(null);
           this.switchMode('login');
-          this.loginForm.patchValue({ login: raw.email.trim(), password: '' });
+          this.loginForm.patchValue({ username: raw.email.trim(), password: '' });
         },
         error: (error) => {
           this.errorMessage.set(this.extractErrorMessage(error, 'Unable to reset password.'));
         }
       });
+  }
+
+  protected openForgotPassword(): void {
+    this.switchMode('forgot');
+    const currentLogin = this.loginForm.getRawValue().username.trim();
+
+    if (currentLogin.includes('@')) {
+      this.forgotForm.patchValue({ email: currentLogin });
+    }
+  }
+
+  protected shouldShowRegisterEmailError(): boolean {
+    const emailControl = this.registerForm.controls.email;
+    return emailControl.invalid && (emailControl.touched || emailControl.dirty);
+  }
+
+  protected getRegisterEmailError(): string {
+    const emailControl = this.registerForm.controls.email;
+
+    if (emailControl.hasError('required')) {
+      return 'Email is required.';
+    }
+
+    if (emailControl.hasError('email')) {
+      return 'Wrong email address format.';
+    }
+
+    return 'Invalid email address.';
   }
 
   private startSubmitting(): void {

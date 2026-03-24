@@ -2,7 +2,13 @@
   <div class="content-area">
     <app-explorer-page [isFocusMode]="isFocusMode" />
   </div>
-  <app-sidebar (loginClick)="toggleLoginModal()" (toggleLayout)="toggleFocusMode()" (aboutClick)="toggleAboutModal()" />
+  <app-sidebar
+    [isAuthenticated]="authState.isAuthenticated()"
+    [userName]="authState.userName() ?? ''"
+    (loginClick)="toggleLoginModal()"
+    (signOutClick)="signOut()"
+    (toggleLayout)="toggleFocusMode()"
+    (aboutClick)="toggleAboutModal()" />
 </main>
 
 <app-login-modal

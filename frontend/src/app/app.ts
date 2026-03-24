@@ -34,6 +34,11 @@ export class App {
     this.isAboutModalOpen = !this.isAboutModalOpen;
   }
 
+  signOut(): void {
+    this.authState.logout();
+    this.isLoginModalOpen = false;
+  }
+
   onAuthenticated(): void {
     this.isLoginModalOpen = false;
   }

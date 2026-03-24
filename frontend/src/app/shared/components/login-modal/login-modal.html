@@ -1,22 +1,15 @@
-<div class="modal-overlay" (click)="onClose()">
+<div class="modal-overlay">
   <div class="modal-container" (click)="$event.stopPropagation()">
     <button *ngIf="showCloseButton" class="close-btn" (click)="onClose()" title="Close">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
     </button>
     
-    <div class="modal-header">
-      <h2>ChessXiv Account</h2>
-      <p>Sign in to access your databases and bookmarks.</p>
-    </div>
-
-    <div class="mode-switch">
-      <button type="button" class="mode-btn" [class.active]="mode() === 'login'" (click)="switchMode('login')">Sign in</button>
-      <button type="button" class="mode-btn" [class.active]="mode() === 'register'" (click)="switchMode('register')">Register</button>
-      <button type="button" class="mode-btn" [class.active]="mode() === 'forgot'" (click)="switchMode('forgot')">Forgot</button>
-      @if (!showCloseButton) {
-        <button type="button" class="mode-btn" [class.active]="mode() === 'reset'" (click)="switchMode('reset')">Reset</button>
-      }
-    </div>
+    @if (showCloseButton) {
+      <div class="mode-switch">
+        <button type="button" class="mode-btn" [class.active]="mode() === 'login' || mode() === 'forgot'" (click)="switchMode('login')">Sign in</button>
+        <button type="button" class="mode-btn" [class.active]="mode() === 'register'" (click)="switchMode('register')">Register</button>
+      </div>
+    }
 
     @if (errorMessage()) {
       <p class="feedback error">{{ errorMessage() }}</p>
@@ -29,14 +22,16 @@
     @if (mode() === 'login') {
       <form class="login-form" [formGroup]="loginForm" (ngSubmit)="submitLogin()">
         <div class="form-group">
-          <label for="login">Email or login</label>
-          <input id="login" type="text" formControlName="login" placeholder="Enter login or email" />
+          <label for="username">Username or email</label>
+          <input id="username" type="text" formControlName="username" placeholder="Enter username or email" />
         </div>
 
         <div class="form-group">
           <label for="password">Password</label>
           <input id="password" type="password" formControlName="password" placeholder="Enter your password" />
         </div>
+
+        <button type="button" class="forgot-link" (click)="openForgotPassword()">Forgot password?</button>
 
         <button type="submit" class="btn-primary" [disabled]="isSubmitting()">{{ isSubmitting() ? 'Signing in...' : 'Sign In' }}</button>
       </form>
@@ -45,13 +40,16 @@
     @if (mode() === 'register') {
       <form class="login-form" [formGroup]="registerForm" (ngSubmit)="submitRegister()">
         <div class="form-group">
-          <label for="register-login">Login</label>
-          <input id="register-login" type="text" formControlName="login" placeholder="Choose login" />
+          <label for="register-username">Username</label>
+          <input id="register-username" type="text" formControlName="username" placeholder="Choose username" />
         </div>
 
         <div class="form-group">
           <label for="register-email">Email</label>
           <input id="register-email" type="email" formControlName="email" placeholder="Enter email" />
+          @if (shouldShowRegisterEmailError()) {
+            <small class="field-error">{{ getRegisterEmailError() }}</small>
+          }
         </div>
 
         <div class="form-group">
@@ -76,6 +74,7 @@
         </div>
 
         <button type="submit" class="btn-primary" [disabled]="isSubmitting()">{{ isSubmitting() ? 'Sending...' : 'Send reset link' }}</button>
+        <button *ngIf="showCloseButton" type="button" class="forgot-link" (click)="switchMode('login')">Back to sign in</button>
       </form>
     }
 
