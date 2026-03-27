@@ -70,11 +70,6 @@ public class GameExplorerController(
             return BadRequest("User database id is required for user database move tree.");
         }
 
-        if (request.Source == MoveTreeSource.StagingSession && (!request.ImportSessionId.HasValue || request.ImportSessionId == Guid.Empty))
-        {
-            return BadRequest("Import session id is required for staging move tree.");
-        }
-
         var userId = GetCurrentUserId();
         if (userId is null)
         {

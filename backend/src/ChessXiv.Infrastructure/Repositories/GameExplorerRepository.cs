@@ -41,8 +41,10 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
     public async Task<PagedResult<GameExplorerItemDto>> SearchAsync(
         GameExplorerSearchRequest request,
         string? ownerUserId,
-        IReadOnlyCollection<Guid>? whitePlayerIds,
-        IReadOnlyCollection<Guid>? blackPlayerIds,
+        string? normalizedWhiteFirstName,
+        string? normalizedWhiteLastName,
+        string? normalizedBlackFirstName,
+        string? normalizedBlackLastName,
         string? normalizedFen,
         long? fenHash,
         CancellationToken cancellationToken = default)
@@ -77,7 +79,13 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
                 .Distinct();
         }
 
-        query = ApplyPlayerFilters(query, request.IgnoreColors, whitePlayerIds, blackPlayerIds);
+        query = ApplyPlayerFilters(
+            query,
+            request.IgnoreColors,
+            normalizedWhiteFirstName,
+            normalizedWhiteLastName,
+            normalizedBlackFirstName,
+            normalizedBlackLastName);
         query = ApplyScalarFilters(query, request);
         query = ApplyPositionFilters(query, request, normalizedFen, fenHash);
 
@@ -219,26 +227,10 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
         long fenHash,
         CancellationToken cancellationToken)
     {
-        if (!request.ImportSessionId.HasValue || request.ImportSessionId == Guid.Empty)
-        {
-            return new MoveTreeResponse();
-        }
-
-        var importSessionId = request.ImportSessionId.Value;
-        var hasAccess = await dbContext.StagingImportSessions
-            .AsNoTracking()
-            .AnyAsync(s => s.Id == importSessionId && s.OwnerUserId == ownerUserId, cancellationToken);
-
-        if (!hasAccess)
-        {
-            return new MoveTreeResponse();
-        }
-
         var parentPositions =
             from game in dbContext.StagingGames.AsNoTracking()
             join parent in dbContext.StagingPositions.AsNoTracking() on game.Id equals parent.StagingGameId
             where game.OwnerUserId == ownerUserId
-                  && game.ImportSessionId == importSessionId
                   && parent.FenHash == fenHash
                   && parent.Fen == normalizedFen
             select new
@@ -362,11 +354,13 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
     private static IQueryable<Game> ApplyPlayerFilters(
         IQueryable<Game> query,
         bool ignoreColors,
-        IReadOnlyCollection<Guid>? whitePlayerIds,
-        IReadOnlyCollection<Guid>? blackPlayerIds)
+        string? normalizedWhiteFirstName,
+        string? normalizedWhiteLastName,
+        string? normalizedBlackFirstName,
+        string? normalizedBlackLastName)
     {
-        var hasWhite = whitePlayerIds is { Count: > 0 };
-        var hasBlack = blackPlayerIds is { Count: > 0 };
+        var hasWhite = normalizedWhiteFirstName is not null || normalizedWhiteLastName is not null;
+        var hasBlack = normalizedBlackFirstName is not null || normalizedBlackLastName is not null;
 
         if (!hasWhite && !hasBlack)
         {
@@ -377,12 +371,16 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
         {
             if (hasWhite)
             {
-                query = query.Where(g => g.WhitePlayerId.HasValue && whitePlayerIds!.Contains(g.WhitePlayerId.Value));
+                query = query.Where(g =>
+                    (normalizedWhiteFirstName == null || g.WhiteNormalizedFirstName == normalizedWhiteFirstName)
+                    && (normalizedWhiteLastName == null || g.WhiteNormalizedLastName == normalizedWhiteLastName));
             }
 
             if (hasBlack)
             {
-                query = query.Where(g => g.BlackPlayerId.HasValue && blackPlayerIds!.Contains(g.BlackPlayerId.Value));
+                query = query.Where(g =>
+                    (normalizedBlackFirstName == null || g.BlackNormalizedFirstName == normalizedBlackFirstName)
+                    && (normalizedBlackLastName == null || g.BlackNormalizedLastName == normalizedBlackLastName));
             }
 
             return query;
@@ -390,18 +388,47 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
 
         if (hasWhite && hasBlack)
         {
-            var whiteIds = whitePlayerIds!;
-            var blackIds = blackPlayerIds!;
             query = query.Where(g =>
-                (g.WhitePlayerId.HasValue && g.BlackPlayerId.HasValue && whiteIds.Contains(g.WhitePlayerId.Value) && blackIds.Contains(g.BlackPlayerId.Value)) ||
-                (g.WhitePlayerId.HasValue && g.BlackPlayerId.HasValue && blackIds.Contains(g.WhitePlayerId.Value) && whiteIds.Contains(g.BlackPlayerId.Value)));
+                (
+                    (normalizedWhiteFirstName == null || g.WhiteNormalizedFirstName == normalizedWhiteFirstName)
+                    && (normalizedWhiteLastName == null || g.WhiteNormalizedLastName == normalizedWhiteLastName)
+                    && (normalizedBlackFirstName == null || g.BlackNormalizedFirstName == normalizedBlackFirstName)
+                    && (normalizedBlackLastName == null || g.BlackNormalizedLastName == normalizedBlackLastName)
+                )
+                ||
+                (
+                    (normalizedWhiteFirstName == null || g.BlackNormalizedFirstName == normalizedWhiteFirstName)
+                    && (normalizedWhiteLastName == null || g.BlackNormalizedLastName == normalizedWhiteLastName)
+                    && (normalizedBlackFirstName == null || g.WhiteNormalizedFirstName == normalizedBlackFirstName)
+                    && (normalizedBlackLastName == null || g.WhiteNormalizedLastName == normalizedBlackLastName)
+                ));
             return query;
         }
 
-        var ids = hasWhite ? whitePlayerIds! : blackPlayerIds!;
+        if (hasWhite)
+        {
+            return query.Where(g =>
+                (
+                    (normalizedWhiteFirstName == null || g.WhiteNormalizedFirstName == normalizedWhiteFirstName)
+                    && (normalizedWhiteLastName == null || g.WhiteNormalizedLastName == normalizedWhiteLastName)
+                )
+                ||
+                (
+                    (normalizedWhiteFirstName == null || g.BlackNormalizedFirstName == normalizedWhiteFirstName)
+                    && (normalizedWhiteLastName == null || g.BlackNormalizedLastName == normalizedWhiteLastName)
+                ));
+        }
+
         return query.Where(g =>
-            (g.WhitePlayerId.HasValue && ids.Contains(g.WhitePlayerId.Value)) ||
-            (g.BlackPlayerId.HasValue && ids.Contains(g.BlackPlayerId.Value)));
+            (
+                (normalizedBlackFirstName == null || g.WhiteNormalizedFirstName == normalizedBlackFirstName)
+                && (normalizedBlackLastName == null || g.WhiteNormalizedLastName == normalizedBlackLastName)
+            )
+            ||
+            (
+                (normalizedBlackFirstName == null || g.BlackNormalizedFirstName == normalizedBlackFirstName)
+                && (normalizedBlackLastName == null || g.BlackNormalizedLastName == normalizedBlackLastName)
+            ));
     }
 
     private static IQueryable<Game> ApplyPositionFilters(

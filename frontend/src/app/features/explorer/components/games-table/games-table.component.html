@@ -2,15 +2,15 @@
   <table class="games-table">
     <thead>
       <tr>
-        <th>Year</th>
-        <th>White</th>
-        <th>WhiteElo</th>
-        <th>Result</th>
-        <th>Black</th>
-        <th>BlackElo</th>
-        <th>Eco</th>
-        <th>Event</th>
-        <th>Moves</th>
+        <th class="sortable" (click)="toggleSort('year')">Year{{ sortIndicator('year') }}</th>
+        <th class="sortable" (click)="toggleSort('white')">White{{ sortIndicator('white') }}</th>
+        <th class="sortable" (click)="toggleSort('whiteElo')">WhiteElo{{ sortIndicator('whiteElo') }}</th>
+        <th class="sortable" (click)="toggleSort('result')">Result{{ sortIndicator('result') }}</th>
+        <th class="sortable" (click)="toggleSort('black')">Black{{ sortIndicator('black') }}</th>
+        <th class="sortable" (click)="toggleSort('blackElo')">BlackElo{{ sortIndicator('blackElo') }}</th>
+        <th class="sortable" (click)="toggleSort('eco')">Eco{{ sortIndicator('eco') }}</th>
+        <th class="sortable" (click)="toggleSort('event')">Event{{ sortIndicator('event') }}</th>
+        <th class="sortable" (click)="toggleSort('moves')">Moves{{ sortIndicator('moves') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -21,10 +21,28 @@
         <td class="result-cell">{{ game.result }}</td>
         <td>{{ game.black }}</td>
         <td>{{ game.blackElo || '-' }}</td>
-        <td>{{ game.eco }}</td>
-        <td class="event-cell" [title]="game.event">{{ game.event }}</td>
+        <td>{{ game.eco || '-' }}</td>
+        <td class="event-cell" [title]="game.event || ''">{{ game.event || '-' }}</td>
         <td>{{ game.moveCount }}</td>
       </tr>
     </tbody>
   </table>
+
+  <footer class="pager" *ngIf="totalCount > 0">
+    <label class="page-size" for="page-size-select">Rows</label>
+    <select
+      id="page-size-select"
+      class="page-size-select"
+      [value]="pageSize"
+      (change)="onPageSizeChanged($any($event.target).value)">
+      <option [value]="10">10</option>
+      <option [value]="18">18</option>
+      <option [value]="25">25</option>
+      <option [value]="50">50</option>
+    </select>
+    <button type="button" (click)="goToPreviousPage()" [disabled]="page <= 1">Previous</button>
+    <span>Page {{ page }} / {{ totalPages() }}</span>
+    <button type="button" (click)="goToNextPage()" [disabled]="page >= totalPages()">Next</button>
+    <span>{{ totalCount }} games</span>
+  </footer>
 </div>

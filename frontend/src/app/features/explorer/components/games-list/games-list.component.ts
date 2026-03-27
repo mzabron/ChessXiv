@@ -4,6 +4,7 @@ import { EmptyGamesStateComponent } from '../empty-games-state/empty-games-state
 import { FiltersPanelComponent } from '../filters-panel/filters-panel.component';
 import { Database, DatabasesPanelComponent } from '../databases-panel/databases-panel.component';
 import { GamesTableComponent } from '../games-table/games-table.component';
+import { DraftGameListItem, DraftGamesResultSortMode, DraftGamesSortBy, DraftGamesSortDirection } from '../../services/draft-import-api.service';
 
 interface UserDatabaseOption {
   id: string;
@@ -26,7 +27,13 @@ interface SaveDatabaseRequestPayload {
 })
 export class GamesListComponent {
   @Input() gamesLoaded = false;
-  @Input() games: any[] = [];
+  @Input() games: DraftGameListItem[] = [];
+  @Input() totalCount = 0;
+  @Input() page = 1;
+  @Input() pageSize = 18;
+  @Input() resultSortMode: DraftGamesResultSortMode = 'default';
+  @Input() sortBy: DraftGamesSortBy = 'createdAt';
+  @Input() sortDirection: DraftGamesSortDirection = 'desc';
   @Input() databaseName = 'Games';
   @Input() sourceType: 'imported' | 'external' = 'imported';
   @Input() myDatabases: UserDatabaseOption[] = [];
@@ -45,6 +52,10 @@ export class GamesListComponent {
   @Output() saveDatabase = new EventEmitter<void>();
   @Output() addBookmark = new EventEmitter<void>();
   @Output() saveDatabaseRequest = new EventEmitter<SaveDatabaseRequestPayload>();
+  @Output() gamesResultSortModeChange = new EventEmitter<DraftGamesResultSortMode>();
+  @Output() gamesSortChange = new EventEmitter<{ sortBy: DraftGamesSortBy; sortDirection: DraftGamesSortDirection }>();
+  @Output() gamesPageSizeChange = new EventEmitter<number>();
+  @Output() gamesPageChange = new EventEmitter<number>();
 
   protected selectTab(tab: 'databases' | 'games' | 'filters'): void {
     this.activeTab = tab;

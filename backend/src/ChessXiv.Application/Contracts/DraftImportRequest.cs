@@ -1,3 +1,3 @@
 namespace ChessXiv.Application.Contracts;
 
-public sealed record DraftImportRequest(string Pgn, Guid? ImportSessionId = null);
+public sealed record DraftImportRequest(string Pgn);

@@ -2,6 +2,7 @@ using System.Text;
 using ChessXiv.Api;
 using ChessXiv.Api.Authentication;
 using ChessXiv.Api.Email;
+using ChessXiv.Api.Hubs;
 using ChessXiv.Api.Services;
 using ChessXiv.Application.Abstractions;
 using ChessXiv.Application.Abstractions.Repositories;
@@ -115,14 +116,31 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
             ClockSkew = TimeSpan.FromMinutes(1)
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+
+                if (!string.IsNullOrWhiteSpace(accessToken)
+                    && path.StartsWithSegments(ImportProgressHub.HubPath))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<Microsoft.AspNetCore.SignalR.IUserIdProvider, SubOrNameIdentifierUserIdProvider>();
 
 builder.Services.AddScoped<IPgnParser, PgnService>();
 builder.Services.AddScoped<IGameRepository, GameRepository>();
 builder.Services.AddScoped<IGameExplorerRepository, GameExplorerRepository>();
-builder.Services.AddScoped<IPlayerRepository, PlayerRepository>();
 builder.Services.AddScoped<IDraftImportRepository, DraftImportRepository>();
 builder.Services.AddScoped<IDraftPromotionRepository, DraftPromotionRepository>();
 builder.Services.AddScoped<IPositionImportCoordinator, PositionImportCoordinator>();
@@ -137,6 +155,9 @@ builder.Services.AddScoped<IDraftPromotionService, DraftPromotionService>();
 builder.Services.AddScoped<IGameExplorerService, GameExplorerService>();
 builder.Services.AddScoped<IPositionPlayService, PositionPlayService>();
 builder.Services.AddScoped<IQuotaService, UserQuotaService>();
+builder.Services.AddSingleton<DraftImportProgressCache>();
+builder.Services.AddSingleton<ImportProgressConnectionRegistry>();
+builder.Services.AddScoped<IDraftImportProgressPublisher, SignalRDraftImportProgressPublisher>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddHttpClient<BrevoEmailSender>(httpClient =>
 {
@@ -155,6 +176,7 @@ builder.Services.AddScoped<IEmailSender>(serviceProvider =>
     return serviceProvider.GetRequiredService<LoggingEmailSender>();
 });
 builder.Services.AddHostedService<UnconfirmedUserCleanupService>();
+builder.Services.AddHostedService<StagingDraftCleanupService>();
 
 var app = builder.Build();
 
@@ -167,6 +189,28 @@ app.UseExceptionHandler(exceptionHandlerApp =>
             .CreateLogger("GlobalExceptionHandler");
 
         var exceptionFeature = context.Features.Get<IExceptionHandlerFeature>();
+        if (exceptionFeature?.Error is BadHttpRequestException badRequestException)
+        {
+            logger.LogWarning(badRequestException, "Bad request while processing {Path}", context.Request.Path);
+
+            context.Response.StatusCode = badRequestException.StatusCode;
+
+            var requestProblem = new ProblemDetails
+            {
+                Status = badRequestException.StatusCode,
+                Title = badRequestException.StatusCode == StatusCodes.Status413PayloadTooLarge
+                    ? "Payload Too Large"
+                    : "Bad Request",
+                Detail = badRequestException.StatusCode == StatusCodes.Status413PayloadTooLarge
+                    ? "The uploaded PGN file is too large for this endpoint."
+                    : badRequestException.Message,
+                Instance = context.Request.Path
+            };
+
+            await context.Response.WriteAsJsonAsync(requestProblem);
+            return;
+        }
+
         if (exceptionFeature?.Error is not null)
         {
             logger.LogError(exceptionFeature.Error, "Unhandled exception while processing request {Path}", context.Request.Path);
@@ -192,4 +236,5 @@ app.UseCors("Frontend");
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ImportProgressHub>(ImportProgressHub.HubPath);
 app.Run();

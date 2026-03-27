@@ -80,8 +80,8 @@ public class AccountControllerTests
             new StagingGame
             {
                 Id = Guid.NewGuid(),
-                ImportSessionId = Guid.NewGuid(),
                 OwnerUserId = user.Id,
+                CreatedAtUtc = DateTime.UtcNow,
                 White = "Alpha",
                 Black = "Beta",
                 Result = "*",
@@ -92,8 +92,8 @@ public class AccountControllerTests
             new StagingGame
             {
                 Id = Guid.NewGuid(),
-                ImportSessionId = Guid.NewGuid(),
                 OwnerUserId = user.Id,
+                CreatedAtUtc = DateTime.UtcNow,
                 White = "Alpha",
                 Black = "Beta",
                 Result = "*",

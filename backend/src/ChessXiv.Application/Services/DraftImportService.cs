@@ -10,15 +10,13 @@ public sealed class DraftImportService(
     IPositionImportCoordinator positionImportCoordinator,
     IDraftImportRepository draftImportRepository,
     IQuotaService quotaService,
-    IUnitOfWork unitOfWork) : IDraftImportService
+    IUnitOfWork unitOfWork,
+    IDraftImportProgressPublisher? progressPublisher = null) : IDraftImportService
 {
-    private static readonly TimeSpan DefaultDraftTtl = TimeSpan.FromDays(7);
-
     public async Task<DraftImportResult> ImportAsync(
         TextReader reader,
         string ownerUserId,
-        Guid? importSessionId = null,
-        int batchSize = 500,
+        int batchSize = 200,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(reader);
@@ -34,25 +32,26 @@ public sealed class DraftImportService(
         }
 
         var now = DateTime.UtcNow;
-        var session = await GetOrCreateSessionAsync(ownerUserId, importSessionId, now, cancellationToken);
         var maxDraftImportGames = await quotaService.GetMaxDraftImportGamesAsync(ownerUserId, cancellationToken);
-        var existingCount = await draftImportRepository.CountStagingGamesAsync(session.Id, ownerUserId, cancellationToken);
 
-        if (existingCount >= maxDraftImportGames)
+        if (maxDraftImportGames <= 0)
         {
-            return new DraftImportResult(session.Id, 0, 0, 0, session.ExpiresAtUtc);
+            return new DraftImportResult(0, 0, 0);
         }
 
         var parsedCount = 0;
         var importedCount = 0;
         var skippedCount = 0;
         var batch = new List<StagingGame>(batchSize);
-        var remainingCapacity = maxDraftImportGames - existingCount;
+        var remainingCapacity = maxDraftImportGames;
 
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
 
         try
         {
+            await draftImportRepository.ClearStagingGamesAsync(ownerUserId, cancellationToken);
+            await PublishProgressAsync(ownerUserId, parsedCount, importedCount, skippedCount, isCompleted: false, isFailed: false, message: "Import started.", cancellationToken);
+
             await foreach (var parsedGame in pgnParser.ParsePgnAsync(reader, cancellationToken))
             {
                 parsedCount++;
@@ -67,7 +66,7 @@ public sealed class DraftImportService(
                     throw new InvalidOperationException($"Import exceeds allowed draft quota ({maxDraftImportGames} games). No games were imported.");
                 }
 
-                var stagingGame = MapToStagingGame(parsedGame, session.Id, ownerUserId);
+                var stagingGame = MapToStagingGame(parsedGame, ownerUserId, now);
                 batch.Add(stagingGame);
                 importedCount++;
 
@@ -75,6 +74,11 @@ public sealed class DraftImportService(
                 {
                     await PersistBatchAsync(batch, cancellationToken);
                     batch.Clear();
+                    await PublishProgressAsync(ownerUserId, parsedCount, importedCount, skippedCount, isCompleted: false, isFailed: false, message: null, cancellationToken);
+                }
+                else if (parsedCount % 10 == 0)
+                {
+                    await PublishProgressAsync(ownerUserId, parsedCount, importedCount, skippedCount, isCompleted: false, isFailed: false, message: null, cancellationToken);
                 }
             }
 
@@ -84,57 +88,41 @@ public sealed class DraftImportService(
             }
 
             await transaction.CommitAsync(cancellationToken);
-            return new DraftImportResult(session.Id, parsedCount, importedCount, skippedCount, session.ExpiresAtUtc);
+            await PublishProgressAsync(ownerUserId, parsedCount, importedCount, skippedCount, isCompleted: true, isFailed: false, message: "Import completed.", cancellationToken);
+            return new DraftImportResult(parsedCount, importedCount, skippedCount);
         }
         catch
         {
             await transaction.RollbackAsync(cancellationToken);
+            await PublishProgressAsync(ownerUserId, parsedCount, importedCount, skippedCount, isCompleted: true, isFailed: true, message: "Import failed.", cancellationToken);
             throw;
         }
     }
 
-    private async Task<StagingImportSession> GetOrCreateSessionAsync(
+    private async Task PublishProgressAsync(
         string ownerUserId,
-        Guid? importSessionId,
-        DateTime now,
+        int parsedCount,
+        int importedCount,
+        int skippedCount,
+        bool isCompleted,
+        bool isFailed,
+        string? message,
         CancellationToken cancellationToken)
     {
-        if (importSessionId.HasValue)
+        if (progressPublisher is null)
         {
-            var existingSession = await draftImportRepository
-                .GetImportSessionAsync(importSessionId.Value, ownerUserId, cancellationToken);
-
-            if (existingSession is null)
-            {
-                throw new InvalidOperationException("Draft import session was not found for this user.");
-            }
-
-            if (existingSession.PromotedAtUtc.HasValue)
-            {
-                throw new InvalidOperationException("Draft import session has already been promoted.");
-            }
-
-            if (existingSession.ExpiresAtUtc <= now)
-            {
-                throw new InvalidOperationException("Draft import session has expired.");
-            }
-
-            return existingSession;
+            return;
         }
 
-        var session = new StagingImportSession
-        {
-            Id = Guid.NewGuid(),
-            OwnerUserId = ownerUserId,
-            CreatedAtUtc = now,
-            ExpiresAtUtc = now.Add(DefaultDraftTtl)
-        };
+        var update = new DraftImportProgressUpdate(
+            parsedCount,
+            importedCount,
+            skippedCount,
+            isCompleted,
+            isFailed,
+            message);
 
-        await draftImportRepository.DeleteUnpromotedSessionsByOwnerAsync(ownerUserId, cancellationToken);
-        await draftImportRepository.AddImportSessionAsync(session, cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return session;
+        await progressPublisher.PublishAsync(ownerUserId, update, cancellationToken);
     }
 
     private async Task PersistBatchAsync(IReadOnlyCollection<StagingGame> stagingGames, CancellationToken cancellationToken)
@@ -165,7 +153,7 @@ public sealed class DraftImportService(
         unitOfWork.ClearTracker();
     }
 
-    internal static StagingGame MapToStagingGame(Game game, Guid importSessionId, string ownerUserId)
+    internal static StagingGame MapToStagingGame(Game game, string ownerUserId, DateTime createdAtUtc)
     {
         if (game.Date.HasValue)
         {
@@ -173,14 +161,13 @@ public sealed class DraftImportService(
         }
 
         game.MoveCount = game.Moves.Count;
+        ApplyNormalizedNames(game);
 
         return new StagingGame
         {
             Id = game.Id,
-            ImportSessionId = importSessionId,
             OwnerUserId = ownerUserId,
-            WhitePlayerId = game.WhitePlayerId,
-            BlackPlayerId = game.BlackPlayerId,
+            CreatedAtUtc = createdAtUtc,
             Date = game.Date,
             Year = game.Year,
             Round = game.Round,
@@ -195,6 +182,12 @@ public sealed class DraftImportService(
             Opening = game.Opening,
             White = game.White,
             Black = game.Black,
+            WhiteNormalizedFullName = game.WhiteNormalizedFullName,
+            WhiteNormalizedFirstName = game.WhiteNormalizedFirstName,
+            WhiteNormalizedLastName = game.WhiteNormalizedLastName,
+            BlackNormalizedFullName = game.BlackNormalizedFullName,
+            BlackNormalizedFirstName = game.BlackNormalizedFirstName,
+            BlackNormalizedLastName = game.BlackNormalizedLastName,
             Result = game.Result,
             Pgn = game.Pgn,
             MoveCount = game.MoveCount,
@@ -212,6 +205,34 @@ public sealed class DraftImportService(
                 BlackEval = m.BlackEval
             }).ToArray()
         };
+    }
+
+    private static void ApplyNormalizedNames(Game game)
+    {
+        ApplyNormalizedName(game.White, out var whiteFull, out var whiteFirst, out var whiteLast);
+        ApplyNormalizedName(game.Black, out var blackFull, out var blackFirst, out var blackLast);
+
+        game.WhiteNormalizedFullName = whiteFull;
+        game.WhiteNormalizedFirstName = whiteFirst;
+        game.WhiteNormalizedLastName = whiteLast;
+        game.BlackNormalizedFullName = blackFull;
+        game.BlackNormalizedFirstName = blackFirst;
+        game.BlackNormalizedLastName = blackLast;
+    }
+
+    private static void ApplyNormalizedName(string rawName, out string full, out string? first, out string? last)
+    {
+        var (parsedFirst, parsedLast) = PlayerNameNormalizer.ParseNameParts(rawName);
+        first = parsedFirst is null ? null : PlayerNameNormalizer.Normalize(parsedFirst);
+        last = parsedLast is null ? null : PlayerNameNormalizer.Normalize(parsedLast);
+
+        if (first is not null && last is not null)
+        {
+            full = PlayerNameNormalizer.Normalize($"{parsedFirst} {parsedLast}");
+            return;
+        }
+
+        full = PlayerNameNormalizer.Normalize(rawName);
     }
 
     internal static Game MapToTransientGame(StagingGame stagingGame)

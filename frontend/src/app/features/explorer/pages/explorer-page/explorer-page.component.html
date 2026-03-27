@@ -1,5 +1,16 @@
 <main class="layout animate-layout" [class.focus-mode]="isFocusMode" #layoutRoot [class.resizing]="isResizing"
   [style.--left-pane-width.px]="leftPaneWidth">
+  <input
+    #pgnFileInput
+    type="file"
+    accept=".pgn"
+    class="visually-hidden"
+    (change)="onPgnFileSelected($event)" />
+
+  @if (importError()) {
+    <div class="import-alert" [class.visible]="importErrorVisible()" role="status">{{ importError() }}</div>
+  }
+
   <!-- LEFT COLUMN -->
   <section class="left-column fade-in" aria-label="Chessboard and filters">
 
@@ -32,7 +43,13 @@
     <app-games-list
       *ngIf="!isFocusMode"
       [gamesLoaded]="gamesLoaded"
-      [games]="mockGames"
+      [games]="draftGames()"
+      [totalCount]="draftGamesTotalCount()"
+      [page]="draftGamesPage()"
+      [pageSize]="draftGamesPageSize()"
+      [resultSortMode]="draftGamesResultSortMode()"
+      [sortBy]="draftGamesSortBy()"
+      [sortDirection]="draftGamesSortDirection()"
       [databaseName]="currentDatabaseName"
       [sourceType]="currentGamesSource"
       [myDatabases]="myDatabases()"
@@ -42,7 +59,11 @@
       (searchCommunityDatabase)="searchCommunityDatabase()"
       (saveDatabase)="saveCurrentDatabase()"
       (saveDatabaseRequest)="onSaveDatabaseRequest($event)"
-      (addBookmark)="addCurrentDatabaseBookmark()" />
+      (addBookmark)="addCurrentDatabaseBookmark()"
+      (gamesResultSortModeChange)="onDraftGamesResultSortModeChanged($event)"
+      (gamesSortChange)="onDraftGamesSortChanged($event)"
+      (gamesPageSizeChange)="onDraftGamesPageSizeChanged($event)"
+      (gamesPageChange)="onDraftGamesPageChanged($event)" />
 
     <!-- Focus Mode Side Panel -->
     <div class="focus-side-panel panel fade-in" *ngIf="isFocusMode">
@@ -74,14 +95,25 @@
             <h2
               style="margin: 0; font-family: 'Space Grotesk', 'Segoe UI', sans-serif; font-weight: 700; font-size: 1rem; letter-spacing: 0.02em;">
               Games</h2>
-            <p style="margin: 0.35rem 0 0; color: var(--muted); font-size: 0.9rem;">{{ gamesLoaded ? mockGames.length + ' games loaded.' : 'No games loaded yet.' }}</p>
+            <p style="margin: 0.35rem 0 0; color: var(--muted); font-size: 0.9rem;">{{ gamesLoaded ? draftGamesTotalCount() + ' games loaded.' : 'No games loaded yet.' }}</p>
           </header>
           
           @if (!gamesLoaded) {
             <app-empty-games-state (importDatabase)="importDatabase()"
               (searchCommunityDatabase)="focusRightTab = 'databases'; searchCommunityDatabase()" />
           } @else {
-            <app-games-table [games]="mockGames" />
+            <app-games-table
+              [games]="draftGames()"
+              [totalCount]="draftGamesTotalCount()"
+              [page]="draftGamesPage()"
+              [pageSize]="draftGamesPageSize()"
+              [resultSortMode]="draftGamesResultSortMode()"
+              [sortBy]="draftGamesSortBy()"
+              [sortDirection]="draftGamesSortDirection()"
+              (resultSortModeChange)="onDraftGamesResultSortModeChanged($event)"
+              (sortChange)="onDraftGamesSortChanged($event)"
+              (pageSizeChange)="onDraftGamesPageSizeChanged($event)"
+              (pageChange)="onDraftGamesPageChanged($event)" />
           }
         </div>
 
@@ -92,3 +124,26 @@
     </div>
   </section>
 </main>
+
+@if (isImporting()) {
+  <div class="import-progress-overlay" role="dialog" aria-modal="true" aria-label="Import progress">
+    <div class="import-progress-card">
+      <h3>Importing PGN</h3>
+      <p class="status-line">{{ importProgress()?.message ?? 'Processing games...' }}</p>
+      <dl>
+        <div>
+          <dt>Parsed</dt>
+          <dd>{{ importProgress()?.parsedCount ?? 0 }}</dd>
+        </div>
+        <div>
+          <dt>Imported</dt>
+          <dd>{{ importProgress()?.importedCount ?? 0 }}</dd>
+        </div>
+        <div>
+          <dt>Skipped</dt>
+          <dd>{{ importProgress()?.skippedCount ?? 0 }}</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+}

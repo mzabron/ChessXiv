@@ -8,7 +8,7 @@ public class DraftImportServiceMappingTests
     [Fact]
     public void MapToStagingGame_MapsYearMoveCountAndMoveMetadata()
     {
-        var importSessionId = Guid.NewGuid();
+        var createdAtUtc = DateTime.UtcNow;
         var game = new Game
         {
             Id = Guid.NewGuid(),
@@ -33,10 +33,10 @@ public class DraftImportServiceMappingTests
             ]
         };
 
-        var staging = DraftImportService.MapToStagingGame(game, importSessionId, "user-1");
+        var staging = DraftImportService.MapToStagingGame(game, "user-1", createdAtUtc);
 
-        Assert.Equal(importSessionId, staging.ImportSessionId);
         Assert.Equal("user-1", staging.OwnerUserId);
+        Assert.Equal(createdAtUtc, staging.CreatedAtUtc);
         Assert.Equal(2024, staging.Year);
         Assert.Equal(1, staging.MoveCount);
         Assert.Single(staging.Moves);

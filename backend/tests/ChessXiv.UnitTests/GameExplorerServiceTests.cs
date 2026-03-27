@@ -10,14 +10,8 @@ namespace ChessXiv.UnitTests;
 public class GameExplorerServiceTests
 {
     [Fact]
-    public async Task SearchAsync_NormalizesPlayerTerms_AndPassesResolvedIdsToRepository()
+    public async Task SearchAsync_NormalizesPlayerTerms_AndPassesNormalizedNamesToRepository()
     {
-        var expectedPlayerId = Guid.NewGuid();
-        var playerRepository = new FakePlayerRepository
-        {
-            SearchIdsResult = [expectedPlayerId]
-        };
-
         var explorerRepository = new FakeGameExplorerRepository
         {
             Response = new PagedResult<GameExplorerItemDto>
@@ -29,7 +23,6 @@ public class GameExplorerServiceTests
 
         var service = new GameExplorerService(
             explorerRepository,
-            playerRepository,
             new FakeBoardStateSerializer(),
             new FakePositionHasher());
 
@@ -43,10 +36,8 @@ public class GameExplorerServiceTests
         var result = await service.SearchAsync(request, "user-1");
 
         Assert.Equal(1, result.TotalCount);
-        Assert.Equal("magnus", playerRepository.LastFirstName);
-        Assert.Equal("carlsen", playerRepository.LastLastName);
-        Assert.Single(explorerRepository.LastWhitePlayerIds!);
-        Assert.Contains(expectedPlayerId, explorerRepository.LastWhitePlayerIds!);
+        Assert.Equal("magnus", explorerRepository.LastWhiteFirstName);
+        Assert.Equal("carlsen", explorerRepository.LastWhiteLastName);
     }
 
     [Fact]
@@ -54,12 +45,11 @@ public class GameExplorerServiceTests
     {
         const string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-        var playerRepository = new FakePlayerRepository();
         var explorerRepository = new FakeGameExplorerRepository();
         var serializer = new FakeBoardStateSerializer();
         var hasher = new FakePositionHasher { HashToReturn = 42UL };
 
-        var service = new GameExplorerService(explorerRepository, playerRepository, serializer, hasher);
+        var service = new GameExplorerService(explorerRepository, serializer, hasher);
 
         await service.SearchAsync(new GameExplorerSearchRequest
         {
@@ -75,17 +65,11 @@ public class GameExplorerServiceTests
     }
 
     [Fact]
-    public async Task SearchAsync_ReturnsEmpty_WhenNoPlayerIdsFound_AndSkipsGameRepository()
+    public async Task SearchAsync_WithNameFilters_DelegatesToRepository()
     {
-        var playerRepository = new FakePlayerRepository
-        {
-            SearchIdsResult = []
-        };
-
         var explorerRepository = new FakeGameExplorerRepository();
         var service = new GameExplorerService(
             explorerRepository,
-            playerRepository,
             new FakeBoardStateSerializer(),
             new FakePositionHasher());
 
@@ -97,13 +81,12 @@ public class GameExplorerServiceTests
 
         Assert.Equal(0, result.TotalCount);
         Assert.Empty(result.Items);
-        Assert.Equal(0, explorerRepository.CallCount);
+        Assert.Equal(1, explorerRepository.CallCount);
     }
 
     [Fact]
     public async Task SearchAsync_ThrowsForbidden_WhenUserDatabaseIsNotAccessible()
     {
-        var playerRepository = new FakePlayerRepository();
         var explorerRepository = new FakeGameExplorerRepository
         {
             AccessStatus = UserDatabaseAccessStatus.Forbidden
@@ -111,7 +94,6 @@ public class GameExplorerServiceTests
 
         var service = new GameExplorerService(
             explorerRepository,
-            playerRepository,
             new FakeBoardStateSerializer(),
             new FakePositionHasher());
 
@@ -125,7 +107,6 @@ public class GameExplorerServiceTests
     [Fact]
     public async Task SearchAsync_ThrowsNotFound_WhenUserDatabaseDoesNotExist()
     {
-        var playerRepository = new FakePlayerRepository();
         var explorerRepository = new FakeGameExplorerRepository
         {
             AccessStatus = UserDatabaseAccessStatus.NotFound
@@ -133,7 +114,6 @@ public class GameExplorerServiceTests
 
         var service = new GameExplorerService(
             explorerRepository,
-            playerRepository,
             new FakeBoardStateSerializer(),
             new FakePositionHasher());
 
@@ -147,7 +127,6 @@ public class GameExplorerServiceTests
     [Fact]
     public async Task SearchAsync_ReturnsData_WhenUserDatabaseIsPublic()
     {
-        var playerRepository = new FakePlayerRepository();
         var explorerRepository = new FakeGameExplorerRepository
         {
             AccessStatus = UserDatabaseAccessStatus.Accessible,
@@ -160,7 +139,6 @@ public class GameExplorerServiceTests
 
         var service = new GameExplorerService(
             explorerRepository,
-            playerRepository,
             new FakeBoardStateSerializer(),
             new FakePositionHasher());
 
@@ -176,7 +154,6 @@ public class GameExplorerServiceTests
     [Fact]
     public async Task SearchAsync_GuestWithoutUserDatabaseId_DelegatesToRepository()
     {
-        var playerRepository = new FakePlayerRepository();
         var explorerRepository = new FakeGameExplorerRepository
         {
             Response = new PagedResult<GameExplorerItemDto>
@@ -188,7 +165,6 @@ public class GameExplorerServiceTests
 
         var service = new GameExplorerService(
             explorerRepository,
-            playerRepository,
             new FakeBoardStateSerializer(),
             new FakePositionHasher());
 
@@ -203,7 +179,6 @@ public class GameExplorerServiceTests
     {
         const string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-        var playerRepository = new FakePlayerRepository();
         var explorerRepository = new FakeGameExplorerRepository
         {
             MoveTreeResponse = new MoveTreeResponse
@@ -233,7 +208,7 @@ public class GameExplorerServiceTests
 
         var serializer = new FakeBoardStateSerializer();
         var hasher = new FakePositionHasher { HashToReturn = 99UL };
-        var service = new GameExplorerService(explorerRepository, playerRepository, serializer, hasher);
+        var service = new GameExplorerService(explorerRepository, serializer, hasher);
 
         var result = await service.GetMoveTreeAsync(new MoveTreeRequest
         {
@@ -259,7 +234,6 @@ public class GameExplorerServiceTests
     {
         const string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-        var playerRepository = new FakePlayerRepository();
         var explorerRepository = new FakeGameExplorerRepository
         {
             MoveTreeResponse = new MoveTreeResponse
@@ -281,7 +255,7 @@ public class GameExplorerServiceTests
 
         var serializer = new FakeBoardStateSerializer();
         var hasher = new FakePositionHasher();
-        var service = new GameExplorerService(explorerRepository, playerRepository, serializer, hasher);
+        var service = new GameExplorerService(explorerRepository, serializer, hasher);
 
         var result = await service.GetMoveTreeAsync(new MoveTreeRequest
         {
@@ -300,8 +274,10 @@ public class GameExplorerServiceTests
     private sealed class FakeGameExplorerRepository : IGameExplorerRepository
     {
         public int CallCount { get; private set; }
-        public IReadOnlyCollection<Guid>? LastWhitePlayerIds { get; private set; }
-        public IReadOnlyCollection<Guid>? LastBlackPlayerIds { get; private set; }
+        public string? LastWhiteFirstName { get; private set; }
+        public string? LastWhiteLastName { get; private set; }
+        public string? LastBlackFirstName { get; private set; }
+        public string? LastBlackLastName { get; private set; }
         public string? LastNormalizedFen { get; private set; }
         public long? LastFenHash { get; private set; }
         public PagedResult<GameExplorerItemDto> Response { get; set; } = new();
@@ -323,15 +299,19 @@ public class GameExplorerServiceTests
         public Task<PagedResult<GameExplorerItemDto>> SearchAsync(
             GameExplorerSearchRequest request,
             string? ownerUserId,
-            IReadOnlyCollection<Guid>? whitePlayerIds,
-            IReadOnlyCollection<Guid>? blackPlayerIds,
+            string? normalizedWhiteFirstName,
+            string? normalizedWhiteLastName,
+            string? normalizedBlackFirstName,
+            string? normalizedBlackLastName,
             string? normalizedFen,
             long? fenHash,
             CancellationToken cancellationToken = default)
         {
             CallCount++;
-            LastWhitePlayerIds = whitePlayerIds;
-            LastBlackPlayerIds = blackPlayerIds;
+            LastWhiteFirstName = normalizedWhiteFirstName;
+            LastWhiteLastName = normalizedWhiteLastName;
+            LastBlackFirstName = normalizedBlackFirstName;
+            LastBlackLastName = normalizedBlackLastName;
             LastNormalizedFen = normalizedFen;
             LastFenHash = fenHash;
             return Task.FromResult(Response);
@@ -349,36 +329,6 @@ public class GameExplorerServiceTests
             LastMoveTreeNormalizedFen = normalizedFen;
             LastMoveTreeFenHash = fenHash;
             return Task.FromResult(MoveTreeResponse);
-        }
-    }
-
-    private sealed class FakePlayerRepository : IPlayerRepository
-    {
-        public IReadOnlyCollection<Guid> SearchIdsResult { get; set; } = [];
-        public string? LastFirstName { get; private set; }
-        public string? LastLastName { get; private set; }
-
-        public Task<IReadOnlyDictionary<string, ChessXiv.Domain.Entities.Player>> GetByNormalizedFullNamesAsync(
-            IReadOnlyCollection<string> normalizedFullNames,
-            CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyDictionary<string, ChessXiv.Domain.Entities.Player>>(
-                new Dictionary<string, ChessXiv.Domain.Entities.Player>(StringComparer.Ordinal));
-        }
-
-        public Task AddRangeAsync(IReadOnlyCollection<ChessXiv.Domain.Entities.Player> players, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<IReadOnlyCollection<Guid>> SearchIdsAsync(
-            string? normalizedFirstName,
-            string? normalizedLastName,
-            CancellationToken cancellationToken = default)
-        {
-            LastFirstName = normalizedFirstName;
-            LastLastName = normalizedLastName;
-            return Task.FromResult(SearchIdsResult);
         }
     }
 

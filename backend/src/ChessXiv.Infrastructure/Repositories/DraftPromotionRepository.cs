@@ -7,12 +7,6 @@ namespace ChessXiv.Infrastructure.Repositories;
 
 public sealed class DraftPromotionRepository(ChessXivDbContext dbContext) : IDraftPromotionRepository
 {
-    public Task<StagingImportSession?> GetSessionAsync(Guid importSessionId, string ownerUserId, CancellationToken cancellationToken = default)
-    {
-        return dbContext.StagingImportSessions
-            .FirstOrDefaultAsync(s => s.Id == importSessionId && s.OwnerUserId == ownerUserId, cancellationToken);
-    }
-
     public Task<UserDatabase?> GetUserDatabaseAsync(Guid userDatabaseId, CancellationToken cancellationToken = default)
     {
         return dbContext.UserDatabases
@@ -20,34 +14,17 @@ public sealed class DraftPromotionRepository(ChessXivDbContext dbContext) : IDra
     }
 
     public async Task<IReadOnlyCollection<StagingGame>> GetStagingGamesPageAsync(
-        Guid importSessionId,
         string ownerUserId,
         int take,
         CancellationToken cancellationToken = default)
     {
         return await dbContext.StagingGames
             .AsNoTracking()
-            .Where(g => g.ImportSessionId == importSessionId && g.OwnerUserId == ownerUserId)
+            .Where(g => g.OwnerUserId == ownerUserId)
             .OrderBy(g => g.Id)
             .Take(take)
             .Include(g => g.Moves)
             .Include(g => g.Positions)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<IReadOnlyCollection<UserDatabaseGame>> GetExistingLinksByGameHashesAsync(
-        Guid userDatabaseId,
-        IReadOnlyCollection<string> gameHashes,
-        CancellationToken cancellationToken = default)
-    {
-        if (gameHashes.Count == 0)
-        {
-            return Array.Empty<UserDatabaseGame>();
-        }
-
-        return await dbContext.UserDatabaseGames
-            .Where(link => link.UserDatabaseId == userDatabaseId && gameHashes.Contains(link.Game.GameHash))
-            .Include(link => link.Game)
             .ToListAsync(cancellationToken);
     }
 
@@ -80,12 +57,4 @@ public sealed class DraftPromotionRepository(ChessXivDbContext dbContext) : IDra
         dbContext.StagingGames.RemoveRange(gamesToRemove);
     }
 
-    public Task MarkSessionPromotedAsync(Guid importSessionId, string ownerUserId, DateTime promotedAtUtc, CancellationToken cancellationToken = default)
-    {
-        return dbContext.StagingImportSessions
-            .Where(s => s.Id == importSessionId && s.OwnerUserId == ownerUserId)
-            .ExecuteUpdateAsync(
-                updates => updates.SetProperty(s => s.PromotedAtUtc, promotedAtUtc),
-                cancellationToken);
-    }
 }

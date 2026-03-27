@@ -40,7 +40,6 @@ builder.Services.AddDbContext<ChessXivDbContext>(options =>
 });
 builder.Services.AddScoped<IPgnParser, PgnService>();
 builder.Services.AddScoped<IGameRepository, GameRepository>();
-builder.Services.AddScoped<IPlayerRepository, PlayerRepository>();
 builder.Services.AddScoped<IPositionImportCoordinator, PositionImportCoordinator>();
 builder.Services.AddScoped<IBoardStateSerializer, FenBoardStateSerializer>();
 builder.Services.AddScoped<IBoardStateFactory, BoardStateFactory>();

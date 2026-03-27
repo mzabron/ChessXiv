@@ -99,11 +99,10 @@ public class PgnImportControllerApiTests
         public Task<DraftImportResult> ImportAsync(
             TextReader reader,
             string ownerUserId,
-            Guid? importSessionId = null,
             int batchSize = 500,
             CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(new DraftImportResult(Guid.NewGuid(), 0, 0, 0, DateTime.UtcNow.AddDays(7)));
+            return Task.FromResult(new DraftImportResult(0, 0, 0));
         }
     }
 
@@ -111,12 +110,10 @@ public class PgnImportControllerApiTests
     {
         public Task<DraftPromotionResult> PromoteAsync(
             string ownerUserId,
-            Guid importSessionId,
             Guid userDatabaseId,
-            DuplicateHandlingMode duplicateHandling,
             CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(new DraftPromotionResult(importSessionId, 0, 0, 0, 0));
+            return Task.FromResult(new DraftPromotionResult(0, 0));
         }
     }
 }

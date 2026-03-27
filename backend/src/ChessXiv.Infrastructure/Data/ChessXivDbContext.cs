@@ -12,13 +12,11 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
     }
 
     public DbSet<Game> Games { get; set; }
-    public DbSet<Player> Players { get; set; }
     public DbSet<Move> Moves { get; set; }
     public DbSet<Position> Positions { get; set; }
     public DbSet<UserDatabase> UserDatabases { get; set; }
     public DbSet<UserDatabaseGame> UserDatabaseGames { get; set; }
     public DbSet<UserDatabaseBookmark> UserDatabaseBookmarks { get; set; }
-    public DbSet<StagingImportSession> StagingImportSessions { get; set; }
     public DbSet<StagingGame> StagingGames { get; set; }
     public DbSet<StagingMove> StagingMoves { get; set; }
     public DbSet<StagingPosition> StagingPositions { get; set; }
@@ -34,31 +32,20 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(u => u.UserTier).HasMaxLength(32).IsRequired();
         });
 
-        modelBuilder.Entity<Player>(entity =>
-        {
-            entity.HasIndex(p => p.NormalizedFullName).IsUnique();
-            entity.HasIndex(p => p.NormalizedFirstName);
-            entity.HasIndex(p => p.NormalizedLastName);
-        });
-
         modelBuilder.Entity<Game>(entity =>
         {
             entity.HasIndex(g => new { g.Year, g.Id });
             entity.HasIndex(g => g.MoveCount);
             entity.Property(g => g.GameHash).HasMaxLength(64).IsRequired();
+            entity.Property(g => g.WhiteNormalizedFullName).HasMaxLength(256).IsRequired();
+            entity.Property(g => g.BlackNormalizedFullName).HasMaxLength(256).IsRequired();
+            entity.Property(g => g.WhiteNormalizedFirstName).HasMaxLength(128);
+            entity.Property(g => g.WhiteNormalizedLastName).HasMaxLength(128);
+            entity.Property(g => g.BlackNormalizedFirstName).HasMaxLength(128);
+            entity.Property(g => g.BlackNormalizedLastName).HasMaxLength(128);
             entity.HasIndex(g => g.GameHash);
-
-            entity
-                .HasOne(g => g.WhitePlayer)
-                .WithMany(p => p.GamesAsWhite)
-                .HasForeignKey(g => g.WhitePlayerId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity
-                .HasOne(g => g.BlackPlayer)
-                .WithMany(p => p.GamesAsBlack)
-                .HasForeignKey(g => g.BlackPlayerId)
-                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(g => new { g.WhiteNormalizedFirstName, g.WhiteNormalizedLastName });
+            entity.HasIndex(g => new { g.BlackNormalizedFirstName, g.BlackNormalizedLastName });
         });
 
         modelBuilder.Entity<Move>(entity =>
@@ -139,42 +126,29 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<StagingImportSession>(entity =>
-        {
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.OwnerUserId).IsRequired();
-            entity.Property(x => x.CreatedAtUtc).IsRequired();
-            entity.Property(x => x.ExpiresAtUtc).IsRequired();
-            entity.HasIndex(x => new { x.OwnerUserId, x.CreatedAtUtc });
-            entity.HasIndex(x => x.ExpiresAtUtc);
-
-            entity
-                .HasOne<ApplicationUser>()
-                .WithMany()
-                .HasForeignKey(x => x.OwnerUserId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
         modelBuilder.Entity<StagingGame>(entity =>
         {
             entity.HasKey(x => x.Id);
             entity.Property(x => x.OwnerUserId).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.Property(x => x.White).IsRequired();
             entity.Property(x => x.Black).IsRequired();
             entity.Property(x => x.Result).IsRequired();
             entity.Property(x => x.Pgn).IsRequired();
             entity.Property(x => x.GameHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.WhiteNormalizedFullName).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.BlackNormalizedFullName).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.WhiteNormalizedFirstName).HasMaxLength(128);
+            entity.Property(x => x.WhiteNormalizedLastName).HasMaxLength(128);
+            entity.Property(x => x.BlackNormalizedFirstName).HasMaxLength(128);
+            entity.Property(x => x.BlackNormalizedLastName).HasMaxLength(128);
 
-            entity.HasIndex(x => new { x.OwnerUserId, x.ImportSessionId, x.GameHash });
-            entity.HasIndex(x => new { x.OwnerUserId, x.ImportSessionId, x.White });
-            entity.HasIndex(x => new { x.OwnerUserId, x.ImportSessionId, x.Black });
-            entity.HasIndex(x => x.ImportSessionId);
-
-            entity
-                .HasOne(x => x.ImportSession)
-                .WithMany(x => x.Games)
-                .HasForeignKey(x => x.ImportSessionId)
-                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.OwnerUserId, x.GameHash });
+            entity.HasIndex(x => new { x.OwnerUserId, x.White });
+            entity.HasIndex(x => new { x.OwnerUserId, x.Black });
+            entity.HasIndex(x => new { x.OwnerUserId, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.OwnerUserId, x.WhiteNormalizedFirstName, x.WhiteNormalizedLastName });
+            entity.HasIndex(x => new { x.OwnerUserId, x.BlackNormalizedFirstName, x.BlackNormalizedLastName });
         });
 
         modelBuilder.Entity<StagingMove>(entity =>

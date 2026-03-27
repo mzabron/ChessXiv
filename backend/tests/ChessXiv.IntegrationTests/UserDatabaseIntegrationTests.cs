@@ -301,29 +301,16 @@ public class UserDatabaseIntegrationTests(PostgresTestFixture fixture)
     private static Game CreateGame(string white, string black)
     {
         var gameId = Guid.NewGuid();
-        var whitePlayer = new Player
-        {
-            Id = Guid.NewGuid(),
-            FullName = white,
-            NormalizedFullName = white.ToLowerInvariant()
-        };
-
-        var blackPlayer = new Player
-        {
-            Id = Guid.NewGuid(),
-            FullName = black,
-            NormalizedFullName = black.ToLowerInvariant()
-        };
+        var whiteNormalized = white.ToLowerInvariant();
+        var blackNormalized = black.ToLowerInvariant();
 
         return new Game
         {
             Id = gameId,
             White = white,
             Black = black,
-            WhitePlayerId = whitePlayer.Id,
-            BlackPlayerId = blackPlayer.Id,
-            WhitePlayer = whitePlayer,
-            BlackPlayer = blackPlayer,
+            WhiteNormalizedFullName = whiteNormalized,
+            BlackNormalizedFullName = blackNormalized,
             Result = "*",
             Pgn = "1. e4 e5 *",
             MoveCount = 1,

@@ -3,10 +3,8 @@ namespace ChessXiv.Domain.Entities;
 public class StagingGame
 {
     public Guid Id { get; set; }
-    public Guid ImportSessionId { get; set; }
     public string OwnerUserId { get; set; } = null!;
-    public Guid? WhitePlayerId { get; set; }
-    public Guid? BlackPlayerId { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
     public DateTime? Date { get; set; }
     public int Year { get; set; }
     public string? Round { get; set; }
@@ -21,12 +19,17 @@ public class StagingGame
     public string? Opening { get; set; }
     public string White { get; set; } = null!;
     public string Black { get; set; } = null!;
+    public string WhiteNormalizedFullName { get; set; } = string.Empty;
+    public string? WhiteNormalizedFirstName { get; set; }
+    public string? WhiteNormalizedLastName { get; set; }
+    public string BlackNormalizedFullName { get; set; } = string.Empty;
+    public string? BlackNormalizedFirstName { get; set; }
+    public string? BlackNormalizedLastName { get; set; }
     public string Result { get; set; } = null!;
     public string Pgn { get; set; } = null!;
     public int MoveCount { get; set; }
     public string GameHash { get; set; } = string.Empty;
 
-    public StagingImportSession ImportSession { get; set; } = null!;
     public ICollection<StagingMove> Moves { get; set; } = new List<StagingMove>();
     public ICollection<StagingPosition> Positions { get; set; } = new List<StagingPosition>();
 }

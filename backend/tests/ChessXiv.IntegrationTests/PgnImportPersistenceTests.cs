@@ -20,14 +20,13 @@ public class PgnImportPersistenceTests(PostgresTestFixture fixture)
         await using var dbContext = fixture.CreateDbContext();
         var parser = new PgnService();
         var repository = new GameRepository(dbContext);
-        var playerRepository = new PlayerRepository(dbContext);
         var serializer = new FenBoardStateSerializer();
         var factory = new BoardStateFactory(serializer);
         var transition = new BitboardBoardStateTransition();
         var hasher = new ZobristPositionHasher();
         var positionCoordinator = new PositionImportCoordinator(factory, serializer, transition, hasher);
         var unitOfWork = new EfUnitOfWork(dbContext);
-        var importService = new PgnImportService(parser, repository, playerRepository, positionCoordinator, unitOfWork);
+        var importService = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         const string pgn = """
             [Event "Integration Import"]
@@ -85,14 +84,13 @@ public class PgnImportPersistenceTests(PostgresTestFixture fixture)
         await using var dbContext = fixture.CreateDbContext();
         var parser = new PgnService();
         var repository = new GameRepository(dbContext);
-        var playerRepository = new PlayerRepository(dbContext);
         var serializer = new FenBoardStateSerializer();
         var factory = new BoardStateFactory(serializer);
         var transition = new BitboardBoardStateTransition();
         var hasher = new ZobristPositionHasher();
         var positionCoordinator = new PositionImportCoordinator(factory, serializer, transition, hasher);
         var unitOfWork = new EfUnitOfWork(dbContext);
-        var importService = new PgnImportService(parser, repository, playerRepository, positionCoordinator, unitOfWork);
+        var importService = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         const string pgn = """
             [Event "Partial Move Import"]

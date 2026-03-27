@@ -7,33 +7,18 @@ namespace ChessXiv.Application.Services;
 
 public sealed class DraftPromotionService(
     IDraftPromotionRepository draftPromotionRepository,
-    IPlayerRepository playerRepository,
     IUnitOfWork unitOfWork) : IDraftPromotionService
 {
     private const int PromotionBatchSize = 500;
 
     public async Task<DraftPromotionResult> PromoteAsync(
         string ownerUserId,
-        Guid importSessionId,
         Guid userDatabaseId,
-        DuplicateHandlingMode duplicateHandling,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(ownerUserId))
         {
             throw new ArgumentException("Owner user id is required.", nameof(ownerUserId));
-        }
-
-        var session = await draftPromotionRepository.GetSessionAsync(importSessionId, ownerUserId, cancellationToken);
-
-        if (session is null)
-        {
-            throw new InvalidOperationException("Draft import session was not found for this user.");
-        }
-
-        if (session.PromotedAtUtc.HasValue)
-        {
-            throw new InvalidOperationException("Draft import session has already been promoted.");
         }
 
         var userDatabase = await draftPromotionRepository.GetUserDatabaseAsync(userDatabaseId, cancellationToken);
@@ -50,8 +35,6 @@ public sealed class DraftPromotionService(
 
         var now = DateTime.UtcNow;
         var promotedCount = 0;
-        var duplicateCount = 0;
-        var overriddenCount = 0;
         var skippedCount = 0;
 
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
@@ -61,48 +44,18 @@ public sealed class DraftPromotionService(
             while (true)
             {
                 var stagingPage = await draftPromotionRepository
-                    .GetStagingGamesPageAsync(importSessionId, ownerUserId, PromotionBatchSize, cancellationToken);
+                    .GetStagingGamesPageAsync(ownerUserId, PromotionBatchSize, cancellationToken);
 
                 if (stagingPage.Count == 0)
                 {
                     break;
                 }
 
-                var pageHashes = stagingPage
-                    .Select(g => g.GameHash)
-                    .Distinct(StringComparer.Ordinal)
-                    .ToArray();
-
-                var existingLinks = await draftPromotionRepository
-                    .GetExistingLinksByGameHashesAsync(userDatabaseId, pageHashes, cancellationToken);
-
-                var existingByHash = existingLinks
-                    .GroupBy(link => link.Game.GameHash, StringComparer.Ordinal)
-                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
-
                 var gamesToPromote = new List<Game>(stagingPage.Count);
                 var stagingIdsToDelete = new List<Guid>(stagingPage.Count);
 
                 foreach (var stagingGame in stagingPage)
                 {
-                    if (existingByHash.TryGetValue(stagingGame.GameHash, out var existingLink))
-                    {
-                        duplicateCount++;
-
-                        if (duplicateHandling == DuplicateHandlingMode.OverrideMetadata)
-                        {
-                            ApplyJoinMetadata(existingLink, stagingGame, now);
-                            overriddenCount++;
-                        }
-                        else
-                        {
-                            skippedCount++;
-                        }
-
-                        stagingIdsToDelete.Add(stagingGame.Id);
-                        continue;
-                    }
-
                     var promotedGame = MapToMainGame(stagingGame);
                     gamesToPromote.Add(promotedGame);
                     stagingIdsToDelete.Add(stagingGame.Id);
@@ -110,8 +63,6 @@ public sealed class DraftPromotionService(
 
                 if (gamesToPromote.Count > 0)
                 {
-                    await ResolvePlayersAsync(gamesToPromote, cancellationToken);
-
                     foreach (var promotedGame in gamesToPromote)
                     {
                         await draftPromotionRepository.AddGameAsync(promotedGame, cancellationToken);
@@ -136,8 +87,6 @@ public sealed class DraftPromotionService(
                 unitOfWork.ClearTracker();
             }
 
-            await draftPromotionRepository.MarkSessionPromotedAsync(importSessionId, ownerUserId, now, cancellationToken);
-            await unitOfWork.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch
@@ -146,96 +95,7 @@ public sealed class DraftPromotionService(
             throw;
         }
 
-        return new DraftPromotionResult(importSessionId, promotedCount, duplicateCount, overriddenCount, skippedCount);
-    }
-
-    private async Task ResolvePlayersAsync(IReadOnlyCollection<Game> games, CancellationToken cancellationToken)
-    {
-        var normalizedToOriginalName = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var name in games.SelectMany(g => new[] { g.White, g.Black }))
-        {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                continue;
-            }
-
-            var normalizedName = PlayerNameNormalizer.Normalize(name);
-            if (normalizedName.Length == 0 || normalizedToOriginalName.ContainsKey(normalizedName))
-            {
-                continue;
-            }
-
-            normalizedToOriginalName[normalizedName] = name;
-        }
-
-        var normalizedNames = normalizedToOriginalName.Keys.ToArray();
-        if (normalizedNames.Length == 0)
-        {
-            return;
-        }
-
-        var existingPlayers = await playerRepository.GetByNormalizedFullNamesAsync(normalizedNames, cancellationToken);
-        var playersByNormalizedName = new Dictionary<string, Player>(existingPlayers, StringComparer.Ordinal);
-        var missingPlayers = new List<Player>();
-
-        foreach (var normalizedName in normalizedNames)
-        {
-            if (playersByNormalizedName.ContainsKey(normalizedName))
-            {
-                continue;
-            }
-
-            var fullName = normalizedToOriginalName[normalizedName];
-            var (firstName, lastName) = PlayerNameNormalizer.ParseNameParts(fullName);
-
-            var player = new Player
-            {
-                Id = Guid.NewGuid(),
-                FullName = fullName,
-                NormalizedFullName = normalizedName,
-                FirstName = firstName,
-                LastName = lastName,
-                NormalizedFirstName = firstName is null ? null : PlayerNameNormalizer.Normalize(firstName),
-                NormalizedLastName = lastName is null ? null : PlayerNameNormalizer.Normalize(lastName)
-            };
-
-            missingPlayers.Add(player);
-        }
-
-        if (missingPlayers.Count > 0)
-        {
-            await playerRepository.AddRangeAsync(missingPlayers, cancellationToken);
-            foreach (var player in missingPlayers)
-            {
-                playersByNormalizedName[player.NormalizedFullName] = player;
-            }
-        }
-
-        foreach (var game in games)
-        {
-            var whiteNormalizedName = PlayerNameNormalizer.Normalize(game.White);
-            var blackNormalizedName = PlayerNameNormalizer.Normalize(game.Black);
-
-            if (playersByNormalizedName.TryGetValue(whiteNormalizedName, out var whitePlayer))
-            {
-                game.WhitePlayerId = whitePlayer.Id;
-            }
-
-            if (playersByNormalizedName.TryGetValue(blackNormalizedName, out var blackPlayer))
-            {
-                game.BlackPlayerId = blackPlayer.Id;
-            }
-        }
-    }
-
-    private static void ApplyJoinMetadata(UserDatabaseGame link, StagingGame stagingGame, DateTime now)
-    {
-        link.AddedAtUtc = now;
-        link.Date = stagingGame.Date;
-        link.Year = stagingGame.Year;
-        link.Event = stagingGame.Event;
-        link.Round = stagingGame.Round;
-        link.Site = stagingGame.Site;
+        return new DraftPromotionResult(promotedCount, skippedCount);
     }
 
     private static Game MapToMainGame(StagingGame stagingGame)
@@ -243,8 +103,6 @@ public sealed class DraftPromotionService(
         return new Game
         {
             Id = Guid.NewGuid(),
-            WhitePlayerId = stagingGame.WhitePlayerId,
-            BlackPlayerId = stagingGame.BlackPlayerId,
             Date = stagingGame.Date,
             Year = stagingGame.Year,
             Round = stagingGame.Round,
@@ -259,6 +117,12 @@ public sealed class DraftPromotionService(
             Opening = stagingGame.Opening,
             White = stagingGame.White,
             Black = stagingGame.Black,
+            WhiteNormalizedFullName = stagingGame.WhiteNormalizedFullName,
+            WhiteNormalizedFirstName = stagingGame.WhiteNormalizedFirstName,
+            WhiteNormalizedLastName = stagingGame.WhiteNormalizedLastName,
+            BlackNormalizedFullName = stagingGame.BlackNormalizedFullName,
+            BlackNormalizedFirstName = stagingGame.BlackNormalizedFirstName,
+            BlackNormalizedLastName = stagingGame.BlackNormalizedLastName,
             Result = stagingGame.Result,
             Pgn = stagingGame.Pgn,
             MoveCount = stagingGame.MoveCount,

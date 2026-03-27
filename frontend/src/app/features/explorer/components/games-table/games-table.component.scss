@@ -30,6 +30,15 @@
     z-index: 1;
   }
 
+  th.sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  th.sortable:hover {
+    color: var(--text);
+  }
+
   .game-row {
     cursor: pointer;
     transition: background 0.15s ease;
@@ -47,6 +56,52 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 15rem;
+  }
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.6rem 0.75rem;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+
+  button {
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--text);
+    border-radius: 8px;
+    padding: 0.35rem 0.6rem;
+    font: 600 0.8rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  span {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .page-size {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-right: 0.2rem;
+  }
+
+  .page-size-select {
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--text);
+    border-radius: 8px;
+    padding: 0.25rem 0.4rem;
+    font: 600 0.76rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
+    margin-right: 0.3rem;
   }
 }
 

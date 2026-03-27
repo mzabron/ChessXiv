@@ -6,8 +6,6 @@ public interface IDraftPromotionService
 {
     Task<DraftPromotionResult> PromoteAsync(
         string ownerUserId,
-        Guid importSessionId,
         Guid userDatabaseId,
-        DuplicateHandlingMode duplicateHandling,
         CancellationToken cancellationToken = default);
 }

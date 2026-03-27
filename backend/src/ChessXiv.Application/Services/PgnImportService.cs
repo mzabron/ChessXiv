@@ -8,7 +8,6 @@ namespace ChessXiv.Application.Services;
 public class PgnImportService(
 	IPgnParser pgnParser,
 	IGameRepository gameRepository,
-	IPlayerRepository playerRepository,
 	IPositionImportCoordinator positionImportCoordinator,
 	IUnitOfWork unitOfWork) : IPgnImportService
 {
@@ -67,94 +66,41 @@ public class PgnImportService(
 			}
 
 			game.MoveCount = game.Moves.Count;
+			ApplyNormalizedNames(game);
 			game.GameHash = GameHashCalculator.Compute(game);
 		}
 
-		await ResolvePlayersAsync(games, cancellationToken);
 		await positionImportCoordinator.PopulateAsync(games, cancellationToken);
 		await gameRepository.AddRangeAsync(games, cancellationToken);
 		await unitOfWork.SaveChangesAsync(cancellationToken);
 		unitOfWork.ClearTracker();
 	}
 
-	private async Task ResolvePlayersAsync(IReadOnlyCollection<Game> games, CancellationToken cancellationToken)
+	private static void ApplyNormalizedNames(Game game)
 	{
-		var normalizedToOriginalName = new Dictionary<string, string>(StringComparer.Ordinal);
-		foreach (var name in games.SelectMany(g => new[] { g.White, g.Black }))
+		ApplyNormalizedName(game.White, out var whiteFull, out var whiteFirst, out var whiteLast);
+		ApplyNormalizedName(game.Black, out var blackFull, out var blackFirst, out var blackLast);
+
+		game.WhiteNormalizedFullName = whiteFull;
+		game.WhiteNormalizedFirstName = whiteFirst;
+		game.WhiteNormalizedLastName = whiteLast;
+		game.BlackNormalizedFullName = blackFull;
+		game.BlackNormalizedFirstName = blackFirst;
+		game.BlackNormalizedLastName = blackLast;
+	}
+
+	private static void ApplyNormalizedName(string rawName, out string full, out string? first, out string? last)
+	{
+		var (parsedFirst, parsedLast) = PlayerNameNormalizer.ParseNameParts(rawName);
+		first = parsedFirst is null ? null : PlayerNameNormalizer.Normalize(parsedFirst);
+		last = parsedLast is null ? null : PlayerNameNormalizer.Normalize(parsedLast);
+
+		if (first is not null && last is not null)
 		{
-			if (string.IsNullOrWhiteSpace(name))
-			{
-				continue;
-			}
-
-			var normalizedName = PlayerNameNormalizer.Normalize(name);
-			if (normalizedName.Length == 0 || normalizedToOriginalName.ContainsKey(normalizedName))
-			{
-				continue;
-			}
-
-			normalizedToOriginalName[normalizedName] = name;
-		}
-
-		var normalizedNames = normalizedToOriginalName.Keys.ToArray();
-
-		if (normalizedNames.Length == 0)
-		{
+			full = PlayerNameNormalizer.Normalize($"{parsedFirst} {parsedLast}");
 			return;
 		}
 
-		var existingPlayers = await playerRepository.GetByNormalizedFullNamesAsync(normalizedNames, cancellationToken);
-		var playersByNormalizedName = new Dictionary<string, Player>(existingPlayers, StringComparer.Ordinal);
-		var missingPlayers = new List<Player>();
-
-		foreach (var normalizedName in normalizedNames)
-		{
-			if (playersByNormalizedName.ContainsKey(normalizedName))
-			{
-				continue;
-			}
-
-			var fullName = normalizedToOriginalName[normalizedName];
-
-			var (firstName, lastName) = PlayerNameNormalizer.ParseNameParts(fullName);
-
-			var player = new Player
-			{
-				Id = Guid.NewGuid(),
-				FullName = fullName,
-				NormalizedFullName = normalizedName,
-				FirstName = firstName,
-				LastName = lastName,
-				NormalizedFirstName = firstName is null ? null : PlayerNameNormalizer.Normalize(firstName),
-				NormalizedLastName = lastName is null ? null : PlayerNameNormalizer.Normalize(lastName)
-			};
-
-			missingPlayers.Add(player);
-		}
-
-		if (missingPlayers.Count > 0)
-		{
-			await playerRepository.AddRangeAsync(missingPlayers, cancellationToken);
-			foreach (var player in missingPlayers)
-			{
-				playersByNormalizedName[player.NormalizedFullName] = player;
-			}
-		}
-
-		foreach (var game in games)
-		{
-			var whiteNormalizedName = PlayerNameNormalizer.Normalize(game.White);
-			var blackNormalizedName = PlayerNameNormalizer.Normalize(game.Black);
-
-			if (playersByNormalizedName.TryGetValue(whiteNormalizedName, out var whitePlayer))
-			{
-				game.WhitePlayerId = whitePlayer.Id;
-			}
-
-			if (playersByNormalizedName.TryGetValue(blackNormalizedName, out var blackPlayer))
-			{
-				game.BlackPlayerId = blackPlayer.Id;
-			}
-		}
+		full = PlayerNameNormalizer.Normalize(rawName);
 	}
 }

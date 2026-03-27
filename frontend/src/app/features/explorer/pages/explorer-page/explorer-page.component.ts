@@ -1,6 +1,7 @@
-import { Component, ElementRef, HostListener, ViewChild, Input, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild, Input, effect, inject, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { forkJoin } from 'rxjs';
+import { firstValueFrom, forkJoin, Subscription } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ChessboardComponent } from '../../components/chessboard/chessboard.component';
 import { GamesListComponent } from '../../components/games-list/games-list.component';
 import { GamesTreeComponent } from '../../components/games-tree/games-tree.component';
@@ -13,6 +14,15 @@ import { MoveRow } from '../../components/move-list/move-list.component';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { UserDatabasesApiService } from '../../services/user-databases-api.service';
 import { Database } from '../../components/databases-panel/databases-panel.component';
+import {
+  DraftGameListItem,
+  DraftGamesResultSortMode,
+  DraftGamesSortBy,
+  DraftGamesSortDirection,
+  DraftImportApiService,
+  DraftImportResult
+} from '../../services/draft-import-api.service';
+import { DraftImportProgressService, DraftImportProgressUpdate } from '../../services/draft-import-progress.service';
 
 @Component({
   selector: 'app-explorer-page',
@@ -21,18 +31,35 @@ import { Database } from '../../components/databases-panel/databases-panel.compo
   templateUrl: './explorer-page.component.html',
   styleUrl: './explorer-page.component.scss'
 })
-export class ExplorerPageComponent {
+export class ExplorerPageComponent implements OnDestroy {
   private readonly authState = inject(AuthStateService);
   private readonly userDatabasesApi = inject(UserDatabasesApiService);
+  private readonly draftImportApi = inject(DraftImportApiService);
+  private readonly draftImportProgress = inject(DraftImportProgressService);
 
   private readonly loadedForCurrentSession = signal(false);
+  private progressSubscription: Subscription | null = null;
 
   @Input() isFocusMode = false;
 
   @ViewChild('layoutRoot', { static: true })
   private readonly layoutRoot!: ElementRef<HTMLElement>;
 
+  @ViewChild('pgnFileInput')
+  private readonly pgnFileInput?: ElementRef<HTMLInputElement>;
+
   protected gamesLoaded = false;
+  protected readonly isImporting = signal(false);
+  protected readonly importProgress = signal<DraftImportProgressUpdate | null>(null);
+  protected readonly importError = signal<string | null>(null);
+  protected readonly importErrorVisible = signal(false);
+  protected readonly draftGames = signal<DraftGameListItem[]>([]);
+  protected readonly draftGamesTotalCount = signal(0);
+  protected readonly draftGamesPage = signal(1);
+  protected readonly draftGamesPageSize = signal(18);
+  protected readonly draftGamesResultSortMode = signal<DraftGamesResultSortMode>('default');
+  protected readonly draftGamesSortBy = signal<DraftGamesSortBy>('createdAt');
+  protected readonly draftGamesSortDirection = signal<DraftGamesSortDirection>('desc');
   protected currentDatabaseName = 'Games';
   protected currentGamesSource: 'imported' | 'external' = 'imported';
   protected readonly myDatabases = signal<Array<{ id: string; name: string }>>([]);
@@ -42,6 +69,8 @@ export class ExplorerPageComponent {
   protected currentPly = 0;
   protected navigationRequest: { ply: number; version: number } | null = null;
   private navigationVersion = 0;
+  private importErrorTimerId: number | null = null;
+  private importErrorClearTimerId: number | null = null;
   protected mockGames: any[] = [
     {
       year: 2023,
@@ -94,8 +123,12 @@ export class ExplorerPageComponent {
         this.loadedForCurrentSession.set(false);
         this.myDatabases.set([]);
         this.panelDatabases.set([]);
+        this.detachProgressSubscription();
+        void this.draftImportProgress.disconnect();
         return;
       }
+
+      void this.draftImportProgress.connect();
 
       if (this.loadedForCurrentSession()) {
         return;
@@ -103,6 +136,11 @@ export class ExplorerPageComponent {
 
       this.loadUserDatabases();
     });
+  }
+
+  ngOnDestroy(): void {
+    this.clearImportErrorTimers();
+    this.detachProgressSubscription();
   }
 
   protected startResize(event: MouseEvent): void {
@@ -143,11 +181,8 @@ export class ExplorerPageComponent {
   }
 
   protected importDatabase(): void {
-    // Placeholder action for opening a local PGN file picker.
-    console.log('Import database (.pgn)');
-    this.gamesLoaded = true;
-    this.currentDatabaseName = 'Imported Games';
-    this.currentGamesSource = 'imported';
+    this.clearImportError();
+    this.pgnFileInput?.nativeElement.click();
   }
 
   protected searchCommunityDatabase(): void {
@@ -159,25 +194,45 @@ export class ExplorerPageComponent {
   }
 
   protected saveCurrentDatabase(): void {
-    console.log('Save current imported games as database');
+    // The save modal handles whether this becomes merge or create.
   }
 
-  protected onSaveDatabaseRequest(payload: {
+  protected async onSaveDatabaseRequest(payload: {
     mode: 'merge' | 'create';
     targetDatabaseId?: string;
     newDatabaseName?: string;
     visibility: 'private' | 'public';
-  }): void {
-    console.log('Save database modal submit', payload);
+  }): Promise<void> {
+    this.clearImportError();
 
-    if (payload.mode === 'create' && payload.newDatabaseName) {
-      this.myDatabases.set([
-        {
-          id: `db-${Date.now()}`,
-          name: payload.newDatabaseName
-        },
-        ...this.myDatabases()
-      ]);
+    try {
+      let userDatabaseId = payload.targetDatabaseId;
+
+      if (payload.mode === 'create') {
+        const created = await firstValueFrom(
+          this.userDatabasesApi.create({
+            name: payload.newDatabaseName ?? 'Imported Games',
+            isPublic: payload.visibility === 'public'
+          })
+        );
+
+        userDatabaseId = created.id;
+      }
+
+      if (!userDatabaseId) {
+        this.showImportError('Choose a target database before saving.');
+        return;
+      }
+
+      await firstValueFrom(this.draftImportApi.promoteDraft({ userDatabaseId }));
+      this.currentDatabaseName = payload.mode === 'create'
+        ? (payload.newDatabaseName ?? 'Imported Games')
+        : (this.myDatabases().find(db => db.id === userDatabaseId)?.name ?? 'Saved Database');
+
+      await this.loadDraftGamesPage();
+      await this.reloadUserDatabases();
+    } catch {
+      this.showImportError('Saving imported games failed. Please try again.');
     }
   }
 
@@ -196,6 +251,155 @@ export class ExplorerPageComponent {
   protected onPlySelected(ply: number): void {
     this.navigationVersion++;
     this.navigationRequest = { ply, version: this.navigationVersion };
+  }
+
+  protected onDraftGamesSortChanged(payload: { sortBy: DraftGamesSortBy; sortDirection: DraftGamesSortDirection }): void {
+    this.draftGamesSortBy.set(payload.sortBy);
+    this.draftGamesSortDirection.set(payload.sortDirection);
+
+    if (payload.sortBy !== 'result') {
+      this.draftGamesResultSortMode.set('default');
+    }
+
+    this.draftGamesPage.set(1);
+    void this.loadDraftGamesPage();
+  }
+
+  protected onDraftGamesResultSortModeChanged(resultSortMode: DraftGamesResultSortMode): void {
+    this.draftGamesResultSortMode.set(resultSortMode);
+    this.draftGamesPage.set(1);
+    void this.loadDraftGamesPage();
+  }
+
+  protected onDraftGamesPageSizeChanged(pageSize: number): void {
+    this.draftGamesPageSize.set(pageSize);
+    this.draftGamesPage.set(1);
+    void this.loadDraftGamesPage();
+  }
+
+  protected onDraftGamesPageChanged(page: number): void {
+    this.draftGamesPage.set(page);
+    void this.loadDraftGamesPage();
+  }
+
+  protected async onPgnFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    const lowerName = file.name.toLowerCase();
+    if (!lowerName.endsWith('.pgn')) {
+      this.showImportError('Select a valid .pgn file.');
+      return;
+    }
+
+    const pgn = await file.text();
+    await this.runDraftImport(pgn);
+  }
+
+  private async runDraftImport(pgn: string): Promise<void> {
+    this.isImporting.set(true);
+    this.clearImportError();
+    this.importProgress.set({
+      parsedCount: 0,
+      importedCount: 0,
+      skippedCount: 0,
+      isCompleted: false,
+      isFailed: false,
+      message: 'Uploading file...'
+    });
+    this.draftImportProgress.reset();
+
+    let progressConnected = false;
+
+    try {
+      try {
+        await this.draftImportProgress.connect();
+        progressConnected = true;
+        this.detachProgressSubscription();
+        this.progressSubscription = this.draftImportProgress.updates$.subscribe(update => {
+          if (update) {
+            this.importProgress.set(update);
+          }
+        });
+      } catch {
+        // Import should still work even if live progress transport is unavailable.
+        progressConnected = false;
+      }
+
+      const result = await firstValueFrom(this.draftImportApi.importDraft({ pgn }));
+      this.applyImportedDraftState(result);
+    } catch (error) {
+      this.showImportError(this.resolveImportErrorMessage(error, progressConnected));
+    } finally {
+      this.isImporting.set(false);
+      this.detachProgressSubscription();
+    }
+  }
+
+  private applyImportedDraftState(result: DraftImportResult): void {
+    this.gamesLoaded = result.importedCount > 0;
+    this.currentDatabaseName = 'Imported Draft';
+    this.currentGamesSource = 'imported';
+    this.draftGamesPage.set(1);
+    void this.loadDraftGamesPage();
+
+    if (!result.importedCount && result.skippedCount > 0) {
+      this.showImportError('No games were imported. All parsed games were skipped.');
+    }
+  }
+
+  private detachProgressSubscription(): void {
+    this.progressSubscription?.unsubscribe();
+    this.progressSubscription = null;
+  }
+
+  private async loadDraftGamesPage(): Promise<void> {
+    try {
+      const response = await firstValueFrom(
+        this.draftImportApi.getDraftGames(
+          this.draftGamesPage(),
+          this.draftGamesPageSize(),
+          this.draftGamesSortBy(),
+          this.draftGamesSortDirection(),
+          this.draftGamesResultSortMode()
+        )
+      );
+
+      this.draftGames.set(response.items);
+      this.draftGamesTotalCount.set(response.totalCount);
+      this.gamesLoaded = response.totalCount > 0;
+    } catch {
+      this.showImportError('Unable to load imported draft games.');
+    }
+  }
+
+  private resolveImportErrorMessage(error: unknown, progressConnected: boolean): string {
+    if (error instanceof HttpErrorResponse) {
+      if (error.status === 401) {
+        return 'Import failed: you are not authenticated. Please sign in again.';
+      }
+
+      if (error.status === 0) {
+        return 'Import failed: backend is unreachable.';
+      }
+
+      if (typeof error.error === 'string' && error.error.trim().length > 0) {
+        return `Import failed: ${error.error}`;
+      }
+
+      return `Import failed with status ${error.status}.`;
+    }
+
+    if (!progressConnected) {
+      return 'Import failed. Live progress could not connect, and the import request did not complete.';
+    }
+
+    return 'Import failed. Please try again.';
   }
 
   private loadUserDatabases(): void {
@@ -232,4 +436,70 @@ export class ExplorerPageComponent {
       }
     });
   }
+
+  private async reloadUserDatabases(): Promise<void> {
+    try {
+      const [mine, bookmarks] = await Promise.all([
+        firstValueFrom(this.userDatabasesApi.getMine()),
+        firstValueFrom(this.userDatabasesApi.getBookmarks())
+      ]);
+
+      this.myDatabases.set(mine.map(db => ({ id: db.id, name: db.name })));
+
+      const mineMapped: Database[] = mine.map(db => ({
+        id: db.id,
+        name: db.name,
+        owner: this.currentUserName() ?? db.ownerUserId,
+        creationDate: new Date(db.createdAtUtc),
+        gamesCount: db.gamesCount
+      }));
+
+      const bookmarkMapped: Database[] = bookmarks
+        .filter(bookmark => !mine.some(owned => owned.id === bookmark.id))
+        .map(bookmark => ({
+          id: bookmark.id,
+          name: bookmark.name,
+          owner: bookmark.ownerUserId,
+          creationDate: new Date(bookmark.createdAtUtc),
+          gamesCount: bookmark.gamesCount
+        }));
+
+      this.panelDatabases.set([...mineMapped, ...bookmarkMapped]);
+    } catch {
+      this.showImportError('Unable to refresh user databases after save.');
+    }
+  }
+
+  private showImportError(message: string): void {
+    this.clearImportErrorTimers();
+    this.importError.set(message);
+    this.importErrorVisible.set(true);
+
+    this.importErrorTimerId = window.setTimeout(() => {
+      this.importErrorVisible.set(false);
+
+      this.importErrorClearTimerId = window.setTimeout(() => {
+        this.importError.set(null);
+      }, 300);
+    }, 4200);
+  }
+
+  private clearImportError(): void {
+    this.clearImportErrorTimers();
+    this.importErrorVisible.set(false);
+    this.importError.set(null);
+  }
+
+  private clearImportErrorTimers(): void {
+    if (this.importErrorTimerId !== null) {
+      window.clearTimeout(this.importErrorTimerId);
+      this.importErrorTimerId = null;
+    }
+
+    if (this.importErrorClearTimerId !== null) {
+      window.clearTimeout(this.importErrorClearTimerId);
+      this.importErrorClearTimerId = null;
+    }
+  }
+
 }

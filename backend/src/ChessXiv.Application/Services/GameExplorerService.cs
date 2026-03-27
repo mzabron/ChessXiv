@@ -8,7 +8,6 @@ namespace ChessXiv.Application.Services;
 
 public class GameExplorerService(
     IGameExplorerRepository gameExplorerRepository,
-    IPlayerRepository playerRepository,
     IBoardStateSerializer boardStateSerializer,
     IPositionHasher positionHasher) : IGameExplorerService
 {
@@ -46,27 +45,6 @@ public class GameExplorerService(
         var normalizedBlackFirstName = NormalizeOptional(request.BlackFirstName);
         var normalizedBlackLastName = NormalizeOptional(request.BlackLastName);
 
-        var hasWhiteFilter = normalizedWhiteFirstName is not null || normalizedWhiteLastName is not null;
-        var hasBlackFilter = normalizedBlackFirstName is not null || normalizedBlackLastName is not null;
-
-        var whitePlayerIds = hasWhiteFilter
-            ? await playerRepository.SearchIdsAsync(normalizedWhiteFirstName, normalizedWhiteLastName, cancellationToken)
-            : null;
-
-        var blackPlayerIds = hasBlackFilter
-            ? await playerRepository.SearchIdsAsync(normalizedBlackFirstName, normalizedBlackLastName, cancellationToken)
-            : null;
-
-        if (hasWhiteFilter && (whitePlayerIds is null || whitePlayerIds.Count == 0))
-        {
-            return new PagedResult<GameExplorerItemDto>();
-        }
-
-        if (hasBlackFilter && (blackPlayerIds is null || blackPlayerIds.Count == 0))
-        {
-            return new PagedResult<GameExplorerItemDto>();
-        }
-
         var normalizedFen = request.SearchByPosition && !string.IsNullOrWhiteSpace(request.Fen)
             ? request.Fen.Trim()
             : null;
@@ -91,8 +69,10 @@ public class GameExplorerService(
         return await gameExplorerRepository.SearchAsync(
             request,
             ownerUserId,
-            whitePlayerIds,
-            blackPlayerIds,
+            normalizedWhiteFirstName,
+            normalizedWhiteLastName,
+            normalizedBlackFirstName,
+            normalizedBlackLastName,
             normalizedFen,
             fenHash,
             cancellationToken);

@@ -15,6 +15,11 @@ export interface BookmarkedUserDatabaseDto extends UserDatabaseDto {
   bookmarkedAtUtc: string;
 }
 
+export interface CreateUserDatabaseRequest {
+  name: string;
+  isPublic: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class UserDatabasesApiService {
   private readonly http = inject(HttpClient);
@@ -26,6 +31,10 @@ export class UserDatabasesApiService {
 
   getBookmarks(): Observable<BookmarkedUserDatabaseDto[]> {
     return this.http.get<BookmarkedUserDatabaseDto[]>(`${this.baseUrl}/user-databases/bookmarks`);
+  }
+
+  create(request: CreateUserDatabaseRequest): Observable<UserDatabaseDto> {
+    return this.http.post<UserDatabaseDto>(`${this.baseUrl}/user-databases`, request);
   }
 
   private resolveBaseUrl(): string {

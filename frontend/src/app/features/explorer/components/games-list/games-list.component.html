@@ -24,7 +24,7 @@
       <header class="panel-header db-summary">
         <div class="db-summary-main">
           <h2>{{ databaseName }}</h2>
-          <p>{{ games.length }} games</p>
+          <p>{{ totalCount }} games</p>
         </div>
         <div class="db-summary-actions">
           @if (sourceType === 'imported') {
@@ -45,7 +45,18 @@
       <app-empty-games-state (importDatabase)="importDatabase.emit()"
         (searchCommunityDatabase)="selectTab('databases'); searchCommunityDatabase.emit()" />
     } @else {
-      <app-games-table [games]="games" />
+      <app-games-table
+        [games]="games"
+        [totalCount]="totalCount"
+        [page]="page"
+        [pageSize]="pageSize"
+        [resultSortMode]="resultSortMode"
+        [sortBy]="sortBy"
+        [sortDirection]="sortDirection"
+        (resultSortModeChange)="gamesResultSortModeChange.emit($event)"
+        (sortChange)="gamesSortChange.emit($event)"
+        (pageSizeChange)="gamesPageSizeChange.emit($event)"
+        (pageChange)="gamesPageChange.emit($event)" />
     }
   </div>
   } @else {

@@ -12,8 +12,10 @@ public interface IGameExplorerRepository
     Task<PagedResult<GameExplorerItemDto>> SearchAsync(
         GameExplorerSearchRequest request,
         string? ownerUserId,
-        IReadOnlyCollection<Guid>? whitePlayerIds,
-        IReadOnlyCollection<Guid>? blackPlayerIds,
+        string? normalizedWhiteFirstName,
+        string? normalizedWhiteLastName,
+        string? normalizedBlackFirstName,
+        string? normalizedBlackLastName,
         string? normalizedFen,
         long? fenHash,
         CancellationToken cancellationToken = default);

@@ -193,3 +193,97 @@
 :host-context(body.dark-theme) .resize-handle {
   background: linear-gradient(180deg, #4b5563 0%, #374151 100%);
 }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.import-alert {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2100;
+  background: #fff1f1;
+  border: 1px solid #f2b6b6;
+  color: #5f1e1e;
+  padding: 0.6rem 0.85rem;
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(95, 30, 30, 0.14);
+  font: 600 0.85rem/1.2 'Space Grotesk', 'Segoe UI', sans-serif;
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.import-alert.visible {
+  opacity: 1;
+}
+
+.import-progress-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  background: rgba(29, 24, 18, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.import-progress-card {
+  width: min(440px, calc(100vw - 2rem));
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 24px 48px rgba(29, 24, 18, 0.24);
+  padding: 1rem 1.1rem;
+}
+
+.import-progress-card h3 {
+  margin: 0;
+  font: 700 1.02rem/1.2 'Space Grotesk', 'Segoe UI', sans-serif;
+}
+
+.status-line {
+  margin: 0.45rem 0 0.9rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.import-progress-card dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.import-progress-card dl div {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.55rem 0.6rem;
+}
+
+.import-progress-card dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.import-progress-card dd {
+  margin: 0.2rem 0 0;
+  font: 700 1.1rem/1.1 'Space Grotesk', 'Segoe UI', sans-serif;
+}
+
+:host-context(body.dark-theme) .import-alert {
+  background: #3a2020;
+  border-color: #6f3434;
+  color: #ffd8d8;
+}

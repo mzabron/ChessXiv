@@ -13,10 +13,9 @@ public class PgnImportServiceTests
     {
         var parser = new FakePgnParser();
         var repository = new FakeGameRepository();
-        var playerRepository = new FakePlayerRepository();
         var positionCoordinator = new FakePositionImportCoordinator();
         var unitOfWork = new FakeUnitOfWork();
-        var service = new PgnImportService(parser, repository, playerRepository, positionCoordinator, unitOfWork);
+        var service = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         using var reader = new StringReader(string.Empty);
         var result = await service.ImportAsync(reader);
@@ -38,10 +37,9 @@ public class PgnImportServiceTests
             GamesToReturn = []
         };
         var repository = new FakeGameRepository();
-        var playerRepository = new FakePlayerRepository();
         var positionCoordinator = new FakePositionImportCoordinator();
         var unitOfWork = new FakeUnitOfWork();
-        var service = new PgnImportService(parser, repository, playerRepository, positionCoordinator, unitOfWork);
+        var service = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         using var reader = new StringReader("[Event \"X\"]\n\n*");
         var result = await service.ImportAsync(reader);
@@ -67,10 +65,9 @@ public class PgnImportServiceTests
             GamesToReturn = [validGameOne, invalidGame, validGameTwo]
         };
         var repository = new FakeGameRepository();
-        var playerRepository = new FakePlayerRepository();
         var positionCoordinator = new FakePositionImportCoordinator();
         var unitOfWork = new FakeUnitOfWork();
-        var service = new PgnImportService(parser, repository, playerRepository, positionCoordinator, unitOfWork);
+        var service = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         using var reader = new StringReader("pgn-content");
         var result = await service.ImportAsync(reader);
@@ -95,10 +92,9 @@ public class PgnImportServiceTests
             GamesToReturn = [CreateGame("Alpha", "Beta")]
         };
         var repository = new FakeGameRepository();
-        var playerRepository = new FakePlayerRepository();
         var positionCoordinator = new FakePositionImportCoordinator();
         var unitOfWork = new FakeUnitOfWork();
-        var service = new PgnImportService(parser, repository, playerRepository, positionCoordinator, unitOfWork);
+        var service = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         using var cts = new CancellationTokenSource();
         var token = cts.Token;
@@ -119,10 +115,9 @@ public class PgnImportServiceTests
             GamesToReturn = [CreateGame("Alpha", "Beta")]
         };
         var repository = new FakeGameRepository();
-        var playerRepository = new FakePlayerRepository();
         var positionCoordinator = new FakePositionImportCoordinator();
         var unitOfWork = new FakeUnitOfWork();
-        var service = new PgnImportService(parser, repository, playerRepository, positionCoordinator, unitOfWork);
+        var service = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         using var reader = new StringReader("pgn-content");
         var result = await service.ImportAsync(reader, markAsMaster: true);
@@ -142,10 +137,9 @@ public class PgnImportServiceTests
             ]
         };
         var repository = new FakeGameRepository();
-        var playerRepository = new FakePlayerRepository();
         var positionCoordinator = new FakePositionImportCoordinator();
         var unitOfWork = new FakeUnitOfWork();
-        var service = new PgnImportService(parser, repository, playerRepository, positionCoordinator, unitOfWork);
+        var service = new PgnImportService(parser, repository, positionCoordinator, unitOfWork);
 
         using var reader = new StringReader("stream-content");
         var result = await service.ImportAsync(reader, markAsMaster: true, batchSize: 10);
@@ -256,35 +250,6 @@ public class PgnImportServiceTests
         public ValueTask DisposeAsync()
         {
             return ValueTask.CompletedTask;
-        }
-    }
-
-    private sealed class FakePlayerRepository : IPlayerRepository
-    {
-        private readonly Dictionary<string, Player> _players = new(StringComparer.Ordinal);
-
-        public Task<IReadOnlyDictionary<string, Player>> GetByNormalizedFullNamesAsync(IReadOnlyCollection<string> normalizedFullNames, CancellationToken cancellationToken = default)
-        {
-            var result = _players
-                .Where(kvp => normalizedFullNames.Contains(kvp.Key))
-                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
-
-            return Task.FromResult<IReadOnlyDictionary<string, Player>>(result);
-        }
-
-        public Task AddRangeAsync(IReadOnlyCollection<Player> players, CancellationToken cancellationToken = default)
-        {
-            foreach (var player in players)
-            {
-                _players[player.NormalizedFullName] = player;
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public Task<IReadOnlyCollection<Guid>> SearchIdsAsync(string? normalizedFirstName, string? normalizedLastName, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyCollection<Guid>>(Array.Empty<Guid>());
         }
     }
 
