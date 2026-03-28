@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { GameReplayResponse } from './game-replay.models';
+import { ExplorerGamesFiltersQuery } from './games-filters.models';
 
 export interface DraftImportRequest {
   pgn: string;
@@ -74,7 +75,8 @@ export class DraftImportApiService {
     pageSize: number,
     sortBy: DraftGamesSortBy,
     sortDirection: DraftGamesSortDirection,
-    resultSortMode: DraftGamesResultSortMode
+    resultSortMode: DraftGamesResultSortMode,
+    filters?: ExplorerGamesFiltersQuery
   ): Observable<DraftGamesPageResponse> {
     return this.http.get<DraftGamesPageResponse>(`${this.baseUrl}/drafts/games`, {
       params: {
@@ -82,7 +84,8 @@ export class DraftImportApiService {
         pageSize,
         sortBy,
         sortDirection,
-        resultSortMode
+        resultSortMode,
+        ...this.buildFilterParams(filters)
       }
     });
   }
@@ -104,5 +107,22 @@ export class DraftImportApiService {
     }
 
     return '/api/pgn';
+  }
+
+  private buildFilterParams(filters?: ExplorerGamesFiltersQuery): Record<string, string | number | boolean> {
+    if (!filters) {
+      return {};
+    }
+
+    const params: Record<string, string | number | boolean> = {};
+    for (const [key, value] of Object.entries(filters)) {
+      if (value === undefined || value === null || value === '') {
+        continue;
+      }
+
+      params[key] = value;
+    }
+
+    return params;
   }
 }

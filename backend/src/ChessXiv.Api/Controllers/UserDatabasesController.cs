@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using ChessXiv.Application.Contracts;
+using ChessXiv.Domain.Engine.Abstractions;
 using ChessXiv.Domain.Entities;
 using ChessXiv.Infrastructure.Data;
+using ChessXiv.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +12,10 @@ namespace ChessXiv.Api.Controllers;
 
 [ApiController]
 [Route("api/user-databases")]
-public class UserDatabasesController(ChessXivDbContext dbContext) : ControllerBase
+public class UserDatabasesController(
+    ChessXivDbContext dbContext,
+    IBoardStateSerializer boardStateSerializer,
+    IPositionHasher positionHasher) : ControllerBase
 {
     private const string DefaultStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -106,6 +111,25 @@ public class UserDatabasesController(ChessXivDbContext dbContext) : ControllerBa
         [FromQuery] string sortBy = "createdAt",
         [FromQuery] string sortDirection = "desc",
         [FromQuery] string resultSortMode = "default",
+        [FromQuery] string? whiteFirstName = null,
+        [FromQuery] string? whiteLastName = null,
+        [FromQuery] string? blackFirstName = null,
+        [FromQuery] string? blackLastName = null,
+        [FromQuery] bool ignoreColors = false,
+        [FromQuery] bool eloEnabled = false,
+        [FromQuery] int? eloFrom = null,
+        [FromQuery] int? eloTo = null,
+        [FromQuery] EloFilterMode eloMode = EloFilterMode.None,
+        [FromQuery] bool yearEnabled = false,
+        [FromQuery] int? yearFrom = null,
+        [FromQuery] int? yearTo = null,
+        [FromQuery] string? ecoCode = null,
+        [FromQuery] string? result = null,
+        [FromQuery] int? moveCountFrom = null,
+        [FromQuery] int? moveCountTo = null,
+        [FromQuery] bool searchByPosition = false,
+        [FromQuery] string? fen = null,
+        [FromQuery] PositionSearchMode positionMode = PositionSearchMode.Exact,
         CancellationToken cancellationToken = default)
     {
         if (page <= 0)
@@ -116,6 +140,11 @@ public class UserDatabasesController(ChessXivDbContext dbContext) : ControllerBa
         if (pageSize <= 0 || pageSize > 200)
         {
             return BadRequest("Page size must be between 1 and 200.");
+        }
+
+        if (!Enum.IsDefined(eloMode))
+        {
+            return BadRequest("Invalid eloMode value.");
         }
 
         var userId = GetCurrentUserId();
@@ -148,73 +177,95 @@ public class UserDatabasesController(ChessXivDbContext dbContext) : ControllerBa
 
         var query = dbContext.UserDatabaseGames
             .AsNoTracking()
-            .Where(link => link.UserDatabaseId == id)
-            .Select(link => new
-            {
-                Link = link,
-                Game = link.Game
-            });
+            .Where(link => link.UserDatabaseId == id);
+
+        var normalizedWhiteFirstName = NormalizeNameToken(whiteFirstName);
+        var normalizedWhiteLastName = NormalizeNameToken(whiteLastName);
+        var normalizedBlackFirstName = NormalizeNameToken(blackFirstName);
+        var normalizedBlackLastName = NormalizeNameToken(blackLastName);
+        var normalizedFen = NormalizeFenForSearch(fen);
+        var fenHash = TryComputeFenHash(searchByPosition, positionMode, normalizedFen, boardStateSerializer, positionHasher);
+
+        query = query.ApplyPlayerFilters(
+            ignoreColors,
+            normalizedWhiteFirstName,
+            normalizedWhiteLastName,
+            normalizedBlackFirstName,
+            normalizedBlackLastName);
+        query = query.ApplyScalarFilters(
+            eloEnabled,
+            eloFrom,
+            eloTo,
+            eloMode,
+            yearEnabled,
+            yearFrom,
+            yearTo,
+            ecoCode,
+            result,
+            moveCountFrom,
+            moveCountTo);
+        query = query.ApplyPositionFilters(searchByPosition, normalizedFen, fenHash, positionMode);
 
         query = (normalizedSortBy, descending) switch
         {
             ("year", true) => query
                 .OrderBy(x => x.Game.Year <= 0 ? 1 : 0)
                 .ThenByDescending(x => x.Game.Year)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
+                .ThenByDescending(x => x.AddedAtUtc),
             ("year", false) => query
                 .OrderBy(x => x.Game.Year <= 0 ? 1 : 0)
                 .ThenBy(x => x.Game.Year)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
-            ("white", true) => query.OrderByDescending(x => x.Game.White).ThenByDescending(x => x.Link.AddedAtUtc),
-            ("white", false) => query.OrderBy(x => x.Game.White).ThenByDescending(x => x.Link.AddedAtUtc),
-            ("black", true) => query.OrderByDescending(x => x.Game.Black).ThenByDescending(x => x.Link.AddedAtUtc),
-            ("black", false) => query.OrderBy(x => x.Game.Black).ThenByDescending(x => x.Link.AddedAtUtc),
+                .ThenByDescending(x => x.AddedAtUtc),
+            ("white", true) => query.OrderByDescending(x => x.Game.White).ThenByDescending(x => x.AddedAtUtc),
+            ("white", false) => query.OrderBy(x => x.Game.White).ThenByDescending(x => x.AddedAtUtc),
+            ("black", true) => query.OrderByDescending(x => x.Game.Black).ThenByDescending(x => x.AddedAtUtc),
+            ("black", false) => query.OrderBy(x => x.Game.Black).ThenByDescending(x => x.AddedAtUtc),
             ("whiteelo", true) => query
                 .OrderBy(x => x.Game.WhiteElo == null ? 1 : 0)
                 .ThenByDescending(x => x.Game.WhiteElo)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
+                .ThenByDescending(x => x.AddedAtUtc),
             ("whiteelo", false) => query
                 .OrderBy(x => x.Game.WhiteElo == null ? 1 : 0)
                 .ThenBy(x => x.Game.WhiteElo)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
+                .ThenByDescending(x => x.AddedAtUtc),
             ("blackelo", true) => query
                 .OrderBy(x => x.Game.BlackElo == null ? 1 : 0)
                 .ThenByDescending(x => x.Game.BlackElo)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
+                .ThenByDescending(x => x.AddedAtUtc),
             ("blackelo", false) => query
                 .OrderBy(x => x.Game.BlackElo == null ? 1 : 0)
                 .ThenBy(x => x.Game.BlackElo)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
+                .ThenByDescending(x => x.AddedAtUtc),
             ("result", _) when normalizedResultSortMode == "whitefirst" => query
                 .OrderBy(x => x.Game.Result == "1-0" ? 0 : x.Game.Result == "0-1" ? 1 : x.Game.Result == "1/2-1/2" ? 2 : 3)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
+                .ThenByDescending(x => x.AddedAtUtc),
             ("result", _) when normalizedResultSortMode == "blackfirst" => query
                 .OrderBy(x => x.Game.Result == "0-1" ? 0 : x.Game.Result == "1-0" ? 1 : x.Game.Result == "1/2-1/2" ? 2 : 3)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
+                .ThenByDescending(x => x.AddedAtUtc),
             ("result", _) when normalizedResultSortMode == "drawfirst" => query
                 .OrderBy(x => x.Game.Result == "1/2-1/2" ? 0 : x.Game.Result == "1-0" ? 1 : x.Game.Result == "0-1" ? 2 : 3)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
-            ("result", _) => query.OrderByDescending(x => x.Link.AddedAtUtc).ThenByDescending(x => x.Game.Id),
+                .ThenByDescending(x => x.AddedAtUtc),
+            ("result", _) => query.OrderByDescending(x => x.AddedAtUtc).ThenByDescending(x => x.Game.Id),
             ("eco", true) => query
                 .OrderBy(x => x.Game.ECO == null || x.Game.ECO == "" || x.Game.ECO == "?" ? 1 : 0)
                 .ThenByDescending(x => x.Game.ECO)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
+                .ThenByDescending(x => x.AddedAtUtc),
             ("eco", false) => query
                 .OrderBy(x => x.Game.ECO == null || x.Game.ECO == "" || x.Game.ECO == "?" ? 1 : 0)
                 .ThenBy(x => x.Game.ECO)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
+                .ThenByDescending(x => x.AddedAtUtc),
             ("event", true) => query
                 .OrderBy(x => x.Game.Event == null || x.Game.Event == "" || x.Game.Event == "?" || x.Game.Event == "-" ? 1 : 0)
                 .ThenByDescending(x => x.Game.Event)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
+                .ThenByDescending(x => x.AddedAtUtc),
             ("event", false) => query
                 .OrderBy(x => x.Game.Event == null || x.Game.Event == "" || x.Game.Event == "?" || x.Game.Event == "-" ? 1 : 0)
                 .ThenBy(x => x.Game.Event)
-                .ThenByDescending(x => x.Link.AddedAtUtc),
-            ("moves", true) => query.OrderByDescending(x => x.Game.MoveCount).ThenByDescending(x => x.Link.AddedAtUtc),
-            ("moves", false) => query.OrderBy(x => x.Game.MoveCount).ThenByDescending(x => x.Link.AddedAtUtc),
-            (_, false) => query.OrderBy(x => x.Link.AddedAtUtc).ThenBy(x => x.Game.Id),
-            _ => query.OrderByDescending(x => x.Link.AddedAtUtc).ThenByDescending(x => x.Game.Id)
+                .ThenByDescending(x => x.AddedAtUtc),
+            ("moves", true) => query.OrderByDescending(x => x.Game.MoveCount).ThenByDescending(x => x.AddedAtUtc),
+            ("moves", false) => query.OrderBy(x => x.Game.MoveCount).ThenByDescending(x => x.AddedAtUtc),
+            (_, false) => query.OrderBy(x => x.AddedAtUtc).ThenBy(x => x.Game.Id),
+            _ => query.OrderByDescending(x => x.AddedAtUtc).ThenByDescending(x => x.Game.Id)
         };
 
         var totalCount = await query.CountAsync(cancellationToken);
@@ -233,7 +284,7 @@ public class UserDatabasesController(ChessXivDbContext dbContext) : ControllerBa
                 x.Game.ECO,
                 x.Game.Event,
                 x.Game.MoveCount,
-                x.Link.AddedAtUtc))
+                x.AddedAtUtc))
             .ToListAsync(cancellationToken);
 
         return Ok(new DraftGamesPageResponse(page, pageSize, totalCount, items));
@@ -677,6 +728,65 @@ public class UserDatabasesController(ChessXivDbContext dbContext) : ControllerBa
     {
         return User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? User.FindFirstValue("sub");
+    }
+
+    private static string? NormalizeNameToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim().ToLowerInvariant();
+    }
+
+    private static string? NormalizeFenForSearch(string? fen)
+    {
+        if (string.IsNullOrWhiteSpace(fen))
+        {
+            return null;
+        }
+
+        var parts = fen.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 6)
+        {
+            return null;
+        }
+
+        return string.Join(' ', parts);
+    }
+
+    private static long? TryComputeFenHash(
+        bool searchByPosition,
+        PositionSearchMode positionMode,
+        string? normalizedFen,
+        IBoardStateSerializer boardStateSerializer,
+        IPositionHasher positionHasher)
+    {
+        if (!searchByPosition)
+        {
+            return null;
+        }
+
+        if (positionMode != PositionSearchMode.Exact && positionMode != PositionSearchMode.SamePosition)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(normalizedFen))
+        {
+            return null;
+        }
+
+        try
+        {
+            var state = boardStateSerializer.FromFen(normalizedFen);
+            return unchecked((long)positionHasher.Compute(state));
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     private static string ResolveStartFen(string? pgn)

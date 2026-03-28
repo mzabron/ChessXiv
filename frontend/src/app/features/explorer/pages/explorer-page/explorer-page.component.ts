@@ -24,6 +24,11 @@ import {
 } from '../../services/draft-import-api.service';
 import { DraftImportProgressService, DraftImportProgressUpdate } from '../../services/draft-import-progress.service';
 import { GameReplayResponse } from '../../services/game-replay.models';
+import {
+  ExplorerGamesFilterState,
+  createDefaultExplorerGamesFilterState,
+  toExplorerGamesFiltersQuery
+} from '../../services/games-filters.models';
 
 @Component({
   selector: 'app-explorer-page',
@@ -71,6 +76,8 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   protected readonly draftGamesResultSortMode = signal<DraftGamesResultSortMode>('default');
   protected readonly draftGamesSortBy = signal<DraftGamesSortBy>('createdAt');
   protected readonly draftGamesSortDirection = signal<DraftGamesSortDirection>('desc');
+  protected readonly gamesFilters = signal<ExplorerGamesFilterState>(createDefaultExplorerGamesFilterState());
+  protected readonly boardFen = signal('');
   protected currentDatabaseName = 'Games';
   protected currentGamesSource: 'imported' | 'external' | 'userDatabase' = 'imported';
   protected readonly selectedGameId = signal<string | null>(null);
@@ -356,6 +363,10 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.currentPly = ply;
   }
 
+  protected onBoardFenChanged(fen: string): void {
+    this.boardFen.set(fen ?? '');
+  }
+
   protected onPlySelected(ply: number): void {
     this.navigationVersion++;
     this.navigationRequest = { ply, version: this.navigationVersion };
@@ -370,23 +381,65 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     }
 
     this.draftGamesPage.set(1);
+    this.syncFilterStateFromListControls();
     void this.loadCurrentGamesPage();
   }
 
   protected onDraftGamesResultSortModeChanged(resultSortMode: DraftGamesResultSortMode): void {
     this.draftGamesResultSortMode.set(resultSortMode);
     this.draftGamesPage.set(1);
+    this.syncFilterStateFromListControls();
     void this.loadCurrentGamesPage();
   }
 
   protected onDraftGamesPageSizeChanged(pageSize: number): void {
     this.draftGamesPageSize.set(pageSize);
     this.draftGamesPage.set(1);
+    this.syncFilterStateFromListControls();
     void this.loadCurrentGamesPage();
   }
 
   protected onDraftGamesPageChanged(page: number): void {
     this.draftGamesPage.set(page);
+    this.syncFilterStateFromListControls();
+    void this.loadCurrentGamesPage();
+  }
+
+  protected onGamesFiltersChanged(filters: ExplorerGamesFilterState): void {
+    this.gamesFilters.set(filters);
+  }
+
+  protected onGamesFiltersApplied(filters: ExplorerGamesFilterState): void {
+    this.gamesFilters.set(filters);
+    this.draftGamesSortBy.set(filters.sortBy);
+    this.draftGamesSortDirection.set(filters.sortDirection);
+
+    if (filters.sortBy !== 'result') {
+      this.draftGamesResultSortMode.set('default');
+    }
+
+    this.draftGamesPageSize.set(filters.pageSize);
+    this.draftGamesPage.set(filters.page);
+    this.syncFilterStateFromListControls();
+
+    if (this.isFocusMode) {
+      this.focusRightTab = 'games';
+    }
+
+    void this.loadCurrentGamesPage();
+  }
+
+  protected onGamesFiltersReset(): void {
+    const cleared = createDefaultExplorerGamesFilterState({
+      sortBy: this.draftGamesSortBy(),
+      sortDirection: this.draftGamesSortDirection(),
+      page: 1,
+      pageSize: this.draftGamesPageSize()
+    });
+
+    this.gamesFilters.set(cleared);
+    this.draftGamesPage.set(1);
+    this.syncFilterStateFromListControls();
     void this.loadCurrentGamesPage();
   }
 
@@ -472,19 +525,23 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
   private async loadDraftGamesPage(): Promise<void> {
     try {
+      const hadLoadedImportedSource = this.currentGamesSource === 'imported' && this.gamesLoaded;
+      const filters = toExplorerGamesFiltersQuery(this.gamesFilters());
       const response = await firstValueFrom(
         this.draftImportApi.getDraftGames(
           this.draftGamesPage(),
           this.draftGamesPageSize(),
           this.draftGamesSortBy(),
           this.draftGamesSortDirection(),
-          this.draftGamesResultSortMode()
+          this.draftGamesResultSortMode(),
+          filters
         )
       );
 
       this.draftGames.set(response.items);
       this.draftGamesTotalCount.set(response.totalCount);
-      this.gamesLoaded = response.totalCount > 0;
+      this.gamesLoaded = response.totalCount > 0 || hadLoadedImportedSource;
+      this.clearSelectedGameIfMissing(response.items);
     } catch {
       this.showImportError('Unable to load imported draft games.');
     }
@@ -492,6 +549,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
   private async loadUserDatabaseGamesPage(databaseId: string): Promise<void> {
     try {
+      const filters = toExplorerGamesFiltersQuery(this.gamesFilters());
       const response = await firstValueFrom(
         this.userDatabasesApi.getGames(
           databaseId,
@@ -499,13 +557,15 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
           this.draftGamesPageSize(),
           this.draftGamesSortBy(),
           this.draftGamesSortDirection(),
-          this.draftGamesResultSortMode()
+          this.draftGamesResultSortMode(),
+          filters
         )
       );
 
       this.draftGames.set(response.items);
       this.draftGamesTotalCount.set(response.totalCount);
-      this.gamesLoaded = response.totalCount > 0;
+      this.gamesLoaded = true;
+      this.clearSelectedGameIfMissing(response.items);
     } catch {
       this.showImportError('Unable to load games from selected database.');
     }
@@ -677,6 +737,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.currentDatabaseName = database.name;
     this.currentGamesSource = 'userDatabase';
     this.draftGamesPage.set(1);
+    this.syncFilterStateFromListControls();
     this.persistActiveDatabase(database);
     await this.loadCurrentGamesPage();
   }
@@ -719,6 +780,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.currentGamesSource = 'imported';
     this.currentDatabaseName = 'Imported Draft';
     this.draftGamesPage.set(1);
+    this.syncFilterStateFromListControls();
     await this.loadCurrentGamesPage();
 
     if (!this.gamesLoaded) {
@@ -747,6 +809,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.draftGames.set([]);
     this.draftGamesTotalCount.set(0);
     this.draftGamesPage.set(1);
+    this.syncFilterStateFromListControls();
     this.gamesLoaded = false;
     this.selectedGameId.set(null);
     this.selectedGameReplay.set(null);
@@ -855,6 +918,32 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       window.clearTimeout(this.importErrorClearTimerId);
       this.importErrorClearTimerId = null;
     }
+  }
+
+  private syncFilterStateFromListControls(): void {
+    this.gamesFilters.update(current => ({
+      ...current,
+      sortBy: this.draftGamesSortBy(),
+      sortDirection: this.draftGamesSortDirection(),
+      page: this.draftGamesPage(),
+      pageSize: this.draftGamesPageSize()
+    }));
+  }
+
+  private clearSelectedGameIfMissing(games: DraftGameListItem[]): void {
+    const selectedGameId = this.selectedGameId();
+    if (!selectedGameId) {
+      return;
+    }
+
+    if (games.some(game => game.id === selectedGameId)) {
+      return;
+    }
+
+    this.selectedGameId.set(null);
+    this.selectedGameReplay.set(null);
+    this.moveRows = [];
+    this.currentPly = 0;
   }
 
   private initializeMoveListHeightSync(): void {

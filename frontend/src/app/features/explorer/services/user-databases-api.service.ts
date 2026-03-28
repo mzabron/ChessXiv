@@ -7,6 +7,7 @@ import {
   DraftGamesSortBy,
   DraftGamesSortDirection
 } from './draft-import-api.service';
+import { ExplorerGamesFiltersQuery } from './games-filters.models';
 import { GameReplayResponse } from './game-replay.models';
 
 export interface UserDatabaseDto {
@@ -54,7 +55,8 @@ export class UserDatabasesApiService {
     pageSize: number,
     sortBy: DraftGamesSortBy,
     sortDirection: DraftGamesSortDirection,
-    resultSortMode: DraftGamesResultSortMode
+    resultSortMode: DraftGamesResultSortMode,
+    filters?: ExplorerGamesFiltersQuery
   ): Observable<DraftGamesPageResponse> {
     return this.http.get<DraftGamesPageResponse>(`${this.baseUrl}/user-databases/${userDatabaseId}/games`, {
       params: {
@@ -62,7 +64,8 @@ export class UserDatabasesApiService {
         pageSize,
         sortBy,
         sortDirection,
-        resultSortMode
+        resultSortMode,
+        ...this.buildFilterParams(filters)
       }
     });
   }
@@ -80,5 +83,22 @@ export class UserDatabasesApiService {
     }
 
     return '/api';
+  }
+
+  private buildFilterParams(filters?: ExplorerGamesFiltersQuery): Record<string, string | number | boolean> {
+    if (!filters) {
+      return {};
+    }
+
+    const params: Record<string, string | number | boolean> = {};
+    for (const [key, value] of Object.entries(filters)) {
+      if (value === undefined || value === null || value === '') {
+        continue;
+      }
+
+      params[key] = value;
+    }
+
+    return params;
   }
 }

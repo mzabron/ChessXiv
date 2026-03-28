@@ -22,6 +22,11 @@ public class GameExplorerController(
             return BadRequest("Request body is required.");
         }
 
+        if (!Enum.IsDefined(request.EloMode))
+        {
+            return BadRequest("Invalid eloMode value.");
+        }
+
         var userId = GetCurrentUserId();
 
         try

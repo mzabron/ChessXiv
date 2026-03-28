@@ -32,6 +32,12 @@
     </tbody>
   </table>
 
+  @if (totalCount === 0) {
+    <div class="table-empty-state" role="status" aria-live="polite">
+      No games found.
+    </div>
+  }
+
   <footer class="pager" *ngIf="totalCount > 0">
     <label class="page-size" for="page-size-select">Rows</label>
     <select

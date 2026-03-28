@@ -191,7 +191,7 @@
   flex-direction: column;
   position: relative;
   z-index: 1;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .tab-body {
@@ -199,6 +199,7 @@
   flex-direction: column;
   min-height: 0;
   flex: 1;
+  overflow: visible;
 }
 
 :host-context(body.dark-theme) {

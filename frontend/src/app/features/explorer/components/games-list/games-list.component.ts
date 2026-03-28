@@ -5,6 +5,7 @@ import { FiltersPanelComponent } from '../filters-panel/filters-panel.component'
 import { Database, DatabasesPanelComponent } from '../databases-panel/databases-panel.component';
 import { GamesTableComponent } from '../games-table/games-table.component';
 import { DraftGameListItem, DraftGamesResultSortMode, DraftGamesSortBy, DraftGamesSortDirection } from '../../services/draft-import-api.service';
+import { ExplorerGamesFilterState, createDefaultExplorerGamesFilterState } from '../../services/games-filters.models';
 
 interface UserDatabaseOption {
   id: string;
@@ -41,6 +42,8 @@ export class GamesListComponent {
   @Input() myDatabases: UserDatabaseOption[] = [];
   @Input() panelDatabases: Database[] = [];
   @Input() currentUserName = '';
+  @Input() boardFen = '';
+  @Input() filters: ExplorerGamesFilterState = createDefaultExplorerGamesFilterState();
   protected activeTab: 'databases' | 'games' | 'filters' = 'games';
   protected isSaveModalOpen = false;
   protected saveMode: 'merge' | 'create' = 'merge';
@@ -62,6 +65,9 @@ export class GamesListComponent {
   @Output() gamesPageSizeChange = new EventEmitter<number>();
   @Output() gamesPageChange = new EventEmitter<number>();
   @Output() gameSelected = new EventEmitter<DraftGameListItem>();
+  @Output() filtersChange = new EventEmitter<ExplorerGamesFilterState>();
+  @Output() filtersApply = new EventEmitter<ExplorerGamesFilterState>();
+  @Output() filtersReset = new EventEmitter<void>();
 
   protected selectTab(tab: 'databases' | 'games' | 'filters'): void {
     this.activeTab = tab;

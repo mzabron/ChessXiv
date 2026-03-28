@@ -63,6 +63,12 @@
   }
 }
 
+.table-empty-state {
+  padding: 1rem 0.85rem;
+  color: var(--muted);
+  font: 600 0.85rem/1.2 'Space Grotesk', 'Segoe UI', sans-serif;
+}
+
 .pager {
   display: flex;
   align-items: center;

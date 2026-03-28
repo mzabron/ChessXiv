@@ -21,7 +21,8 @@
         [navigationRequest]="navigationRequest"
         [replayData]="selectedGameReplay()"
         (moveRowsChanged)="onMoveRowsChanged($event)"
-        (currentPlyChanged)="onCurrentPlyChanged($event)" />
+        (currentPlyChanged)="onCurrentPlyChanged($event)"
+        (currentFenChanged)="onBoardFenChanged($event)" />
       <app-move-list
         [style.height.px]="moveListHeightPx || null"
         [moveRows]="moveRows"
@@ -37,7 +38,8 @@
       [navigationRequest]="navigationRequest"
       [replayData]="selectedGameReplay()"
       (moveRowsChanged)="onMoveRowsChanged($event)"
-      (currentPlyChanged)="onCurrentPlyChanged($event)" />
+      (currentPlyChanged)="onCurrentPlyChanged($event)"
+      (currentFenChanged)="onBoardFenChanged($event)" />
 
     <!-- Default Mode Tree -->
     <app-games-tree *ngIf="!isFocusMode" />
@@ -65,6 +67,8 @@
       [myDatabases]="myDatabases()"
       [panelDatabases]="panelDatabases()"
       [currentUserName]="currentUserName() ?? ''"
+      [boardFen]="boardFen()"
+      [filters]="gamesFilters()"
       (importDatabase)="importDatabase()"
       (searchCommunityDatabase)="searchCommunityDatabase()"
       (saveDatabase)="saveCurrentDatabase()"
@@ -77,7 +81,10 @@
       (gamesSortChange)="onDraftGamesSortChanged($event)"
       (gamesPageSizeChange)="onDraftGamesPageSizeChanged($event)"
       (gamesPageChange)="onDraftGamesPageChanged($event)"
-      (gameSelected)="onGameSelected($event)" />
+      (gameSelected)="onGameSelected($event)"
+      (filtersChange)="onGamesFiltersChanged($event)"
+      (filtersApply)="onGamesFiltersApplied($event)"
+      (filtersReset)="onGamesFiltersReset()" />
 
     <!-- Focus Mode Side Panel -->
     <div class="focus-side-panel panel fade-in" *ngIf="isFocusMode">
@@ -140,7 +147,13 @@
         </div>
 
         <div *ngIf="focusRightTab === 'filters'" class="full-height-child">
-          <app-filters-panel [gamesLoaded]="gamesLoaded" />
+          <app-filters-panel
+            [gamesLoaded]="gamesLoaded || currentGamesSource === 'userDatabase'"
+            [boardFen]="boardFen()"
+            [value]="gamesFilters()"
+            (valueChange)="onGamesFiltersChanged($event)"
+            (apply)="onGamesFiltersApplied($event)"
+            (reset)="onGamesFiltersReset()" />
         </div>
       </div>
     </div>

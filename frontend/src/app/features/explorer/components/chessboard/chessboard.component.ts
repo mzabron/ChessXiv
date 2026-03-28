@@ -72,6 +72,7 @@ export class ChessboardComponent implements OnChanges {
 
   @Output() readonly moveRowsChanged = new EventEmitter<MoveRow[]>();
   @Output() readonly currentPlyChanged = new EventEmitter<number>();
+  @Output() readonly currentFenChanged = new EventEmitter<string>();
 
   pieces: ChessPiece[] = [];
   protected selectedSquare: string | null = null;
@@ -703,6 +704,7 @@ export class ChessboardComponent implements OnChanges {
 
   private emitNavigationState(): void {
     this.currentPlyChanged.emit(this.currentPly);
+    this.currentFenChanged.emit(this.currentFen);
   }
 
   private emitMoveRows(): void {

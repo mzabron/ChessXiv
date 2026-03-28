@@ -73,7 +73,13 @@
   </div>
   } @else {
   <div class="tab-body" role="tabpanel" aria-label="Filters tab content">
-    <app-filters-panel [gamesLoaded]="gamesLoaded" />
+    <app-filters-panel
+      [gamesLoaded]="gamesLoaded || sourceType === 'userDatabase'"
+      [boardFen]="boardFen"
+      [value]="filters"
+      (valueChange)="filtersChange.emit($event)"
+      (apply)="selectTab('games'); filtersApply.emit($event)"
+      (reset)="filtersReset.emit()" />
   </div>
   }
 

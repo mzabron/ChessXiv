@@ -49,19 +49,25 @@ public class GameExplorerService(
             ? request.Fen.Trim()
             : null;
 
-        if (request.SearchByPosition && request.PositionMode == PositionSearchMode.Subset && normalizedFen is null)
-        {
-            return new PagedResult<GameExplorerItemDto>();
-        }
-
         long? fenHash = null;
-        if (request.SearchByPosition && request.PositionMode == PositionSearchMode.Exact && normalizedFen is not null)
+        if (request.SearchByPosition
+            && (request.PositionMode == PositionSearchMode.Exact || request.PositionMode == PositionSearchMode.SamePosition)
+            && normalizedFen is not null)
         {
-            var state = boardStateSerializer.FromFen(normalizedFen);
-            fenHash = unchecked((long)positionHasher.Compute(state));
+            try
+            {
+                var state = boardStateSerializer.FromFen(normalizedFen);
+                fenHash = unchecked((long)positionHasher.Compute(state));
+            }
+            catch (FormatException)
+            {
+                return new PagedResult<GameExplorerItemDto>();
+            }
         }
 
-        if (request.SearchByPosition && request.PositionMode == PositionSearchMode.Exact && normalizedFen is null)
+        if (request.SearchByPosition
+            && (request.PositionMode == PositionSearchMode.Exact || request.PositionMode == PositionSearchMode.SamePosition)
+            && normalizedFen is null)
         {
             return new PagedResult<GameExplorerItemDto>();
         }

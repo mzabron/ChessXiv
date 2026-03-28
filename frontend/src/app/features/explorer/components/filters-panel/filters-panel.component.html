@@ -1,143 +1,162 @@
 <div class="filter-form">
+  <div class="filter-actions top-actions">
+    <button type="button" class="action-btn" [disabled]="!gamesLoaded" (click)="resetFilters()">Reset</button>
+    <button type="button" class="action-btn primary" [disabled]="!gamesLoaded" (click)="applyFilters()">Apply filters</button>
+  </div>
+
+  @if (!gamesLoaded) {
   <p class="tab-note" [class.disabled]="!gamesLoaded">
     Search filters are disabled until a database is loaded.
   </p>
+  }
 
-  <fieldset class="filters-grid" [disabled]="!gamesLoaded">
-    <label class="control">
-      <span>White first name</span>
-      <input type="text" placeholder="e.g. Magnus" />
-    </label>
+  <fieldset class="sections" [disabled]="!gamesLoaded">
+    <section class="section-card">
+      <h3>Names</h3>
+      <div class="filters-grid">
+        <label class="control">
+          <span>White first name</span>
+          <input type="text" placeholder="e.g. Magnus" [(ngModel)]="model.whiteFirstName" (ngModelChange)="onModelChanged()" />
+        </label>
 
-    <label class="control">
-      <span>White last name</span>
-      <input type="text" placeholder="e.g. Carlsen" />
-    </label>
+        <label class="control">
+          <span>White last name</span>
+          <input type="text" placeholder="e.g. Carlsen" [(ngModel)]="model.whiteLastName" (ngModelChange)="onModelChanged()" />
+        </label>
 
-    <label class="control">
-      <span>Black first name</span>
-      <input type="text" placeholder="e.g. Hikaru" />
-    </label>
+        <label class="control">
+          <span>Black first name</span>
+          <input type="text" placeholder="e.g. Hikaru" [(ngModel)]="model.blackFirstName" (ngModelChange)="onModelChanged()" />
+        </label>
 
-    <label class="control">
-      <span>Black last name</span>
-      <input type="text" placeholder="e.g. Nakamura" />
-    </label>
+        <label class="control">
+          <span>Black last name</span>
+          <input type="text" placeholder="e.g. Nakamura" [(ngModel)]="model.blackLastName" (ngModelChange)="onModelChanged()" />
+        </label>
 
-    <label class="control control-checkbox wide">
-      <input type="checkbox" />
-      <span>Ignore colors</span>
-    </label>
+        <label class="control control-checkbox wide">
+          <input type="checkbox" [(ngModel)]="model.ignoreColors" (ngModelChange)="onModelChanged()" />
+          <span>Ignore colors</span>
+        </label>
+      </div>
+    </section>
 
-    <label class="control control-checkbox wide">
-      <input type="checkbox" />
-      <span>Elo enabled</span>
-    </label>
+    <section class="section-card">
+      <label class="section-toggle">
+        <input type="checkbox" [(ngModel)]="model.eloEnabled" (ngModelChange)="onModelChanged()" />
+        <span>Elo</span>
+      </label>
 
-    <label class="control">
-      <span>Elo from</span>
-      <input type="number" placeholder="1200" />
-    </label>
+      <fieldset class="filters-grid section-body" [disabled]="!model.eloEnabled">
+        <label class="control">
+          <span>Elo from</span>
+          <input type="number" placeholder="e.g. 1200" [(ngModel)]="model.eloFrom" (ngModelChange)="onModelChanged()" />
+        </label>
 
-    <label class="control">
-      <span>Elo to</span>
-      <input type="number" placeholder="2900" />
-    </label>
+        <label class="control">
+          <span>Elo to</span>
+          <input type="number" placeholder="e.g. 2900" [(ngModel)]="model.eloTo" (ngModelChange)="onModelChanged()" />
+        </label>
 
-    <label class="control wide">
-      <span>Elo mode</span>
-      <select>
-        <option>None</option>
-        <option>Both</option>
-        <option>Average</option>
-        <option>Any</option>
-      </select>
-    </label>
+        <label class="control wide">
+          <span>Elo mode</span>
+          <select [(ngModel)]="model.eloMode" (ngModelChange)="onModelChanged()">
+            <option value="none">None</option>
+            <option value="one">Any Player</option>
+            <option value="both">Both Players</option>
+            <option value="avg">Average</option>
+          </select>
+        </label>
+      </fieldset>
+    </section>
 
-    <label class="control control-checkbox wide">
-      <input type="checkbox" />
-      <span>Year enabled</span>
-    </label>
+    <section class="section-card">
+      <label class="section-toggle">
+        <input type="checkbox" [(ngModel)]="model.yearEnabled" (ngModelChange)="onModelChanged()" />
+        <span>Year</span>
+      </label>
 
-    <label class="control">
-      <span>Year from</span>
-      <input type="number" placeholder="1990" />
-    </label>
+      <fieldset class="filters-grid section-body" [disabled]="!model.yearEnabled">
+        <label class="control">
+          <span>Year from</span>
+          <input type="number" placeholder="e.g. 1990" [(ngModel)]="model.yearFrom" (ngModelChange)="onModelChanged()" />
+        </label>
 
-    <label class="control">
-      <span>Year to</span>
-      <input type="number" placeholder="2026" />
-    </label>
+        <label class="control">
+          <span>Year to</span>
+          <input type="number" placeholder="e.g. 2026" [(ngModel)]="model.yearTo" (ngModelChange)="onModelChanged()" />
+        </label>
+      </fieldset>
+    </section>
 
-    <label class="control">
-      <span>ECO code</span>
-      <input type="text" placeholder="B90" />
-    </label>
+    <section class="section-card">
+      <label class="section-toggle">
+        <input type="checkbox" [(ngModel)]="model.searchByPosition" (ngModelChange)="onModelChanged()" />
+        <span>Board</span>
+      </label>
 
-    <label class="control">
-      <span>Result</span>
-      <select>
-        <option>Any</option>
-        <option>1-0</option>
-        <option>0-1</option>
-        <option>1/2-1/2</option>
-      </select>
-    </label>
+      <fieldset class="filters-grid section-body" [disabled]="!model.searchByPosition">
+        <label class="control wide">
+          <span>Search by position on the board</span>
+          <textarea rows="2" [value]="boardFen || 'No active board position yet.'" readonly></textarea>
+        </label>
 
-    <label class="control">
-      <span>Move count from</span>
-      <input type="number" placeholder="1" />
-    </label>
+        <label class="control wide">
+          <span class="position-mode-title">
+            Position mode
+            <span class="help-icon" tabindex="0" aria-label="Position mode help">?
+              <span class="help-tooltip">Exact matches full FEN including move counters. Same position uses Zobrist key to identify identical positions across different paths, so even with a different move number the position can still be found.</span>
+            </span>
+          </span>
+          <select [(ngModel)]="model.positionMode" (ngModelChange)="onModelChanged()">
+            <option value="exact">Exact</option>
+            <option value="samePosition">Same position (Zobrist)</option>
+          </select>
+        </label>
+      </fieldset>
+    </section>
 
-    <label class="control">
-      <span>Move count to</span>
-      <input type="number" placeholder="150" />
-    </label>
+    <section class="section-card">
+      <h3>Game Meta</h3>
+      <div class="filters-grid">
+        <label class="control">
+          <span>ECO code</span>
+          <input type="text" placeholder="e.g. B90" [(ngModel)]="model.ecoCode" (ngModelChange)="onModelChanged()" />
+        </label>
 
-    <label class="control control-checkbox wide">
-      <input type="checkbox" />
-      <span>Search by position</span>
-    </label>
+        <label class="control">
+          <span>Result</span>
+          <select [(ngModel)]="model.result" (ngModelChange)="onModelChanged()">
+            <option value="">Any</option>
+            <option value="1-0">1-0</option>
+            <option value="0-1">0-1</option>
+            <option value="1/2-1/2">1/2-1/2</option>
+          </select>
+        </label>
+      </div>
+    </section>
 
-    <label class="control wide">
-      <span>FEN</span>
-      <textarea rows="2" placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"></textarea>
-    </label>
+    <section class="section-card">
+      <label class="section-toggle">
+        <input type="checkbox" [(ngModel)]="model.moveEnabled" (ngModelChange)="onModelChanged()" />
+        <span>Moves</span>
+      </label>
 
-    <label class="control wide">
-      <span>Position mode</span>
-      <select>
-        <option>Exact</option>
-        <option>Contains</option>
-      </select>
-    </label>
+      <fieldset class="filters-grid section-body" [disabled]="!model.moveEnabled">
+        <label class="control">
+          <span>Move count from</span>
+          <input type="number" placeholder="e.g. 20" [(ngModel)]="model.moveCountFrom" (ngModelChange)="onModelChanged()" />
+        </label>
 
-    <label class="control">
-      <span>Sort by</span>
-      <select>
-        <option>Year</option>
-        <option>Date</option>
-        <option>Elo</option>
-        <option>MoveCount</option>
-      </select>
-    </label>
-
-    <label class="control">
-      <span>Sort direction</span>
-      <select>
-        <option>Desc</option>
-        <option>Asc</option>
-      </select>
-    </label>
-
-    <label class="control">
-      <span>Page</span>
-      <input type="number" value="1" />
-    </label>
-
-    <label class="control">
-      <span>Page size</span>
-      <input type="number" value="50" />
-    </label>
+        <label class="control">
+          <span>Move count to</span>
+          <input type="number" placeholder="e.g. 120" [(ngModel)]="model.moveCountTo" (ngModelChange)="onModelChanged()" />
+        </label>
+      </fieldset>
+    </section>
   </fieldset>
+
+  @if (validationError) {
+    <p class="validation-error">{{ validationError }}</p>
+  }
 </div>
