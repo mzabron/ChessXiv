@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { GameReplayResponse } from './game-replay.models';
 
 export interface DraftImportRequest {
   pgn: string;
@@ -88,6 +89,10 @@ export class DraftImportApiService {
 
   clearDraftGames(): Observable<{ deletedCount: number }> {
     return this.http.delete<{ deletedCount: number }>(`${this.baseUrl}/drafts`);
+  }
+
+  getDraftGameReplay(gameId: string): Observable<GameReplayResponse> {
+    return this.http.get<GameReplayResponse>(`${this.baseUrl}/drafts/games/${gameId}`);
   }
 
   private resolveBaseUrl(): string {

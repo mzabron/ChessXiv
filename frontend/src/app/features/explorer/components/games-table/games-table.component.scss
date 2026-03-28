@@ -46,6 +46,10 @@
     &:hover {
       background: rgba(0, 0, 0, 0.04);
     }
+
+    &.selected {
+      background: #eadab8;
+    }
   }
 
   .result-cell {
@@ -114,5 +118,9 @@
 
   .game-row:hover {
     background: rgba(255, 255, 255, 0.04);
+  }
+
+  .game-row.selected {
+    background: #3f3f46;
   }
 }

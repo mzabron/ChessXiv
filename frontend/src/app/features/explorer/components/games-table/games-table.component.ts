@@ -23,6 +23,9 @@ export class GamesTableComponent {
   @Output() sortChange = new EventEmitter<{ sortBy: DraftGamesSortBy; sortDirection: DraftGamesSortDirection }>();
   @Output() pageSizeChange = new EventEmitter<number>();
   @Output() pageChange = new EventEmitter<number>();
+  @Output() gameSelected = new EventEmitter<DraftGameListItem>();
+
+  @Input() selectedGameId: string | null = null;
 
   protected readonly totalPages = () => {
     const pages = Math.ceil(this.totalCount / this.pageSize);
@@ -80,6 +83,10 @@ export class GamesTableComponent {
     }
 
     this.pageChange.emit(this.page + 1);
+  }
+
+  protected selectGame(game: DraftGameListItem): void {
+    this.gameSelected.emit(game);
   }
 
   protected sortIndicator(column: DraftGamesSortBy): string {

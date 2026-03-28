@@ -1,3 +1,9 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
 .panel {
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -6,12 +12,18 @@
 }
 
 .move-list-panel {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .moves-table {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scroll-behavior: smooth;
   padding: 0.45rem 0.45rem 0.5rem;
   display: flex;
   flex-direction: column;
@@ -64,9 +76,27 @@
   padding: 0.15rem 0.2rem;
 }
 
+.result-row {
+  margin-top: 0.35rem;
+  padding: 0.3rem 0.2rem 0.15rem;
+  border-top: 1px solid var(--line);
+  color: var(--text);
+  font: 700 0.72rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
 @media (max-width: 980px) {
+  :host {
+    height: auto;
+  }
+
   .move-list-panel {
-    min-height: auto;
+    height: auto;
+  }
+
+  .moves-table {
+    max-height: 18rem;
   }
 }
 

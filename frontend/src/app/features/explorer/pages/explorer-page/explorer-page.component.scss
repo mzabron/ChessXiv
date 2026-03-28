@@ -58,6 +58,7 @@
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(145px, 185px);
   gap: 0.75rem;
+  align-items: stretch;
 }
 
 .board-moves-row>* {
@@ -70,6 +71,7 @@
 
 .board-moves-row app-move-list {
   min-width: 145px;
+  height: 100%;
 }
 
 .resize-handle {

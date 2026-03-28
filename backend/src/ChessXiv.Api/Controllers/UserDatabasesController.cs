@@ -12,6 +12,8 @@ namespace ChessXiv.Api.Controllers;
 [Route("api/user-databases")]
 public class UserDatabasesController(ChessXivDbContext dbContext) : ControllerBase
 {
+    private const string DefaultStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
     [Authorize]
     [HttpGet("mine")]
     public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
@@ -235,6 +237,99 @@ public class UserDatabasesController(ChessXivDbContext dbContext) : ControllerBa
             .ToListAsync(cancellationToken);
 
         return Ok(new DraftGamesPageResponse(page, pageSize, totalCount, items));
+    }
+
+    [HttpGet("{id:guid}/games/{gameId:guid}")]
+    public async Task<IActionResult> GetGameReplay(Guid id, Guid gameId, CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+
+        var dbInfo = await dbContext.UserDatabases
+            .AsNoTracking()
+            .Where(d => d.Id == id)
+            .Select(d => new
+            {
+                d.OwnerUserId,
+                d.IsPublic
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (dbInfo is null)
+        {
+            return NotFound();
+        }
+
+        if (!dbInfo.IsPublic && dbInfo.OwnerUserId != userId)
+        {
+            return Forbid();
+        }
+
+        var linked = await dbContext.UserDatabaseGames
+            .AsNoTracking()
+            .AnyAsync(x => x.UserDatabaseId == id && x.GameId == gameId, cancellationToken);
+
+        if (!linked)
+        {
+            return NotFound();
+        }
+
+        var game = await dbContext.Games
+            .AsNoTracking()
+            .Where(g => g.Id == gameId)
+            .Select(g => new
+            {
+                g.Id,
+                g.White,
+                g.WhiteElo,
+                g.Black,
+                g.BlackElo,
+                g.Result,
+                g.Event,
+                g.Year,
+                g.Pgn
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (game is null)
+        {
+            return NotFound();
+        }
+
+        var moves = await dbContext.Moves
+            .AsNoTracking()
+            .Where(m => m.GameId == gameId)
+            .OrderBy(m => m.MoveNumber)
+            .Select(m => new GameReplayMoveDto(
+                m.MoveNumber,
+                m.WhiteMove,
+                m.BlackMove,
+                string.IsNullOrWhiteSpace(m.WhiteClk) ? null : m.WhiteClk,
+                string.IsNullOrWhiteSpace(m.BlackClk) ? null : m.BlackClk))
+            .ToListAsync(cancellationToken);
+
+        var fenHistory = await dbContext.Positions
+            .AsNoTracking()
+            .Where(p => p.GameId == gameId)
+            .OrderBy(p => p.PlyCount)
+            .Select(p => p.Fen)
+            .ToListAsync(cancellationToken);
+
+        if (fenHistory.Count == 0)
+        {
+            fenHistory.Add(ResolveStartFen(game.Pgn));
+        }
+
+        return Ok(new GameReplayResponse(
+            game.Id,
+            game.White,
+            game.WhiteElo,
+            game.Black,
+            game.BlackElo,
+            game.Result,
+            game.Event,
+            game.Year,
+            fenHistory,
+            moves));
     }
 
     [Authorize]
@@ -582,5 +677,28 @@ public class UserDatabasesController(ChessXivDbContext dbContext) : ControllerBa
     {
         return User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? User.FindFirstValue("sub");
+    }
+
+    private static string ResolveStartFen(string? pgn)
+    {
+        if (!string.IsNullOrWhiteSpace(pgn))
+        {
+            foreach (var line in pgn.Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (!trimmed.StartsWith("[FEN \"", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith("\"]", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var fen = trimmed[6..^2].Trim();
+                if (!string.IsNullOrWhiteSpace(fen))
+                {
+                    return fen;
+                }
+            }
+        }
+
+        return DefaultStartFen;
     }
 }

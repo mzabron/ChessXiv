@@ -2,10 +2,10 @@
   @if (!isSetupMode) {
     <div class="player-strip top" aria-label="Black player details">
       <div class="player-main">
-        <span class="player-name">Hikaru Nakamura</span>
-        <span class="player-rating">2780</span>
+        <span class="player-name">{{ topDisplayName() }}</span>
+        <span class="player-rating">{{ topDisplayRating() }}</span>
       </div>
-      <span class="player-clock">00:08:42</span>
+      <span class="player-clock">{{ topPlayerClock() }}</span>
     </div>
   } @else {
     <div class="setup-strip top" aria-label="Black setup pieces">
@@ -83,10 +83,10 @@
   @if (!isSetupMode) {
     <div class="player-strip bottom" aria-label="White player details">
       <div class="player-main">
-        <span class="player-name">Magnus Carlsen</span>
-        <span class="player-rating">2835</span>
+        <span class="player-name">{{ bottomDisplayName() }}</span>
+        <span class="player-rating">{{ bottomDisplayRating() }}</span>
       </div>
-      <span class="player-clock">00:13:28</span>
+      <span class="player-clock">{{ bottomPlayerClock() }}</span>
     </div>
   } @else {
     <div class="setup-strip bottom" aria-label="White setup pieces">

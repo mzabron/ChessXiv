@@ -17,10 +17,17 @@
     <!-- Default Mode Board Row -->
     <div class="board-moves-row" *ngIf="!isFocusMode">
       <app-chessboard
+        #mainChessboard
         [navigationRequest]="navigationRequest"
+        [replayData]="selectedGameReplay()"
         (moveRowsChanged)="onMoveRowsChanged($event)"
         (currentPlyChanged)="onCurrentPlyChanged($event)" />
-      <app-move-list [moveRows]="moveRows" [currentPly]="currentPly" (plySelected)="onPlySelected($event)" />
+      <app-move-list
+        [style.height.px]="moveListHeightPx || null"
+        [moveRows]="moveRows"
+        [currentPly]="currentPly"
+        [gameResult]="selectedGameReplay()?.result ?? null"
+        (plySelected)="onPlySelected($event)" />
     </div>
 
     <!-- Focus Mode Board -->
@@ -28,6 +35,7 @@
       *ngIf="isFocusMode"
       class="full-size-board"
       [navigationRequest]="navigationRequest"
+      [replayData]="selectedGameReplay()"
       (moveRowsChanged)="onMoveRowsChanged($event)"
       (currentPlyChanged)="onCurrentPlyChanged($event)" />
 
@@ -50,6 +58,7 @@
       [resultSortMode]="draftGamesResultSortMode()"
       [sortBy]="draftGamesSortBy()"
       [sortDirection]="draftGamesSortDirection()"
+      [selectedGameId]="selectedGameId()"
       [databaseName]="currentDatabaseName"
       [sourceType]="currentGamesSource"
       [activeDatabaseId]="activeUserDatabaseId()"
@@ -67,7 +76,8 @@
       (gamesResultSortModeChange)="onDraftGamesResultSortModeChanged($event)"
       (gamesSortChange)="onDraftGamesSortChanged($event)"
       (gamesPageSizeChange)="onDraftGamesPageSizeChanged($event)"
-      (gamesPageChange)="onDraftGamesPageChanged($event)" />
+      (gamesPageChange)="onDraftGamesPageChanged($event)"
+      (gameSelected)="onGameSelected($event)" />
 
     <!-- Focus Mode Side Panel -->
     <div class="focus-side-panel panel fade-in" *ngIf="isFocusMode">
@@ -97,6 +107,7 @@
           class="full-height-child"
           [moveRows]="moveRows"
           [currentPly]="currentPly"
+          [gameResult]="selectedGameReplay()?.result ?? null"
           (plySelected)="onPlySelected($event)" />
 
         <div *ngIf="focusRightTab === 'games'" class="full-height-child" style="display: flex; flex-direction: column;">
@@ -116,13 +127,15 @@
               [totalCount]="draftGamesTotalCount()"
               [page]="draftGamesPage()"
               [pageSize]="draftGamesPageSize()"
+              [selectedGameId]="selectedGameId()"
               [resultSortMode]="draftGamesResultSortMode()"
               [sortBy]="draftGamesSortBy()"
               [sortDirection]="draftGamesSortDirection()"
               (resultSortModeChange)="onDraftGamesResultSortModeChanged($event)"
               (sortChange)="onDraftGamesSortChanged($event)"
               (pageSizeChange)="onDraftGamesPageSizeChanged($event)"
-              (pageChange)="onDraftGamesPageChanged($event)" />
+              (pageChange)="onDraftGamesPageChanged($event)"
+              (gameSelected)="onGameSelected($event)" />
           }
         </div>
 

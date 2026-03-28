@@ -18,6 +18,8 @@ public class PgnImportController(
     ChessXivDbContext dbContext,
     ChessXiv.Api.Services.DraftImportProgressCache progressCache) : ControllerBase
 {
+    private const string DefaultStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
     [HttpPost("import")]
     public async Task<IActionResult> Import([FromBody] PgnImportRequest request, CancellationToken cancellationToken)
     {
@@ -253,6 +255,75 @@ public class PgnImportController(
     }
 
     [Authorize]
+    [HttpGet("drafts/games/{gameId:guid}")]
+    public async Task<IActionResult> GetDraftGameReplay(Guid gameId, CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var game = await dbContext.StagingGames
+            .AsNoTracking()
+            .Where(g => g.Id == gameId && g.OwnerUserId == userId)
+            .Select(g => new
+            {
+                g.Id,
+                g.White,
+                g.WhiteElo,
+                g.Black,
+                g.BlackElo,
+                g.Result,
+                g.Event,
+                g.Year,
+                g.Pgn
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (game is null)
+        {
+            return NotFound();
+        }
+
+        var moves = await dbContext.StagingMoves
+            .AsNoTracking()
+            .Where(m => m.StagingGameId == gameId)
+            .OrderBy(m => m.MoveNumber)
+            .Select(m => new GameReplayMoveDto(
+                m.MoveNumber,
+                m.WhiteMove,
+                m.BlackMove,
+                string.IsNullOrWhiteSpace(m.WhiteClk) ? null : m.WhiteClk,
+                string.IsNullOrWhiteSpace(m.BlackClk) ? null : m.BlackClk))
+            .ToListAsync(cancellationToken);
+
+        var fenHistory = await dbContext.StagingPositions
+            .AsNoTracking()
+            .Where(p => p.StagingGameId == gameId)
+            .OrderBy(p => p.PlyCount)
+            .Select(p => p.Fen)
+            .ToListAsync(cancellationToken);
+
+        if (fenHistory.Count == 0)
+        {
+            fenHistory.Add(ResolveStartFen(game.Pgn));
+        }
+
+        return Ok(new GameReplayResponse(
+            game.Id,
+            game.White,
+            game.WhiteElo,
+            game.Black,
+            game.BlackElo,
+            game.Result,
+            game.Event,
+            game.Year,
+            fenHistory,
+            moves));
+    }
+
+    [Authorize]
     [HttpDelete("drafts")]
     public async Task<IActionResult> ClearDraftGames(CancellationToken cancellationToken)
     {
@@ -273,5 +344,28 @@ public class PgnImportController(
     {
         return User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? User.FindFirstValue("sub");
+    }
+
+    private static string ResolveStartFen(string? pgn)
+    {
+        if (!string.IsNullOrWhiteSpace(pgn))
+        {
+            foreach (var line in pgn.Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (!trimmed.StartsWith("[FEN \"", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith("\"]", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var fen = trimmed[6..^2].Trim();
+                if (!string.IsNullOrWhiteSpace(fen))
+                {
+                    return fen;
+                }
+            }
+        }
+
+        return DefaultStartFen;
     }
 }

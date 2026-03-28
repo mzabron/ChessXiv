@@ -34,6 +34,7 @@ export class GamesListComponent {
   @Input() resultSortMode: DraftGamesResultSortMode = 'default';
   @Input() sortBy: DraftGamesSortBy = 'createdAt';
   @Input() sortDirection: DraftGamesSortDirection = 'desc';
+  @Input() selectedGameId: string | null = null;
   @Input() databaseName = 'Games';
   @Input() sourceType: 'imported' | 'external' | 'userDatabase' = 'imported';
   @Input() activeDatabaseId: string | null = null;
@@ -60,6 +61,7 @@ export class GamesListComponent {
   @Output() gamesSortChange = new EventEmitter<{ sortBy: DraftGamesSortBy; sortDirection: DraftGamesSortDirection }>();
   @Output() gamesPageSizeChange = new EventEmitter<number>();
   @Output() gamesPageChange = new EventEmitter<number>();
+  @Output() gameSelected = new EventEmitter<DraftGameListItem>();
 
   protected selectTab(tab: 'databases' | 'games' | 'filters'): void {
     this.activeTab = tab;

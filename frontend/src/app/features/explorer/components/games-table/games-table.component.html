@@ -14,7 +14,11 @@
       </tr>
     </thead>
     <tbody>
-      <tr *ngFor="let game of games" class="game-row">
+      <tr
+        *ngFor="let game of games"
+        class="game-row"
+        [class.selected]="selectedGameId === game.id"
+        (click)="selectGame(game)">
         <td>{{ game.year || '-' }}</td>
         <td>{{ game.white }}</td>
         <td>{{ game.whiteElo || '-' }}</td>

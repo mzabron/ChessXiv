@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ElementRef, EventEmitter, HostListener, Input, OnChanges, Output, SimpleChanges, ViewChild, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ExplorerBoardApiService } from '../../services/explorer-board-api.service';
+import { GameReplayResponse } from '../../services/game-replay.models';
 import { MoveRow } from '../move-list/move-list.component';
 
 interface ChessPiece {
@@ -67,6 +68,7 @@ export class ChessboardComponent implements OnChanges {
   ];
 
   @Input() navigationRequest: { ply: number; version: number } | null = null;
+  @Input() replayData: GameReplayResponse | null = null;
 
   @Output() readonly moveRowsChanged = new EventEmitter<MoveRow[]>();
   @Output() readonly currentPlyChanged = new EventEmitter<number>();
@@ -93,6 +95,11 @@ export class ChessboardComponent implements OnChanges {
   private fenHistory: string[] = [START_FEN];
   private sanHistory: string[] = [];
   private currentPly = 0;
+  private readonly clocksByPly = new Map<number, string>();
+  protected topPlayerName = 'Black';
+  protected topPlayerRating: number | null = null;
+  protected bottomPlayerName = 'White';
+  protected bottomPlayerRating: number | null = null;
   private isFlipped = false;
   private setupSnapshot: SetupSnapshot | null = null;
   private activeDrag: {
@@ -111,8 +118,47 @@ export class ChessboardComponent implements OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if ('replayData' in changes) {
+      this.applyReplayData(this.replayData);
+    }
+
     if ('navigationRequest' in changes && this.navigationRequest) {
       this.navigateToPly(this.navigationRequest.ply);
+    }
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  protected onWindowKeyDown(event: KeyboardEvent): void {
+    if (this.isSetupMode || this.pendingPromotionMove) {
+      return;
+    }
+
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
+      return;
+    }
+
+    switch (event.key) {
+      case 'ArrowLeft':
+        event.preventDefault();
+        this.goPreviousMove();
+        break;
+      case 'ArrowRight':
+        event.preventDefault();
+        this.goNextMove();
+        break;
+      case 'Home':
+        event.preventDefault();
+        this.goToGameStart();
+        break;
+      case 'End':
+        event.preventDefault();
+        this.goToGameEnd();
+        break;
     }
   }
 
@@ -471,6 +517,32 @@ export class ChessboardComponent implements OnChanges {
     return options;
   }
 
+  protected topPlayerClock(): string {
+    return this.getLatestClockForSide(this.isFlipped ? 'w' : 'b');
+  }
+
+  protected bottomPlayerClock(): string {
+    return this.getLatestClockForSide(this.isFlipped ? 'b' : 'w');
+  }
+
+  protected topDisplayName(): string {
+    return this.isFlipped ? this.bottomPlayerName : this.topPlayerName;
+  }
+
+  protected bottomDisplayName(): string {
+    return this.isFlipped ? this.topPlayerName : this.bottomPlayerName;
+  }
+
+  protected topDisplayRating(): string {
+    const rating = this.isFlipped ? this.bottomPlayerRating : this.topPlayerRating;
+    return rating === null ? '\u00A0' : String(rating);
+  }
+
+  protected bottomDisplayRating(): string {
+    const rating = this.isFlipped ? this.topPlayerRating : this.bottomPlayerRating;
+    return rating === null ? '\u00A0' : String(rating);
+  }
+
   protected setSetupSideToMove(side: 'w' | 'b'): void {
     this.setupSideToMove = side;
     this.normalizeSetupEnPassantSelection();
@@ -651,7 +723,8 @@ export class ChessboardComponent implements OnChanges {
           white: san,
           black: '',
           whitePly: ply,
-          blackPly: null
+          blackPly: null,
+          whiteClk: this.clocksByPly.get(ply) ?? null
         };
         side = 'b';
         continue;
@@ -663,11 +736,13 @@ export class ChessboardComponent implements OnChanges {
           white: '...',
           black: san,
           whitePly: null,
-          blackPly: ply
+          blackPly: ply,
+          blackClk: this.clocksByPly.get(ply) ?? null
         });
       } else {
         openRow.black = san;
         openRow.blackPly = ply;
+        openRow.blackClk = this.clocksByPly.get(ply) ?? null;
         rows.push(openRow);
       }
 
@@ -1055,5 +1130,80 @@ export class ChessboardComponent implements OnChanges {
     };
 
     return map[ch] ?? null;
+  }
+
+  private applyReplayData(replay: GameReplayResponse | null): void {
+    if (!replay) {
+      return;
+    }
+
+    this.topPlayerName = replay.black;
+    this.topPlayerRating = replay.blackElo;
+    this.bottomPlayerName = replay.white;
+    this.bottomPlayerRating = replay.whiteElo;
+
+    this.clocksByPly.clear();
+    const sanHistory: string[] = [];
+
+    for (const move of replay.moves) {
+      if (move.whiteMove) {
+        sanHistory.push(move.whiteMove);
+        if (move.whiteClk) {
+          this.clocksByPly.set(sanHistory.length, move.whiteClk);
+        }
+      }
+
+      if (move.blackMove) {
+        sanHistory.push(move.blackMove);
+        if (move.blackClk) {
+          this.clocksByPly.set(sanHistory.length, move.blackClk);
+        }
+      }
+    }
+
+    const nextFenHistory = (replay.fenHistory ?? []).filter(fen => !!fen && fen.trim().length > 0);
+
+    this.startFen = nextFenHistory[0] ?? START_FEN;
+    this.sanHistory = sanHistory;
+    this.fenHistory = nextFenHistory.length >= sanHistory.length + 1
+      ? nextFenHistory.slice(0, sanHistory.length + 1)
+      : [this.startFen];
+
+    while (this.fenHistory.length < this.sanHistory.length + 1) {
+      this.fenHistory.push(this.fenHistory[this.fenHistory.length - 1] ?? this.startFen);
+    }
+
+    this.currentPly = 0;
+    this.currentFen = this.startFen;
+    this.pieces = this.parseFenToPieces(this.currentFen);
+    this.selectedSquare = null;
+    this.pendingPromotionMove = null;
+    this.statusMessage = null;
+    this.emitMoveRows();
+    this.emitNavigationState();
+  }
+
+  private getLatestClockForSide(side: 'w' | 'b'): string {
+    for (let ply = this.currentPly; ply >= 1; ply--) {
+      if (this.getSideForPly(ply) !== side) {
+        continue;
+      }
+
+      const value = this.clocksByPly.get(ply);
+      if (value) {
+        return value;
+      }
+    }
+
+    return '';
+  }
+
+  private getSideForPly(ply: number): 'w' | 'b' {
+    const startSide = this.getStartSideToMove();
+    if (startSide === 'w') {
+      return ply % 2 === 1 ? 'w' : 'b';
+    }
+
+    return ply % 2 === 1 ? 'b' : 'w';
   }
 }

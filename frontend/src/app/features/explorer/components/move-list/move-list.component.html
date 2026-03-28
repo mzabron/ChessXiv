@@ -2,7 +2,7 @@
   @if (moveRows.length === 0) {
     <p class="empty-note">Play moves on the board to build notation.</p>
   } @else {
-    <div class="moves-table" aria-label="Move list">
+    <div class="moves-table" #movesTable aria-label="Move list">
       @for (row of moveRows; track row.number) {
         <div class="move-row">
           <span class="ply-number">{{ row.number }}.</span>
@@ -10,6 +10,7 @@
             <button
               type="button"
               class="move-btn"
+              [attr.data-ply]="row.whitePly"
               [class.active]="currentPly === row.whitePly"
               (click)="selectPly(row.whitePly)">{{ row.white }}</button>
           } @else {
@@ -19,12 +20,17 @@
             <button
               type="button"
               class="move-btn"
+              [attr.data-ply]="row.blackPly"
               [class.active]="row.blackPly !== null && currentPly === row.blackPly"
               (click)="row.blackPly !== null && selectPly(row.blackPly)">{{ row.black }}</button>
           } @else {
             <span class="move-placeholder" aria-hidden="true"></span>
           }
         </div>
+      }
+
+      @if (gameResult) {
+        <div class="result-row" aria-label="Game result">{{ gameResult }}</div>
       }
     </div>
   }

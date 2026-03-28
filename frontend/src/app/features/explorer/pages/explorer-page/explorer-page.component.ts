@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, ViewChild, Input, effect, inject, signal, OnDestroy } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild, Input, effect, inject, signal, OnDestroy, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { firstValueFrom, forkJoin, Subscription } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -23,6 +23,7 @@ import {
   DraftImportResult
 } from '../../services/draft-import-api.service';
 import { DraftImportProgressService, DraftImportProgressUpdate } from '../../services/draft-import-progress.service';
+import { GameReplayResponse } from '../../services/game-replay.models';
 
 @Component({
   selector: 'app-explorer-page',
@@ -31,7 +32,7 @@ import { DraftImportProgressService, DraftImportProgressUpdate } from '../../ser
   templateUrl: './explorer-page.component.html',
   styleUrl: './explorer-page.component.scss'
 })
-export class ExplorerPageComponent implements OnDestroy {
+export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   private readonly authState = inject(AuthStateService);
   private readonly userDatabasesApi = inject(UserDatabasesApiService);
   private readonly draftImportApi = inject(DraftImportApiService);
@@ -49,6 +50,9 @@ export class ExplorerPageComponent implements OnDestroy {
 
   @ViewChild('pgnFileInput')
   private readonly pgnFileInput?: ElementRef<HTMLInputElement>;
+
+  @ViewChild('mainChessboard', { read: ElementRef })
+  private readonly mainChessboardRef?: ElementRef<HTMLElement>;
 
   protected gamesLoaded = false;
   protected readonly isImporting = signal(false);
@@ -69,6 +73,8 @@ export class ExplorerPageComponent implements OnDestroy {
   protected readonly draftGamesSortDirection = signal<DraftGamesSortDirection>('desc');
   protected currentDatabaseName = 'Games';
   protected currentGamesSource: 'imported' | 'external' | 'userDatabase' = 'imported';
+  protected readonly selectedGameId = signal<string | null>(null);
+  protected readonly selectedGameReplay = signal<GameReplayResponse | null>(null);
   protected readonly myDatabases = signal<Array<{ id: string; name: string }>>([]);
   protected readonly panelDatabases = signal<Database[]>([]);
   protected readonly currentUserName = this.authState.userName;
@@ -118,12 +124,14 @@ export class ExplorerPageComponent implements OnDestroy {
   protected leftPaneWidth = 620;
 
   protected focusRightTab: 'databases' | 'tree' | 'moves' | 'games' | 'filters' = 'tree';
+  protected moveListHeightPx = 0;
 
   private static readonly minBoardWidth = 320;
   private static readonly minMoveListWidth = 145;
   private static readonly boardMoveGap = 12;
   private static readonly rightColumnMinWidth = 390;
   private static readonly handleWidth = 8;
+  private boardResizeObserver: ResizeObserver | null = null;
 
   constructor() {
     effect(() => {
@@ -150,6 +158,12 @@ export class ExplorerPageComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.clearImportErrorTimers();
     this.detachProgressSubscription();
+    this.boardResizeObserver?.disconnect();
+    this.boardResizeObserver = null;
+  }
+
+  ngAfterViewInit(): void {
+    this.initializeMoveListHeightSync();
   }
 
   protected startResize(event: MouseEvent): void {
@@ -182,6 +196,7 @@ export class ExplorerPageComponent implements OnDestroy {
     );
 
     this.leftPaneWidth = Math.min(Math.max(requestedLeftWidth, minLeftWidth), maxLeftWidth);
+    this.syncMoveListHeightToBoard();
   }
 
   @HostListener('window:mouseup')
@@ -202,6 +217,10 @@ export class ExplorerPageComponent implements OnDestroy {
     this.gamesLoaded = true;
     this.currentDatabaseName = 'Community Database';
     this.currentGamesSource = 'external';
+    this.selectedGameId.set(null);
+    this.selectedGameReplay.set(null);
+    this.moveRows = [];
+    this.currentPly = 0;
   }
 
   protected onDatabaseSelected(database: Database): void {
@@ -371,6 +390,10 @@ export class ExplorerPageComponent implements OnDestroy {
     void this.loadCurrentGamesPage();
   }
 
+  protected onGameSelected(game: DraftGameListItem): void {
+    void this.loadSelectedGameReplay(game);
+  }
+
   protected async onPgnFileSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -507,6 +530,34 @@ export class ExplorerPageComponent implements OnDestroy {
     }
   }
 
+  private async loadSelectedGameReplay(game: DraftGameListItem): Promise<void> {
+    try {
+      let replay: GameReplayResponse | null = null;
+
+      if (this.currentGamesSource === 'userDatabase') {
+        const userDatabaseId = this.activeUserDatabaseId();
+        if (!userDatabaseId) {
+          return;
+        }
+
+        replay = await firstValueFrom(this.userDatabasesApi.getGameReplay(userDatabaseId, game.id));
+      } else if (this.currentGamesSource === 'imported') {
+        replay = await firstValueFrom(this.draftImportApi.getDraftGameReplay(game.id));
+      }
+
+      if (!replay) {
+        return;
+      }
+
+      this.selectedGameId.set(game.id);
+      this.selectedGameReplay.set(replay);
+      this.navigationVersion++;
+      this.navigationRequest = { ply: 0, version: this.navigationVersion };
+    } catch {
+      this.showImportError('Unable to load selected game replay.');
+    }
+  }
+
   private resolveImportErrorMessage(error: unknown, progressConnected: boolean): string {
     if (error instanceof HttpErrorResponse) {
       if (error.status === 401) {
@@ -618,6 +669,10 @@ export class ExplorerPageComponent implements OnDestroy {
 
   private async openUserDatabase(database: Database): Promise<void> {
     this.clearImportError();
+    this.selectedGameId.set(null);
+    this.selectedGameReplay.set(null);
+    this.moveRows = [];
+    this.currentPly = 0;
     this.activeUserDatabaseId.set(database.id);
     this.currentDatabaseName = database.name;
     this.currentGamesSource = 'userDatabase';
@@ -657,6 +712,10 @@ export class ExplorerPageComponent implements OnDestroy {
   }
 
   private async restoreImportedDraftIfAny(): Promise<void> {
+    this.selectedGameId.set(null);
+    this.selectedGameReplay.set(null);
+    this.moveRows = [];
+    this.currentPly = 0;
     this.currentGamesSource = 'imported';
     this.currentDatabaseName = 'Imported Draft';
     this.draftGamesPage.set(1);
@@ -689,6 +748,10 @@ export class ExplorerPageComponent implements OnDestroy {
     this.draftGamesTotalCount.set(0);
     this.draftGamesPage.set(1);
     this.gamesLoaded = false;
+    this.selectedGameId.set(null);
+    this.selectedGameReplay.set(null);
+    this.moveRows = [];
+    this.currentPly = 0;
   }
 
   private async deleteDatabase(database: Database): Promise<void> {
@@ -792,6 +855,29 @@ export class ExplorerPageComponent implements OnDestroy {
       window.clearTimeout(this.importErrorClearTimerId);
       this.importErrorClearTimerId = null;
     }
+  }
+
+  private initializeMoveListHeightSync(): void {
+    if (!this.mainChessboardRef?.nativeElement || typeof ResizeObserver === 'undefined') {
+      this.syncMoveListHeightToBoard();
+      return;
+    }
+
+    this.boardResizeObserver = new ResizeObserver(() => {
+      this.syncMoveListHeightToBoard();
+    });
+
+    this.boardResizeObserver.observe(this.mainChessboardRef.nativeElement);
+    this.syncMoveListHeightToBoard();
+  }
+
+  private syncMoveListHeightToBoard(): void {
+    const boardHost = this.mainChessboardRef?.nativeElement;
+    if (!boardHost) {
+      return;
+    }
+
+    this.moveListHeightPx = Math.round(boardHost.getBoundingClientRect().height);
   }
 
 }

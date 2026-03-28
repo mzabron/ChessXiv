@@ -60,13 +60,15 @@
         [totalCount]="totalCount"
         [page]="page"
         [pageSize]="pageSize"
+        [selectedGameId]="selectedGameId"
         [resultSortMode]="resultSortMode"
         [sortBy]="sortBy"
         [sortDirection]="sortDirection"
         (resultSortModeChange)="gamesResultSortModeChange.emit($event)"
         (sortChange)="gamesSortChange.emit($event)"
         (pageSizeChange)="gamesPageSizeChange.emit($event)"
-        (pageChange)="gamesPageChange.emit($event)" />
+        (pageChange)="gamesPageChange.emit($event)"
+        (gameSelected)="gameSelected.emit($event)" />
     }
   </div>
   } @else {

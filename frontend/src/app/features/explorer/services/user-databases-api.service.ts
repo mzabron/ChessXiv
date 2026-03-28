@@ -7,6 +7,7 @@ import {
   DraftGamesSortBy,
   DraftGamesSortDirection
 } from './draft-import-api.service';
+import { GameReplayResponse } from './game-replay.models';
 
 export interface UserDatabaseDto {
   id: string;
@@ -64,6 +65,10 @@ export class UserDatabasesApiService {
         resultSortMode
       }
     });
+  }
+
+  getGameReplay(userDatabaseId: string, gameId: string): Observable<GameReplayResponse> {
+    return this.http.get<GameReplayResponse>(`${this.baseUrl}/user-databases/${userDatabaseId}/games/${gameId}`);
   }
 
   private resolveBaseUrl(): string {
