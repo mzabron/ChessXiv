@@ -1,22 +1,21 @@
 # ChessXiv
+A High-Performance Chess Database & Explorer Web App
 
-**A High-Performance Chess Database & Explorer Web App**
-
+![Status: Incubating](https://img.shields.io/badge/status-active_development-orange)
 ## Introduction
 ChessXiv was created to bring a ChessBase-style experience to all platforms. It enables users to natively import their own PGN databases and efficiently search through them using a range of advanced filtering options. In addition, it introduces new functionality such as user accounts, allowing individuals to create community databases and share access with others. More features will be released soon!
 
-**Live Project:** [chessxiv.org](https://chessxiv.org)  
+Live Project: [chessxiv.org](https://chessxiv.org)  
 
 ## What ChessXiv offers in the current state?
-Note that ChessXiv is currently in early development stage. Described feature will be actively upadted along adding new functionalities. However right now it can offer:
-* **Imports up to 200 MB** - Users can import (.pgn) files up to 200 MB (approximately 50 000 - 80 000, based on games metadata). When importing games can take some time (about 1s for each 400 games), then all filters and sorting filters works almost instantly which make it really convinient
-* **Multiple filter options** -  User can filter imported games by names, ratings, year, board positions, ECO code, result and move count setting specified options to each of listed categories also imported games/ filtered result might be sorted by each of dipslayed column.
-* **Board Set Up** - users can move pieces around the board creating custom games, and then using it as a filter for imported games. Also you can set up a position a single position (not going from the start position) with the board editor.
-* **Moves Tree** - for each set of imported games moves tress is automatically created - it shows the user what's are the most common played next moves, taking the current position on the board and all imported games, or just then one that you filter for.
-* **Convinient UI** - UI is very flexible, you can change the size fo the components dynamically by dragging vertical line in between components, there's also a focus mode which changes the componentes aligment and make board bigger and dark mode.
+Note that ChessXiv is currently in the early development stage. Described features will be actively updated alongside adding new functionalities. However, right now it can offer:
+* Imports up to 200 MB - Users can import (.pgn) files up to 200 MB (approximately 50,000 - 80,000 games, based on game metadata). While importing games can take some time (about 1s for every 400 games), all filters and sorting options work almost instantly, which makes the experience very convenient.
+* Multiple filter options - Users can filter imported games by names, ratings, year, board positions, ECO code, result, and move count. You can set specified options for each of these categories, and filtered results can be sorted by each displayed column.
+* Board Setup - Users can move pieces around the board to create custom games and use them as a filter for imported games. You can also set up a single position (not starting from the initial position) with the board editor.
+* Moves Tree - For each set of imported games, a moves tree is automatically created. It shows the user the most commonly played next moves based on the current board position and the imported games or filtered results.
+* Convenient UI - The UI is very flexible; you can change the size of components dynamically by dragging the vertical line between them. There is also a focus mode that changes component alignment to make the board bigger, as well as a dark mode.
 
-In current state be able to import games you need to create an account and verify your email (confirmation email will be sent automatically). As right now it may seem useless, in the future more features related to user accounts will be added. Also that's the way to avoid mass-bot imports that might crash the server.
-
+In the current state, to be able to import games, you need to create an account and verify your email (a confirmation email will be sent automatically). While this may seem unnecessary now, more features related to user accounts will be added in the future. This also serves as a way to avoid mass-bot imports that might crash the server.
 
 ---
 
@@ -33,10 +32,8 @@ To handle massive PGN uploads without impacting the performance of the primary p
 * Automated Data Lifecycle: To ensure optimal storage efficiency, a background Hosted Service (StagingDraftCleanupService) monitors the staging tables. Any temporary data older than 24 hours is automatically purged, keeping the system lean and responsive.
 * PostgreSQL Binary COPY: The infrastructure layer utilizes the Npgsql Binary COPY protocol. This maps C# objects directly to the PostgreSQL internal binary format, streaming data into the database at the maximum hardware limit—bypassing the overhead of standard SQL INSERT statements.
 
----
-
 ## User Identity & Lifecycle
-ChessXiv implements a robust, enterprise-grade account system using ASP.NET Core Identity.
+ChessXiv implements account system using ASP.NET Core Identity.
 
 * Two-Step Email Confirmation: To maintain system integrity and prevent bot spam, accounts require email verification. I integrated the Brevo API to handle transactional emails for registration and password resets.
 * Secure Token Handling: Confirmation and password-reset tokens are Base64Url-encoded and cryptographically signed, ensuring they cannot be tampered with.
@@ -45,7 +42,44 @@ ChessXiv implements a robust, enterprise-grade account system using ASP.NET Core
 
 ---
 
-## Database Schema
-The schema is optimized for Deep Explorer queries, allowing users to find specific positions and move frequencies across millions of records.
+## Gallery
 
-![Database Schema](docs/assets/database-schema.png)
+### User Interface & Explorer
+The core of ChessXiv is a high-performance explorer designed for PGN analysis with native-feeling responsiveness and statistics integrated with the current board state.
+
+<p align="center">
+  <img src="docs/assets/explorer-main.png" width="90%" alt="Main Explorer View">
+  <br>
+  <i>Main Explorer: On-board position integrated move tree and thousands of games ready to open.</i>
+</p>
+
+<p align="center">
+  <img src="docs/assets/explorer-dark-mode.png" width="48%" alt="Dark Mode Explorer">
+  <img src="docs/assets/games-tree-dark.png" width="48%" alt="Dark Mode Games Tree">
+  <br>
+  <i>Dark mode explorer in both default view and focus mode.</i>
+</p>
+
+---
+
+### Advanced Tools & Mobile Support
+Tailored filtering and setup tools ensure that users can find specific motifs or positions across millions of games, even on mobile devices.
+
+<p align="center">
+  <img src="docs/assets/filters-tab.png" width="31%" alt="Filter Tab">
+  <img src="docs/assets/position-set-up.png" width="31%" alt="Position Setup">
+  <img src="docs/assets/mobile-view.png" width="31%" alt="Mobile View">
+  <br>
+  <i>From left: Advanced search parameters, custom position setup, responsive mobile layout.</i>
+</p>
+
+---
+
+### Architecture & Data Logic
+The backend is built for the heavy lifting required for bulk PGN ingestion and complex relational queries.
+
+<p align="center">
+  <img src="docs/assets/database-schema.png" width="85%" alt="Database Schema">
+  <br>
+  <i>System Schema: PostgreSQL structure.</i>
+</p>
