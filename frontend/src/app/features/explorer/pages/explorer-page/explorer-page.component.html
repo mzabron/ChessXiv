@@ -25,7 +25,6 @@
         (currentPlyChanged)="onCurrentPlyChanged($event)"
         (currentFenChanged)="onBoardFenChanged($event)" />
       <app-move-list
-        [style.height.px]="moveListHeightPx || null"
         [moveRows]="moveRows"
         [currentPly]="currentPly"
         [gameResult]="selectedGameReplay()?.result ?? null"

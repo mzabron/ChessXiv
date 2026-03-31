@@ -145,15 +145,12 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   protected leftPaneWidth = 620;
 
   protected focusRightTab: 'databases' | 'tree' | 'moves' | 'games' | 'filters' = 'tree';
-  protected moveListHeightPx = 0;
 
   private static readonly minBoardWidth = 320;
   private static readonly minMoveListWidth = 145;
   private static readonly boardMoveGap = 12;
   private static readonly rightColumnMinWidth = 390;
   private static readonly handleWidth = 8;
-  private boardResizeObserver: ResizeObserver | null = null;
-
   constructor() {
     effect(() => {
       if (!this.authState.isAuthenticated()) {
@@ -179,12 +176,9 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   ngOnDestroy(): void {
     this.clearImportErrorTimers();
     this.detachProgressSubscription();
-    this.boardResizeObserver?.disconnect();
-    this.boardResizeObserver = null;
   }
 
   ngAfterViewInit(): void {
-    this.initializeMoveListHeightSync();
   }
 
   protected startResize(event: MouseEvent): void {
@@ -217,7 +211,6 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     );
 
     this.leftPaneWidth = Math.min(Math.max(requestedLeftWidth, minLeftWidth), maxLeftWidth);
-    this.syncMoveListHeightToBoard();
   }
 
   @HostListener('window:mouseup')
@@ -1039,29 +1032,6 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.selectedGameReplay.set(null);
     this.moveRows = [];
     this.currentPly = 0;
-  }
-
-  private initializeMoveListHeightSync(): void {
-    if (!this.mainChessboardRef?.nativeElement || typeof ResizeObserver === 'undefined') {
-      this.syncMoveListHeightToBoard();
-      return;
-    }
-
-    this.boardResizeObserver = new ResizeObserver(() => {
-      this.syncMoveListHeightToBoard();
-    });
-
-    this.boardResizeObserver.observe(this.mainChessboardRef.nativeElement);
-    this.syncMoveListHeightToBoard();
-  }
-
-  private syncMoveListHeightToBoard(): void {
-    const boardHost = this.mainChessboardRef?.nativeElement;
-    if (!boardHost) {
-      return;
-    }
-
-    this.moveListHeightPx = Math.round(boardHost.getBoundingClientRect().height);
   }
 
 }
