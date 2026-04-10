@@ -629,7 +629,7 @@ export class ChessboardComponent implements OnChanges {
           .filter(p => this.coordsToSquare(p.x, p.y) !== to)
           .map(p => {
             if (p.id === movingPiece.id) {
-              return { ...p, id: `${p.type}-${toCoords.x}-${toCoords.y}`, x: toCoords.x, y: toCoords.y };
+              return { ...p, x: toCoords.x, y: toCoords.y };
             }
             return p;
           });
@@ -660,14 +660,14 @@ export class ChessboardComponent implements OnChanges {
 
       if (!response.isValid || !response.fen) {
         this.statusMessage = null;
-        this.pieces = fallbackPieces ?? this.parseFenToPieces(this.currentFen);
+        this.pieces = fallbackPieces ?? this.parseFenToPieces(this.currentFen, this.pieces);
         return;
       }
 
       this.applySuccessfulMove(response.fen, response.san ?? `${from}${to}`);
     } catch (error) {
       this.statusMessage = this.resolveBackendErrorMessage(error);
-      this.pieces = fallbackPieces ?? this.parseFenToPieces(this.currentFen);
+      this.pieces = fallbackPieces ?? this.parseFenToPieces(this.currentFen, this.pieces);
     } finally {
       this.isSubmittingMove = false;
     }
@@ -740,7 +740,7 @@ export class ChessboardComponent implements OnChanges {
     this.fenHistory = [this.startFen];
     this.currentPly = 0;
     this.currentFen = this.startFen;
-    this.pieces = this.parseFenToPieces(this.currentFen);
+    this.pieces = this.parseFenToPieces(this.currentFen, this.pieces);
     this.selectedSquare = null;
     this.pendingPromotionMove = null;
     this.statusMessage = null;
@@ -755,7 +755,7 @@ export class ChessboardComponent implements OnChanges {
     if (this.currentPly < this.sanHistory.length && continuationFen === nextFen) {
       this.currentPly++;
       this.currentFen = nextFen;
-      this.pieces = this.parseFenToPieces(this.currentFen);
+      this.pieces = this.parseFenToPieces(this.currentFen, this.pieces);
       this.emitNavigationState();
       return;
     }
@@ -769,7 +769,7 @@ export class ChessboardComponent implements OnChanges {
     this.fenHistory = [...this.fenHistory, nextFen];
     this.currentPly = this.sanHistory.length;
     this.currentFen = nextFen;
-    this.pieces = this.parseFenToPieces(this.currentFen);
+    this.pieces = this.parseFenToPieces(this.currentFen, this.pieces);
     this.emitMoveRows();
     this.emitNavigationState();
   }
@@ -786,7 +786,7 @@ export class ChessboardComponent implements OnChanges {
 
     this.currentPly = clamped;
     this.currentFen = this.fenHistory[this.currentPly] ?? START_FEN;
-    this.pieces = this.parseFenToPieces(this.currentFen);
+    this.pieces = this.parseFenToPieces(this.currentFen, this.pieces);
     this.selectedSquare = null;
     this.pendingPromotionMove = null;
     this.statusMessage = null;
@@ -1169,14 +1169,14 @@ export class ChessboardComponent implements OnChanges {
     return `${file}${rank}`;
   }
 
-  private parseFenToPieces(fen: string): ChessPiece[] {
+  private parseFenToPieces(fen: string, previousPieces?: ChessPiece[]): ChessPiece[] {
     const placement = fen.split(' ')[0] ?? '';
     const ranks = placement.split('/');
     if (ranks.length !== 8) {
       return [];
     }
 
-    const pieces: ChessPiece[] = [];
+    const naivePieces: ChessPiece[] = [];
     for (let y = 0; y < 8; y++) {
       const rank = ranks[y] ?? '';
       let x = 0;
@@ -1192,8 +1192,8 @@ export class ChessboardComponent implements OnChanges {
           continue;
         }
 
-        pieces.push({
-          id: `${pieceType}-${x}-${y}`,
+        naivePieces.push({
+          id: 'NEW',
           type: pieceType,
           x,
           y
@@ -1203,7 +1203,53 @@ export class ChessboardComponent implements OnChanges {
       }
     }
 
-    return pieces;
+    if (!previousPieces || previousPieces.length === 0) {
+      return naivePieces.map((p, idx) => ({ ...p, id: `${p.type}-${p.x}-${p.y}-${idx}` }));
+    }
+
+    const result: ChessPiece[] = [];
+    const usedOldIds = new Set<string>();
+
+    for (const np of naivePieces) {
+      const exact = previousPieces.find(op => !usedOldIds.has(op.id) && op.type === np.type && op.x === np.x && op.y === np.y);
+      if (exact) {
+        usedOldIds.add(exact.id);
+        np.id = exact.id;
+      }
+    }
+
+    for (const np of naivePieces) {
+      if (np.id !== 'NEW') {
+        result.push(np);
+        continue;
+      }
+
+      const candidates = previousPieces.filter(op => !usedOldIds.has(op.id) && op.type === np.type);
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => {
+          const distA = Math.abs(a.x - np.x) + Math.abs(a.y - np.y);
+          const distB = Math.abs(b.x - np.x) + Math.abs(b.y - np.y);
+          return distA - distB;
+        });
+        const best = candidates[0];
+        usedOldIds.add(best.id);
+        np.id = best.id;
+      } else {
+        np.id = `${np.type}-${np.x}-${np.y}-${Math.random()}`;
+      }
+      result.push(np);
+    }
+
+    const oldOrder = new Map<string, number>();
+    previousPieces.forEach((p, idx) => oldOrder.set(p.id, idx));
+
+    result.sort((a, b) => {
+      const idxA = oldOrder.has(a.id) ? oldOrder.get(a.id)! : 99999;
+      const idxB = oldOrder.has(b.id) ? oldOrder.get(b.id)! : 99999;
+      return idxA - idxB;
+    });
+
+    return result;
   }
 
   private mapFenCharToPieceType(ch: string): string | null {
@@ -1268,7 +1314,7 @@ export class ChessboardComponent implements OnChanges {
 
     this.currentPly = 0;
     this.currentFen = this.startFen;
-    this.pieces = this.parseFenToPieces(this.currentFen);
+    this.pieces = this.parseFenToPieces(this.currentFen, this.pieces);
     this.selectedSquare = null;
     this.pendingPromotionMove = null;
     this.statusMessage = null;
