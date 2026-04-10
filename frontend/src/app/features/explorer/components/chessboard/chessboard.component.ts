@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ElementRef, EventEmitter, HostListener, Input, OnChanges, Output, SimpleChanges, ViewChild, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { Chess } from 'chess.js';
 import { ExplorerBoardApiService } from '../../services/explorer-board-api.service';
 import { GameReplayResponse } from '../../services/game-replay.models';
 import { MoveRow } from '../move-list/move-list.component';
@@ -604,53 +605,46 @@ export class ChessboardComponent implements OnChanges {
   }
 
   private async tryStartMove(from: string, to: string): Promise<void> {
-    const promotionSide = this.getPromotionSide(from, to);
-    if (promotionSide) {
-      this.isSubmittingMove = true;
-      this.statusMessage = null;
+    let isValidLocally = false;
+    try {
+      const chess = new Chess(this.currentFen);
+      chess.move({ from, to, promotion: 'q' });
+      isValidLocally = true;
+    } catch {
+      isValidLocally = false;
+    }
 
-      try {
-        const response = await firstValueFrom(
-          this.boardApi.applyMove({
-            fen: this.currentFen,
-            from,
-            to,
-            promotion: 'q'
-          })
-        );
-
-        if (response.isValid) {
-          const movingPiece = this.getPieceAtSquare(from);
-          if (movingPiece) {
-            const toCoords = this.squareToCoords(to);
-            if (toCoords) {
-              this.pieces = this.pieces
-                .filter(p => this.coordsToSquare(p.x, p.y) !== to)
-                .map(p => {
-                  if (p.id === movingPiece.id) {
-                    return { ...p, id: `${p.type}-${toCoords.x}-${toCoords.y}`, x: toCoords.x, y: toCoords.y };
-                  }
-                  return p;
-                });
-            }
-          }
-          this.pendingPromotionMove = { from, to, side: promotionSide };
-        } else {
-          this.statusMessage = null;
-        }
-      } catch (error) {
-        this.statusMessage = this.resolveBackendErrorMessage(error);
-      } finally {
-        this.isSubmittingMove = false;
-      }
-
+    if (!isValidLocally) {
       return;
     }
 
-    void this.tryApplyMove(from, to, null);
+    const promotionSide = this.getPromotionSide(from, to);
+    const originalPieces = this.pieces;
+    const movingPiece = this.getPieceAtSquare(from);
+
+    if (movingPiece) {
+      const toCoords = this.squareToCoords(to);
+      if (toCoords) {
+        this.pieces = this.pieces
+          .filter(p => this.coordsToSquare(p.x, p.y) !== to)
+          .map(p => {
+            if (p.id === movingPiece.id) {
+              return { ...p, id: `${p.type}-${toCoords.x}-${toCoords.y}`, x: toCoords.x, y: toCoords.y };
+            }
+            return p;
+          });
+      }
+    }
+
+    if (promotionSide) {
+      this.pendingPromotionMove = { from, to, side: promotionSide };
+      return;
+    }
+
+    void this.tryApplyMove(from, to, null, originalPieces);
   }
 
-  private async tryApplyMove(from: string, to: string, promotion: 'q' | 'r' | 'b' | 'n' | null): Promise<void> {
+  private async tryApplyMove(from: string, to: string, promotion: 'q' | 'r' | 'b' | 'n' | null, fallbackPieces: ChessPiece[] | null = null): Promise<void> {
     this.isSubmittingMove = true;
     this.statusMessage = null;
 
@@ -666,12 +660,14 @@ export class ChessboardComponent implements OnChanges {
 
       if (!response.isValid || !response.fen) {
         this.statusMessage = null;
+        this.pieces = fallbackPieces ?? this.parseFenToPieces(this.currentFen);
         return;
       }
 
       this.applySuccessfulMove(response.fen, response.san ?? `${from}${to}`);
     } catch (error) {
       this.statusMessage = this.resolveBackendErrorMessage(error);
+      this.pieces = fallbackPieces ?? this.parseFenToPieces(this.currentFen);
     } finally {
       this.isSubmittingMove = false;
     }
