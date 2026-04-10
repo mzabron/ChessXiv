@@ -239,7 +239,7 @@ export class ChessboardComponent implements OnChanges {
     }
 
     const sourceSquare = this.coordsToSquare(piece.x, piece.y);
-    
+
     if (!this.canSelectSquare(sourceSquare)) {
       if (this.selectedSquare && !this.isSubmittingMove) {
         this.handleSquareInteraction(sourceSquare);
@@ -603,10 +603,47 @@ export class ChessboardComponent implements OnChanges {
     this.tryStartMove(from, square);
   }
 
-  private tryStartMove(from: string, to: string): void {
+  private async tryStartMove(from: string, to: string): Promise<void> {
     const promotionSide = this.getPromotionSide(from, to);
     if (promotionSide) {
-      this.pendingPromotionMove = { from, to, side: promotionSide };
+      this.isSubmittingMove = true;
+      this.statusMessage = null;
+
+      try {
+        const response = await firstValueFrom(
+          this.boardApi.applyMove({
+            fen: this.currentFen,
+            from,
+            to,
+            promotion: 'q'
+          })
+        );
+
+        if (response.isValid) {
+          const movingPiece = this.getPieceAtSquare(from);
+          if (movingPiece) {
+            const toCoords = this.squareToCoords(to);
+            if (toCoords) {
+              this.pieces = this.pieces
+                .filter(p => this.coordsToSquare(p.x, p.y) !== to)
+                .map(p => {
+                  if (p.id === movingPiece.id) {
+                    return { ...p, id: `${p.type}-${toCoords.x}-${toCoords.y}`, x: toCoords.x, y: toCoords.y };
+                  }
+                  return p;
+                });
+            }
+          }
+          this.pendingPromotionMove = { from, to, side: promotionSide };
+        } else {
+          this.statusMessage = null;
+        }
+      } catch (error) {
+        this.statusMessage = this.resolveBackendErrorMessage(error);
+      } finally {
+        this.isSubmittingMove = false;
+      }
+
       return;
     }
 
