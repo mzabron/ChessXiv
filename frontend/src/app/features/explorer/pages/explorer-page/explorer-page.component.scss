@@ -72,7 +72,8 @@
 
 .board-moves-row app-move-list {
   min-width: 145px;
-  height: 100%;
+  height: var(--board-moves-height, auto);
+  max-height: var(--board-moves-height, none);
 }
 
 .resize-handle {
@@ -98,6 +99,11 @@
 
   .board-moves-row {
     grid-template-columns: 1fr;
+  }
+
+  .board-moves-row app-move-list {
+    height: auto;
+    max-height: none;
   }
 
   .resize-handle {

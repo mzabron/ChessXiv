@@ -15,7 +15,7 @@
   <section class="left-column fade-in" aria-label="Chessboard and filters">
 
     <!-- Default Mode Board Row -->
-    <div class="board-moves-row" *ngIf="!isFocusMode">
+    <div class="board-moves-row" #boardMovesRow *ngIf="!isFocusMode">
       <app-chessboard
         #mainChessboard
         [navigationRequest]="navigationRequest"
@@ -25,6 +25,7 @@
         (currentPlyChanged)="onCurrentPlyChanged($event)"
         (currentFenChanged)="onBoardFenChanged($event)" />
       <app-move-list
+        #mainMoveList
         [moveRows]="moveRows"
         [currentPly]="currentPly"
         [gameResult]="selectedGameReplay()?.result ?? null"

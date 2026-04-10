@@ -67,6 +67,12 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   @ViewChild('mainChessboard', { read: ElementRef })
   private readonly mainChessboardRef?: ElementRef<HTMLElement>;
 
+  @ViewChild('mainMoveList', { read: ElementRef })
+  private readonly mainMoveListRef?: ElementRef<HTMLElement>;
+
+  @ViewChild('boardMovesRow', { read: ElementRef })
+  private readonly boardMovesRowRef?: ElementRef<HTMLElement>;
+
   protected gamesLoaded = false;
   protected readonly isImporting = signal(false);
   protected readonly isSavingDraft = signal(false);
@@ -106,6 +112,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   private importErrorTimerId: number | null = null;
   private importErrorClearTimerId: number | null = null;
   private pendingDeleteDatabase: Database | null = null;
+  private boardMovesResizeObserver: ResizeObserver | null = null;
   protected mockGames: any[] = [
     {
       year: 2023,
@@ -176,9 +183,36 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   ngOnDestroy(): void {
     this.clearImportErrorTimers();
     this.detachProgressSubscription();
+    this.boardMovesResizeObserver?.disconnect();
   }
 
   ngAfterViewInit(): void {
+    this.initBoardMovesHeightSync();
+  }
+
+  private initBoardMovesHeightSync(): void {
+    const boardElement = this.mainChessboardRef?.nativeElement;
+    const rowElement = this.boardMovesRowRef?.nativeElement;
+    const moveListElement = this.mainMoveListRef?.nativeElement;
+
+    if (!boardElement || !rowElement || !moveListElement) {
+      return;
+    }
+
+    const syncHeight = (): void => {
+      const boardHeight = Math.round(boardElement.getBoundingClientRect().height);
+      if (boardHeight <= 0) {
+        return;
+      }
+
+      rowElement.style.setProperty('--board-moves-height', `${boardHeight}px`);
+      moveListElement.style.setProperty('height', `${boardHeight}px`);
+    };
+
+    syncHeight();
+    this.boardMovesResizeObserver?.disconnect();
+    this.boardMovesResizeObserver = new ResizeObserver(() => syncHeight());
+    this.boardMovesResizeObserver.observe(boardElement);
   }
 
   protected startResize(event: MouseEvent): void {
