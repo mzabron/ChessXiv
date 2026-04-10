@@ -17,6 +17,29 @@
   overflow-y: auto;
 }
 
+.mobile-sidebar-toggle {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #374151;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.16);
+  z-index: 40;
+}
+
+:host-context(body.dark-theme) .mobile-sidebar-toggle {
+  background: #111827;
+  border-color: #374151;
+  color: #e5e7eb;
+}
+
 .confirm-email-view {
   min-height: 100vh;
   display: flex;

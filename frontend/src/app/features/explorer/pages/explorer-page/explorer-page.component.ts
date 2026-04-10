@@ -73,6 +73,9 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   @ViewChild('boardMovesRow', { read: ElementRef })
   private readonly boardMovesRowRef?: ElementRef<HTMLElement>;
 
+  @ViewChild('focusTabs', { read: ElementRef })
+  private readonly focusTabsRef?: ElementRef<HTMLElement>;
+
   protected gamesLoaded = false;
   protected readonly isImporting = signal(false);
   protected readonly isSavingDraft = signal(false);
@@ -250,6 +253,17 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   @HostListener('window:mouseup')
   protected onWindowMouseUp(): void {
     this.isResizing = false;
+  }
+
+  protected scrollFocusTabs(direction: 'left' | 'right'): void {
+    const tabsElement = this.focusTabsRef?.nativeElement;
+    if (!tabsElement) {
+      return;
+    }
+
+    const amount = Math.max(96, Math.floor(tabsElement.clientWidth * 0.55));
+    const delta = direction === 'left' ? -amount : amount;
+    tabsElement.scrollBy({ left: delta, behavior: 'smooth' });
   }
 
   protected importDatabase(): void {

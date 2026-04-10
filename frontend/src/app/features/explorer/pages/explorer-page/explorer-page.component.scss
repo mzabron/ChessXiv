@@ -109,6 +109,35 @@
   .resize-handle {
     display: none;
   }
+
+  .tabs-shell {
+    gap: 0.2rem;
+    padding: 0.3rem;
+  }
+
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  .tab-btn {
+    padding: 0.5rem 0.62rem;
+    font-size: 0.78rem;
+    text-align: left;
+  }
 }
 
 /* --- Focus Mode Styles & Transitions --- */
@@ -152,15 +181,45 @@
   overflow: hidden;
 }
 
-.tabs {
+.tabs-shell {
   display: flex;
-  padding: 0.35rem 0.35rem 0;
-  gap: 0.35rem;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
 }
 
+.tabs {
+  display: flex;
+  padding: 0;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.tabs-nav {
+  display: none;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.tabs-nav:hover {
+  background: color-mix(in srgb, var(--line) 42%, transparent);
+  color: var(--text);
+}
+
 .tab-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
@@ -201,6 +260,37 @@
 
 :host-context(body.dark-theme) .resize-handle {
   background: linear-gradient(180deg, #4b5563 0%, #374151 100%);
+}
+
+@media (max-width: 980px) {
+  .tabs-shell {
+    gap: 0.2rem;
+    padding: 0.3rem;
+  }
+
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  .tab-btn {
+    padding: 0.5rem 0.62rem;
+    font-size: 0.78rem;
+    text-align: left;
+  }
 }
 
 .visually-hidden {

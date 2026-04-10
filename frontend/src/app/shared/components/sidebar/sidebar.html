@@ -1,5 +1,15 @@
 <aside class="sidebar">
   <div class="sidebar-top">
+    @if (showMobileCollapse) {
+      <button class="icon-btn" (click)="onMobileCollapseClick()" title="Minimize sidebar" aria-label="Minimize sidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-panel-left-close">
+          <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+          <path d="M9 3v18"/>
+          <path d="m16 15-3-3 3-3"/>
+        </svg>
+      </button>
+    }
+
     <div class="user-control" [class.open]="isUserMenuOpen">
       <button class="icon-btn user-btn" (click)="onUserButtonClick($event)" [title]="isAuthenticated ? userName : 'Sign in'">
         @if (isAuthenticated) {
@@ -79,14 +89,16 @@
       }
     </div>
     
-    <!-- Focus Layout Icon -->
-    <button class="icon-btn" (click)="onToggleLayout()" title="Toggle Focus Mode">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-panel-left-close">
-        <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
-        <path d="M9 3v18"/>
-        <path d="m16 15-3-3 3-3"/>
-      </svg>
-    </button>
+    @if (showFocusToggle) {
+      <!-- Focus Layout Icon -->
+      <button class="icon-btn" (click)="onToggleLayout()" title="Toggle Focus Mode">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-panel-left-close">
+          <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+          <path d="M9 3v18"/>
+          <path d="m16 15-3-3 3-3"/>
+        </svg>
+      </button>
+    }
 
     <!-- Dark Mode Icon -->
     <button class="icon-btn" (click)="toggleDarkMode()" title="Toggle Dark Mode">

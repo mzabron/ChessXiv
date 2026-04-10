@@ -18,11 +18,14 @@ export class Sidebar {
 
   @Input() isAuthenticated = false;
   @Input() userName = '';
+  @Input() showFocusToggle = true;
+  @Input() showMobileCollapse = false;
 
   @Output() loginClick = new EventEmitter<void>();
   @Output() signOutClick = new EventEmitter<void>();
   @Output() toggleLayout = new EventEmitter<void>();
   @Output() aboutClick = new EventEmitter<void>();
+  @Output() mobileCollapseClick = new EventEmitter<void>();
 
   protected isUserMenuOpen = false;
   protected readonly accountSummary = signal<AccountSummary | null>(null);
@@ -288,6 +291,10 @@ export class Sidebar {
 
   onAboutClick() {
     this.aboutClick.emit();
+  }
+
+  onMobileCollapseClick() {
+    this.mobileCollapseClick.emit();
   }
 
   toggleDarkMode() {

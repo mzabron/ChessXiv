@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, HostListener, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ExplorerPageComponent } from './features/explorer/pages/explorer-page/explorer-page.component';
 import { Sidebar } from './shared/components/sidebar/sidebar';
@@ -15,10 +15,13 @@ import { AccountApiService } from './core/auth/account-api.service';
   styleUrl: './app.scss'
 })
 export class App implements OnInit {
+  private static readonly mobileBreakpointPx = 980;
   protected readonly authState = inject(AuthStateService);
   private readonly accountApi = inject(AccountApiService);
   isLoginModalOpen = false;
   isFocusMode = false;
+  isMobileLayout = false;
+  isMobileSidebarCollapsed = false;
   isAboutModalOpen = false;
   readonly isResetPasswordView = window.location.pathname === '/reset-password';
   readonly isConfirmEmailView = window.location.pathname === '/confirm-email';
@@ -32,6 +35,8 @@ export class App implements OnInit {
   confirmMessage = 'Confirming your email...';
 
   ngOnInit(): void {
+    this.updateMobileLayout();
+
     if (this.isConfirmEmailChangeView) {
       this.confirmEmailChange();
       return;
@@ -99,8 +104,37 @@ export class App implements OnInit {
     this.isFocusMode = !this.isFocusMode;
   }
 
+  protected get effectiveFocusMode(): boolean {
+    return this.isMobileLayout || this.isFocusMode;
+  }
+
+  protected get showMainSidebar(): boolean {
+    return !this.isMobileLayout || !this.isMobileSidebarCollapsed;
+  }
+
+  @HostListener('window:resize')
+  protected onWindowResize(): void {
+    this.updateMobileLayout();
+  }
+
   toggleAboutModal() {
     this.isAboutModalOpen = !this.isAboutModalOpen;
+  }
+
+  protected expandMobileSidebar(): void {
+    if (!this.isMobileLayout) {
+      return;
+    }
+
+    this.isMobileSidebarCollapsed = false;
+  }
+
+  protected collapseMobileSidebar(): void {
+    if (!this.isMobileLayout) {
+      return;
+    }
+
+    this.isMobileSidebarCollapsed = true;
   }
 
   signOut(): void {
@@ -140,5 +174,20 @@ export class App implements OnInit {
     }
 
     return 'Unable to confirm email. Please request a new confirmation link.';
+  }
+
+  private updateMobileLayout(): void {
+    const isNowMobile = window.innerWidth <= App.mobileBreakpointPx;
+    const wasMobile = this.isMobileLayout;
+    this.isMobileLayout = isNowMobile;
+
+    // Mobile opens with full sidebar by default.
+    if (!wasMobile && isNowMobile) {
+      this.isMobileSidebarCollapsed = false;
+    }
+
+    if (wasMobile && !isNowMobile) {
+      this.isMobileSidebarCollapsed = false;
+    }
   }
 }
