@@ -56,7 +56,7 @@ export type DraftGamesResultSortMode = 'default' | 'whiteFirst' | 'blackFirst' |
 @Injectable({ providedIn: 'root' })
 export class DraftImportApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = this.resolveBaseUrl();
+  private readonly baseUrl = '/api/pgn';
 
   importDraft(request: DraftImportRequest): Observable<DraftImportResult> {
     return this.http.post<DraftImportResult>(`${this.baseUrl}/drafts/import`, request);

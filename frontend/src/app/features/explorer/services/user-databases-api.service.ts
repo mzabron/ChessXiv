@@ -31,7 +31,7 @@ export interface CreateUserDatabaseRequest {
 @Injectable({ providedIn: 'root' })
 export class UserDatabasesApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = this.resolveBaseUrl();
+  private readonly baseUrl = '/api';
 
   getMine(): Observable<UserDatabaseDto[]> {
     return this.http.get<UserDatabaseDto[]>(`${this.baseUrl}/user-databases/mine`);

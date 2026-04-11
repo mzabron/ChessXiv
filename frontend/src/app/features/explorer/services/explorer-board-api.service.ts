@@ -62,7 +62,7 @@ export interface ExplorerMoveTreeResponse {
 @Injectable({ providedIn: 'root' })
 export class ExplorerBoardApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = this.resolveBaseUrl();
+  private readonly baseUrl = '/api/games/explorer';
 
   applyMove(request: PositionMoveRequest): Observable<PositionMoveResponse> {
     return this.http.post<PositionMoveResponse>(`${this.baseUrl}/position/move`, request);

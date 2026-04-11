@@ -16,7 +16,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class AuthApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = this.resolveBaseUrl();
+  private readonly baseUrl = '/api';
 
   register(request: AuthRegisterRequest): Observable<AuthRegisterResponse> {
     return this.http.post<AuthRegisterResponse>(`${this.baseUrl}/auth/register`, request);

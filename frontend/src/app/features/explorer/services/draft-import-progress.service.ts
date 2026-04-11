@@ -32,7 +32,7 @@ export class DraftImportProgressService {
 
     if (!this.connection) {
       this.connection = new HubConnectionBuilder()
-        .withUrl(this.resolveHubUrl(), {
+        .withUrl('/hubs/import-progress', {
           withCredentials: false,
           accessTokenFactory: () => this.authState.getAccessToken() ?? ''
         })
@@ -58,16 +58,5 @@ export class DraftImportProgressService {
 
   reset(): void {
     this.updatesSubject.next(null);
-  }
-
-  private resolveHubUrl(): string {
-    const host = window.location.hostname;
-    const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
-
-    if (isLocalHost) {
-      return `http://${host}:5027/hubs/import-progress`;
-    }
-
-    return '/hubs/import-progress';
   }
 }

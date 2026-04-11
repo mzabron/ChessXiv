@@ -12,7 +12,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class AccountApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = this.resolveBaseUrl();
+  private readonly baseUrl = '/api';
 
   getSummary(): Observable<AccountSummary> {
     return this.http.get<AccountSummary>(`${this.baseUrl}/account/summary`);

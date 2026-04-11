@@ -377,14 +377,14 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
       const selectedDatabase = this.panelDatabases().find(db => db.id === userDatabaseId)
         ?? {
-          id: userDatabaseId,
-          name: payload.mode === 'create'
-            ? (payload.newDatabaseName ?? 'Imported Games')
-            : (this.myDatabases().find(db => db.id === userDatabaseId)?.name ?? 'Saved Database'),
-          owner: this.currentUserName() ?? '',
-          creationDate: new Date(),
-          gamesCount: 0
-        };
+        id: userDatabaseId,
+        name: payload.mode === 'create'
+          ? (payload.newDatabaseName ?? 'Imported Games')
+          : (this.myDatabases().find(db => db.id === userDatabaseId)?.name ?? 'Saved Database'),
+        owner: this.currentUserName() ?? '',
+        creationDate: new Date(),
+        gamesCount: 0
+      };
 
       await this.openUserDatabase(selectedDatabase);
       this.saveDraftCompleted.set(true);
@@ -550,7 +550,10 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
     try {
       try {
-        await this.draftImportProgress.connect();
+        await Promise.race([
+          this.draftImportProgress.connect(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('SignalR timeout')), 5000))
+        ]);
         progressConnected = true;
         this.detachProgressSubscription();
         this.progressSubscription = this.draftImportProgress.updates$.subscribe(update => {
