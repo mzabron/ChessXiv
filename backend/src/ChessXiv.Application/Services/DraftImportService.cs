@@ -99,7 +99,7 @@ public sealed class DraftImportService(
             }
 
             await transaction.CommitAsync(cancellationToken);
-            await PublishProgressAsync(ownerUserId, parsedCount, importedCount, skippedCount, isCompleted: true, isFailed: false, message: "Import completed.", cancellationToken);
+            await PublishProgressAsync(ownerUserId, parsedCount, importedCount, skippedCount, isCompleted: false, isFailed: false, message: "Finalizing system database...", cancellationToken);
             return new DraftImportResult(parsedCount, importedCount, skippedCount);
         }
         catch

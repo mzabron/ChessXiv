@@ -44,7 +44,7 @@ public class BackgroundImportWorker(
             if (workItem.TargetType == ImportTargetType.Draft)
             {
                 var draftImportService = scope.ServiceProvider.GetRequiredService<IDraftImportService>();
-                await draftImportService.ImportAsync(
+                var result = await draftImportService.ImportAsync(
                     reader,
                     workItem.UserId,
                     batchSize: 200,
@@ -57,6 +57,19 @@ public class BackgroundImportWorker(
                         dbContext.Database, "ANALYZE \"StagingGames\";", cancellationToken: stoppingToken);
                     await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(
                         dbContext.Database, "ANALYZE \"StagingPositions\";", cancellationToken: stoppingToken);
+                }
+
+                var progressPublisher = scope.ServiceProvider.GetService<ChessXiv.Application.Abstractions.IDraftImportProgressPublisher>();
+                if (progressPublisher is not null)
+                {
+                    var update = new ChessXiv.Application.Contracts.DraftImportProgressUpdate(
+                        result.ParsedCount,
+                        result.ImportedCount,
+                        result.SkippedCount,
+                        IsCompleted: true,
+                        IsFailed: false,
+                        Message: "Import completed.");
+                    await progressPublisher.PublishAsync(workItem.UserId, update, stoppingToken);
                 }
             }
             else if (workItem.TargetType == ImportTargetType.UserDatabase && workItem.UserDatabaseId.HasValue)
