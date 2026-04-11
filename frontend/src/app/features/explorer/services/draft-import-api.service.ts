@@ -4,22 +4,7 @@ import { Observable } from 'rxjs';
 import { GameReplayResponse } from './game-replay.models';
 import { ExplorerGamesFiltersQuery } from './games-filters.models';
 
-export interface DraftImportRequest {
-  pgn: string;
-}
-
-export interface DraftImportResult {
-  parsedCount: number;
-  importedCount: number;
-  skippedCount: number;
-}
-
 export interface DraftPromotionRequest {
-  userDatabaseId: string;
-}
-
-export interface DirectImportToDatabaseRequest {
-  pgn: string;
   userDatabaseId: string;
 }
 
@@ -58,16 +43,25 @@ export class DraftImportApiService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = '/api/pgn';
 
-  importDraft(request: DraftImportRequest): Observable<DraftImportResult> {
-    return this.http.post<DraftImportResult>(`${this.baseUrl}/drafts/import`, request);
+  importDraft(file: File): Observable<void> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<void>(`${this.baseUrl}/drafts/import-file`, formData);
   }
 
   promoteDraft(request: DraftPromotionRequest): Observable<DraftPromotionResult> {
     return this.http.post<DraftPromotionResult>(`${this.baseUrl}/drafts/promote`, request);
   }
 
-  importToDatabase(request: DirectImportToDatabaseRequest): Observable<DraftImportResult> {
-    return this.http.post<DraftImportResult>(`${this.baseUrl}/import-to-database`, request);
+  importToDatabase(file: File, userDatabaseId: string): Observable<void> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('userDatabaseId', userDatabaseId);
+    return this.http.post<void>(`${this.baseUrl}/import-to-database-file`, formData);
+  }
+
+  getDraftImportProgress(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/drafts/import-progress`);
   }
 
   getDraftGames(
@@ -96,17 +90,6 @@ export class DraftImportApiService {
 
   getDraftGameReplay(gameId: string): Observable<GameReplayResponse> {
     return this.http.get<GameReplayResponse>(`${this.baseUrl}/drafts/games/${gameId}`);
-  }
-
-  private resolveBaseUrl(): string {
-    const host = window.location.hostname;
-    const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
-
-    if (isLocalHost) {
-      return `http://${host}:5027/api/pgn`;
-    }
-
-    return '/api/pgn';
   }
 
   private buildFilterParams(filters?: ExplorerGamesFiltersQuery): Record<string, string | number | boolean> {

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using ChessXiv.Api.Services;
 
 namespace ChessXiv.Api.Controllers;
 
@@ -14,13 +15,12 @@ namespace ChessXiv.Api.Controllers;
 [Route("api/pgn")]
 public class PgnImportController(
     IPgnImportService pgnImportService,
-    IDraftImportService draftImportService,
-    IDirectDatabaseImportService directDatabaseImportService,
     IDraftPromotionService draftPromotionService,
     ChessXivDbContext dbContext,
     IBoardStateSerializer boardStateSerializer,
     IPositionHasher positionHasher,
-    ChessXiv.Api.Services.DraftImportProgressCache progressCache) : ControllerBase
+    DraftImportProgressCache progressCache,
+    BackgroundImportQueue backgroundQueue) : ControllerBase
 {
     private const string DefaultStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -38,16 +38,17 @@ public class PgnImportController(
     }
 
     [Authorize]
-    [HttpPost("import-to-database")]
+    [HttpPost("import-to-database-file")]
     [RequestSizeLimit(200_000_000)]
-    public async Task<IActionResult> ImportToDatabase([FromBody] DirectImportToDatabaseRequest request, CancellationToken cancellationToken)
+    [DisableRequestSizeLimit]
+    public async Task<IActionResult> ImportToDatabaseFile([FromForm] IFormFile file, [FromForm] Guid userDatabaseId, CancellationToken cancellationToken)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.Pgn))
+        if (file is null || file.Length == 0)
         {
-            return BadRequest("PGN content is required.");
+            return BadRequest("File is empty or not provided.");
         }
 
-        if (request.UserDatabaseId == Guid.Empty)
+        if (userDatabaseId == Guid.Empty)
         {
             return BadRequest("User database id is required.");
         }
@@ -58,25 +59,32 @@ public class PgnImportController(
             return Unauthorized();
         }
 
-        using var reader = new StringReader(request.Pgn);
-        var result = await directDatabaseImportService.ImportToDatabaseAsync(
-            reader,
-            userId,
-            request.UserDatabaseId,
-            batchSize: 500,
-            cancellationToken: cancellationToken);
+        var tempFilePath = Path.GetTempFileName();
+        await using (var stream = new FileStream(tempFilePath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream, cancellationToken);
+        }
 
-        return Ok(result);
+        await backgroundQueue.QueueBackgroundWorkItemAsync(new BackgroundImportJob
+        {
+            UserId = userId,
+            TempFilePath = tempFilePath,
+            TargetType = ImportTargetType.UserDatabase,
+            UserDatabaseId = userDatabaseId
+        });
+
+        return Accepted();
     }
 
     [Authorize]
-    [HttpPost("drafts/import")]
+    [HttpPost("drafts/import-file")]
     [RequestSizeLimit(200_000_000)]
-    public async Task<IActionResult> ImportDraft([FromBody] DraftImportRequest request, CancellationToken cancellationToken)
+    [DisableRequestSizeLimit]
+    public async Task<IActionResult> ImportDraftFile(IFormFile file, CancellationToken cancellationToken)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.Pgn))
+        if (file is null || file.Length == 0)
         {
-            return BadRequest("PGN content is required.");
+            return BadRequest("File is empty or not provided.");
         }
 
         var userId = GetCurrentUserId();
@@ -85,14 +93,20 @@ public class PgnImportController(
             return Unauthorized();
         }
 
-        using var reader = new StringReader(request.Pgn);
-        var result = await draftImportService.ImportAsync(
-            reader,
-            userId,
-            batchSize: 200,
-            cancellationToken: cancellationToken);
+        var tempFilePath = Path.GetTempFileName();
+        await using (var stream = new FileStream(tempFilePath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream, cancellationToken);
+        }
 
-        return Ok(result);
+        await backgroundQueue.QueueBackgroundWorkItemAsync(new BackgroundImportJob
+        {
+            UserId = userId,
+            TempFilePath = tempFilePath,
+            TargetType = ImportTargetType.Draft
+        });
+
+        return Accepted();
     }
 
     [Authorize]

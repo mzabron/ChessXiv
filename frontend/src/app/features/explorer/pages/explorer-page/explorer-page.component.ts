@@ -19,8 +19,7 @@ import {
   DraftGamesResultSortMode,
   DraftGamesSortBy,
   DraftGamesSortDirection,
-  DraftImportApiService,
-  DraftImportResult
+  DraftImportApiService
 } from '../../services/draft-import-api.service';
 import { DraftImportProgressService, DraftImportProgressUpdate } from '../../services/draft-import-progress.service';
 import { GameReplayResponse } from '../../services/game-replay.models';
@@ -174,12 +173,50 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       }
 
       void this.draftImportProgress.connect();
+      this.attachGlobalProgressSubscription();
+      this.checkAndHydrateGhostImport();
 
       if (this.loadedForCurrentSession()) {
         return;
       }
 
       this.loadUserDatabases();
+    });
+  }
+
+  private attachGlobalProgressSubscription(): void {
+    if (this.progressSubscription) {
+      return;
+    }
+
+    this.progressSubscription = this.draftImportProgress.updates$.subscribe(update => {
+      if (!update) return;
+
+      this.importProgress.set(update);
+
+      if (!update.isCompleted && !update.isFailed) {
+        this.isImporting.set(true);
+      } else if (this.isImporting()) {
+        if (update.isCompleted) {
+          this.applyImportedDraftState(update);
+        } else if (update.isFailed) {
+          this.showImportError(update.message || 'Import failed.');
+        }
+
+        this.isImporting.set(false);
+      }
+    });
+  }
+
+  private checkAndHydrateGhostImport(): void {
+    this.draftImportApi.getDraftImportProgress().subscribe({
+      next: (progress) => {
+        if (progress && !progress.isCompleted && !progress.isFailed) {
+          this.isImporting.set(true);
+          this.importProgress.set(progress);
+        }
+      },
+      error: () => { } // Ghost import fetch failed or no content, ignore
     });
   }
 
@@ -529,11 +566,10 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       return;
     }
 
-    const pgn = await file.text();
-    await this.runDraftImport(pgn);
+    await this.runDraftImport(file);
   }
 
-  private async runDraftImport(pgn: string): Promise<void> {
+  private async runDraftImport(file: File): Promise<void> {
     this.isImporting.set(true);
     this.clearImportError();
     this.importProgress.set({
@@ -555,28 +591,23 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
           new Promise((_, reject) => setTimeout(() => reject(new Error('SignalR timeout')), 5000))
         ]);
         progressConnected = true;
-        this.detachProgressSubscription();
-        this.progressSubscription = this.draftImportProgress.updates$.subscribe(update => {
-          if (update) {
-            this.importProgress.set(update);
-          }
-        });
       } catch {
         // Import should still work even if live progress transport is unavailable.
         progressConnected = false;
       }
 
-      const result = await firstValueFrom(this.draftImportApi.importDraft({ pgn }));
-      this.applyImportedDraftState(result);
+      // Send the file to the backend, it will process asynchronously. 
+      await firstValueFrom(this.draftImportApi.importDraft(file));
+
     } catch (error) {
       this.showImportError(this.resolveImportErrorMessage(error, progressConnected));
-    } finally {
       this.isImporting.set(false);
-      this.detachProgressSubscription();
     }
+    // Finally block omitted because isImporting needs to stay true 
+    // while the background process completes via SignalR!
   }
 
-  private applyImportedDraftState(result: DraftImportResult): void {
+  private applyImportedDraftState(result: DraftImportProgressUpdate): void {
     this.gamesLoaded = result.importedCount > 0;
     this.currentDatabaseName = 'Imported Draft';
     this.currentGamesSource = 'imported';
@@ -697,6 +728,10 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     if (error instanceof HttpErrorResponse) {
       if (error.status === 401) {
         return 'Import failed: you are not authenticated. Please sign in again.';
+      }
+
+      if (error.status === 413) {
+        return 'Import failed: This PGN is too large for web upload.';
       }
 
       if (error.status === 0) {

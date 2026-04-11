@@ -179,6 +179,8 @@ builder.Services.AddScoped<IEmailSender>(serviceProvider =>
 });
 builder.Services.AddHostedService<UnconfirmedUserCleanupService>();
 builder.Services.AddHostedService<StagingDraftCleanupService>();
+builder.Services.AddSingleton<BackgroundImportQueue>();
+builder.Services.AddHostedService<BackgroundImportWorker>();
 
 var app = builder.Build();
 
