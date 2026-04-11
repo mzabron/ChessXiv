@@ -49,6 +49,15 @@ public class BackgroundImportWorker(
                     workItem.UserId,
                     batchSize: 200,
                     cancellationToken: stoppingToken);
+                    
+                var dbContext = scope.ServiceProvider.GetRequiredService<ChessXiv.Infrastructure.Data.ChessXivDbContext>();
+                if (dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+                {
+                    await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(
+                        dbContext.Database, "ANALYZE \"StagingGames\";", cancellationToken: stoppingToken);
+                    await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(
+                        dbContext.Database, "ANALYZE \"StagingPositions\";", cancellationToken: stoppingToken);
+                }
             }
             else if (workItem.TargetType == ImportTargetType.UserDatabase && workItem.UserDatabaseId.HasValue)
             {
@@ -59,6 +68,17 @@ public class BackgroundImportWorker(
                     workItem.UserDatabaseId.Value,
                     batchSize: 500,
                     cancellationToken: stoppingToken);
+
+                var dbContext = scope.ServiceProvider.GetRequiredService<ChessXiv.Infrastructure.Data.ChessXivDbContext>();
+                if (dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+                {
+                    await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(
+                        dbContext.Database, "ANALYZE \"Games\";", cancellationToken: stoppingToken);
+                    await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(
+                        dbContext.Database, "ANALYZE \"Positions\";", cancellationToken: stoppingToken);
+                    await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(
+                        dbContext.Database, "ANALYZE \"UserDatabaseGames\";", cancellationToken: stoppingToken);
+                }
             }
         }
         catch (OperationCanceledException)
