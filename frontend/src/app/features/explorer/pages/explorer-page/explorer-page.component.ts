@@ -233,26 +233,43 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   private initBoardMovesHeightSync(): void {
     const boardElement = this.mainChessboardRef?.nativeElement;
     const rowElement = this.boardMovesRowRef?.nativeElement;
-    const moveListElement = this.mainMoveListRef?.nativeElement;
+    const observedElement = this.getBoardHeightMeasureElement();
 
-    if (!boardElement || !rowElement || !moveListElement) {
+    if (!boardElement || !rowElement || !observedElement) {
       return;
     }
 
-    const syncHeight = (): void => {
-      const boardHeight = Math.round(boardElement.getBoundingClientRect().height);
-      if (boardHeight <= 0) {
-        return;
-      }
+    this.syncBoardMovesHeight();
+    this.boardMovesResizeObserver?.disconnect();
+    this.boardMovesResizeObserver = new ResizeObserver(() => this.syncBoardMovesHeight());
+    this.boardMovesResizeObserver.observe(observedElement);
+    this.boardMovesResizeObserver.observe(rowElement);
+  }
 
+  private getBoardHeightMeasureElement(): HTMLElement | null {
+    const boardHost = this.mainChessboardRef?.nativeElement;
+    if (!boardHost) {
+      return null;
+    }
+
+    return boardHost.querySelector('.board-panel') ?? boardHost;
+  }
+
+  private syncBoardMovesHeight(): void {
+    const rowElement = this.boardMovesRowRef?.nativeElement;
+    const moveListElement = this.mainMoveListRef?.nativeElement;
+    const boardMeasureElement = this.getBoardHeightMeasureElement();
+
+    if (!rowElement || !moveListElement || !boardMeasureElement) {
+      return;
+    }
+
+    const boardHeight = Math.round(boardMeasureElement.getBoundingClientRect().height);
+    if (boardHeight > 0) {
       rowElement.style.setProperty('--board-moves-height', `${boardHeight}px`);
       moveListElement.style.setProperty('height', `${boardHeight}px`);
-    };
-
-    syncHeight();
-    this.boardMovesResizeObserver?.disconnect();
-    this.boardMovesResizeObserver = new ResizeObserver(() => syncHeight());
-    this.boardMovesResizeObserver.observe(boardElement);
+      moveListElement.style.setProperty('max-height', `${boardHeight}px`);
+    }
   }
 
   protected startResize(event: MouseEvent): void {
@@ -285,11 +302,18 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     );
 
     this.leftPaneWidth = Math.min(Math.max(requestedLeftWidth, minLeftWidth), maxLeftWidth);
+    requestAnimationFrame(() => this.syncBoardMovesHeight());
   }
 
   @HostListener('window:mouseup')
   protected onWindowMouseUp(): void {
     this.isResizing = false;
+    this.syncBoardMovesHeight();
+  }
+
+  @HostListener('window:resize')
+  protected onWindowResize(): void {
+    this.syncBoardMovesHeight();
   }
 
   protected scrollFocusTabs(direction: 'left' | 'right'): void {
