@@ -9,7 +9,7 @@ Live Project: [chessxiv.org](https://chessxiv.org)
 
 ## What ChessXiv offers in the current state?
 Note that ChessXiv is currently in the early development stage. Described features will be actively updated alongside adding new functionalities. However, right now it can offer:
-* Imports up to 200 MB - Users can import (.pgn) files up to 200 MB (approximately 50,000 - 80,000 games, based on game metadata). While importing games can take some time (about 1s for every 400 games), all filters and sorting options work almost instantly, which makes the experience very convenient.
+* Imports up to 100 MB - Users can import (.pgn) files up to 100 MB (approximately 20 000 games). While importing games can take some time, all filters and sorting options work almost instantly, which makes the experience very convenient.
 * Multiple filter options - Users can filter imported games by names, ratings, year, board positions, ECO code, result, and move count. You can set specified options for each of these categories, and filtered results can be sorted by each displayed column.
 * Board Setup - Users can move pieces around the board to create custom games and use them as a filter for imported games. You can also set up a single position (not starting from the initial position) with the board editor.
 * Moves Tree - For each set of imported games, a moves tree is automatically created. It shows the user the most commonly played next moves based on the current board position and the imported games or filtered results.
