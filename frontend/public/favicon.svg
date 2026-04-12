@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ChessXiv icon">
+  <defs>
+    <style>
+      .bg-light { fill: #f5efe2; }
+      .bg-dark { fill: #b87443; }
+      .chi-back {
+        fill: none;
+        stroke-width: 142;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .chi-back-on-dark { stroke: #f5efe2; }
+      .chi-front {
+        fill: none;
+        stroke: #0e1118;
+        stroke-width: 100;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+    </style>
+
+    <clipPath id="light-squares">
+      <rect x="0" y="0" width="256" height="256"/>
+      <rect x="256" y="256" width="256" height="256"/>
+    </clipPath>
+
+    <clipPath id="dark-squares">
+      <rect x="256" y="0" width="256" height="256"/>
+      <rect x="0" y="256" width="256" height="256"/>
+    </clipPath>
+  </defs>
+
+  <rect width="512" height="512" class="bg-light"/>
+  <rect x="256" y="0" width="256" height="256" class="bg-dark"/>
+  <rect x="0" y="256" width="256" height="256" class="bg-dark"/>
+
+  <g transform="translate(256 256) scale(0.95) translate(-256 -256)">
+    <g clip-path="url(#dark-squares)">
+      <path class="chi-back chi-back-on-dark" d="M88 424L424 88"/>
+    </g>
+
+    <path class="chi-front" transform="translate(-20 0)" d="M102 128C157 77 228 118 262 188C295 256 313 336 366 399C392 430 430 442 464 425"/>
+    <path class="chi-front" d="M88 424L424 88"/>
+  </g>
+
+</svg>
