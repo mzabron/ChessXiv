@@ -37,12 +37,15 @@
 }
 
 .layout {
+  --layout-inline-padding: clamp(0.45rem, 0.65vw, 0.8rem);
+
   display: grid;
   grid-template-columns: var(--left-pane-width, 620px) 8px minmax(390px, 1fr);
   gap: 0.75rem;
-  padding: 0.55rem;
-  max-width: 1680px;
-  margin: 0 auto;
+  width: 100%;
+  padding: 0.55rem var(--layout-inline-padding);
+  max-width: min(2400px, 100%);
+  margin: 0;
   align-items: start;
 }
 
