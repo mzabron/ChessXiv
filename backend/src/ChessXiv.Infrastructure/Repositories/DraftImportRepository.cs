@@ -132,9 +132,7 @@ public sealed class DraftImportRepository(ChessXivDbContext dbContext) : IDraftI
                 "WhiteMove",
                 "BlackMove",
                 "WhiteClk",
-                "BlackClk",
-                "WhiteEval",
-                "BlackEval"
+                "BlackClk"
             ) FROM STDIN (FORMAT BINARY)
             """;
 
@@ -151,8 +149,6 @@ public sealed class DraftImportRepository(ChessXivDbContext dbContext) : IDraftI
                 WriteNullableText(importer, move.BlackMove);
                 WriteNullableText(importer, move.WhiteClk);
                 WriteNullableText(importer, move.BlackClk);
-                WriteNullableDouble(importer, move.WhiteEval);
-                WriteNullableDouble(importer, move.BlackEval);
             }
         }
 
@@ -214,14 +210,4 @@ public sealed class DraftImportRepository(ChessXivDbContext dbContext) : IDraftI
         importer.Write(value.Value, NpgsqlDbType.Integer);
     }
 
-    private static void WriteNullableDouble(NpgsqlBinaryImporter importer, double? value)
-    {
-        if (!value.HasValue)
-        {
-            importer.WriteNull();
-            return;
-        }
-
-        importer.Write(value.Value, NpgsqlDbType.Double);
-    }
 }

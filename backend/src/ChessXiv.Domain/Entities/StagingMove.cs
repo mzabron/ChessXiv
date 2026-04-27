@@ -9,8 +9,6 @@ public class StagingMove
     public string? BlackMove { get; set; }
     public string? WhiteClk { get; set; }
     public string? BlackClk { get; set; }
-    public double? WhiteEval { get; set; }
-    public double? BlackEval { get; set; }
 
     public StagingGame Game { get; set; } = null!;
 }

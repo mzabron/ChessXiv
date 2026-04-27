@@ -43,10 +43,10 @@ public sealed class DraftPromotionRepository(ChessXivDbContext dbContext) : IDra
                 ON CONFLICT ("Id") DO NOTHING;
 
                 INSERT INTO "Moves" (
-                    "Id", "GameId", "MoveNumber", "WhiteMove", "BlackMove", "WhiteClk", "BlackClk", "WhiteEval", "BlackEval"
+                    "Id", "GameId", "MoveNumber", "WhiteMove", "BlackMove", "WhiteClk", "BlackClk"
                 )
                 SELECT
-                    sm."Id", sm."StagingGameId", sm."MoveNumber", sm."WhiteMove", sm."BlackMove", sm."WhiteClk", sm."BlackClk", sm."WhiteEval", sm."BlackEval"
+                    sm."Id", sm."StagingGameId", sm."MoveNumber", sm."WhiteMove", sm."BlackMove", sm."WhiteClk", sm."BlackClk"
                 FROM "StagingMoves" sm
                 INNER JOIN "StagingGames" sg ON sg."Id" = sm."StagingGameId"
                 WHERE sg."OwnerUserId" = {ownerUserId}

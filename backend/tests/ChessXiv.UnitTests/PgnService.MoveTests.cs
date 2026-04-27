@@ -27,7 +27,7 @@ public class PgnServiceMoveTests
     }
 
     [Fact]
-    public void ParsePgn_ParsesEvalAndClock_ForWhiteAndBlackMoves()
+    public void ParsePgn_ParsesClock_ForWhiteAndBlackMoves()
     {
         var pgn = PgnServiceTestData.LoadGamesSamplePgn();
 
@@ -35,13 +35,9 @@ public class PgnServiceMoveTests
         var firstMove = firstGame.Moves.Single(move => move.MoveNumber == 1);
         var secondMove = firstGame.Moves.Single(move => move.MoveNumber == 2);
 
-        Assert.Equal(0.1, firstMove.WhiteEval);
-        Assert.Equal(0.38, firstMove.BlackEval);
         Assert.Equal("0:10:02", firstMove.WhiteClk);
         Assert.Equal("0:10:03", firstMove.BlackClk);
 
-        Assert.Equal(0.16, secondMove.WhiteEval);
-        Assert.Equal(0.15, secondMove.BlackEval);
         Assert.Equal("0:10:03", secondMove.WhiteClk);
         Assert.Equal("0:10:04", secondMove.BlackClk);
     }

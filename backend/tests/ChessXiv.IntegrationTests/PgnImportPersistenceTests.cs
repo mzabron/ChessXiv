@@ -67,8 +67,6 @@ public class PgnImportPersistenceTests(PostgresTestFixture fixture)
         var moveOne = savedGame.Moves.Single(move => move.MoveNumber == 1);
         Assert.Equal("e4", moveOne.WhiteMove);
         Assert.Equal("c5", moveOne.BlackMove);
-        Assert.Equal(0.18, moveOne.WhiteEval);
-        Assert.Equal(0.25, moveOne.BlackEval);
         Assert.Equal("0:10:00", moveOne.WhiteClk);
         Assert.Equal("0:09:58", moveOne.BlackClk);
 

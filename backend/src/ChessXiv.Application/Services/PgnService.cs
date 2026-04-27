@@ -13,7 +13,6 @@ public class PgnService : IPgnParser
     private static readonly Regex TagRegex = new(@"^\[(\w+)\s+""(.*)""\]$", RegexOptions.Compiled);
     private static readonly Regex WhiteMoveNumberRegex = new(@"^(\d+)\.$", RegexOptions.Compiled);
     private static readonly Regex BlackMoveNumberRegex = new(@"^(\d+)\.\.\.$", RegexOptions.Compiled);
-    private static readonly Regex EvalRegex = new(@"%eval\s+([^\]\s]+)", RegexOptions.Compiled);
     private static readonly Regex ClockRegex = new(@"%clk\s+([^\]\s]+)", RegexOptions.Compiled);
     private static readonly HashSet<string> ResultTokens =
     [
@@ -367,19 +366,6 @@ public class PgnService : IPgnParser
 
     private static void ApplyMoveMetadata(Move move, Side side, string comment)
     {
-        var evalMatch = EvalRegex.Match(comment);
-        if (evalMatch.Success && TryParseEval(evalMatch.Groups[1].Value, out var eval))
-        {
-            if (side == Side.White)
-            {
-                move.WhiteEval = eval;
-            }
-            else
-            {
-                move.BlackEval = eval;
-            }
-        }
-
         var clkMatch = ClockRegex.Match(comment);
         if (clkMatch.Success)
         {
@@ -392,22 +378,6 @@ public class PgnService : IPgnParser
                 move.BlackClk = clkMatch.Groups[1].Value;
             }
         }
-    }
-
-    private static bool TryParseEval(string rawEval, out double eval)
-    {
-        eval = 0;
-        if (string.IsNullOrWhiteSpace(rawEval))
-        {
-            return false;
-        }
-
-        if (rawEval.StartsWith('#'))
-        {
-            return false;
-        }
-
-        return double.TryParse(rawEval, NumberStyles.Float, CultureInfo.InvariantCulture, out eval);
     }
 
     private static bool TryParsePgnDate(string? rawDate, out DateTime date)

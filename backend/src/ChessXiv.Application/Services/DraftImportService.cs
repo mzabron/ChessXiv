@@ -219,9 +219,7 @@ public sealed class DraftImportService(
                 WhiteMove = m.WhiteMove,
                 BlackMove = m.BlackMove,
                 WhiteClk = m.WhiteClk,
-                BlackClk = m.BlackClk,
-                WhiteEval = m.WhiteEval,
-                BlackEval = m.BlackEval
+                BlackClk = m.BlackClk
             }).ToArray()
         };
     }
@@ -271,9 +269,7 @@ public sealed class DraftImportService(
                 WhiteMove = m.WhiteMove,
                 BlackMove = m.BlackMove,
                 WhiteClk = m.WhiteClk,
-                BlackClk = m.BlackClk,
-                WhiteEval = m.WhiteEval,
-                BlackEval = m.BlackEval
+                BlackClk = m.BlackClk
             }).ToArray()
         };
     }

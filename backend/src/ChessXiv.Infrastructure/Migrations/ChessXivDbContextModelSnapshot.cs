@@ -141,9 +141,6 @@ namespace ChessXiv.Infrastructure.Migrations
                     b.Property<string>("BlackClk")
                         .HasColumnType("text");
 
-                    b.Property<double?>("BlackEval")
-                        .HasColumnType("double precision");
-
                     b.Property<string>("BlackMove")
                         .HasColumnType("text");
 
@@ -155,9 +152,6 @@ namespace ChessXiv.Infrastructure.Migrations
 
                     b.Property<string>("WhiteClk")
                         .HasColumnType("text");
-
-                    b.Property<double?>("WhiteEval")
-                        .HasColumnType("double precision");
 
                     b.Property<string>("WhiteMove")
                         .IsRequired()
@@ -331,9 +325,6 @@ namespace ChessXiv.Infrastructure.Migrations
                     b.Property<string>("BlackClk")
                         .HasColumnType("text");
 
-                    b.Property<double?>("BlackEval")
-                        .HasColumnType("double precision");
-
                     b.Property<string>("BlackMove")
                         .HasColumnType("text");
 
@@ -345,9 +336,6 @@ namespace ChessXiv.Infrastructure.Migrations
 
                     b.Property<string>("WhiteClk")
                         .HasColumnType("text");
-
-                    b.Property<double?>("WhiteEval")
-                        .HasColumnType("double precision");
 
                     b.Property<string>("WhiteMove")
                         .IsRequired()
