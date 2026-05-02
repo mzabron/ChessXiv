@@ -5,5 +5,6 @@ public sealed record UserDatabaseDto(
     string Name,
     bool IsPublic,
     string OwnerUserId,
+    string OwnerUserName,
     int GameCount,
     DateTime CreatedAtUtc);

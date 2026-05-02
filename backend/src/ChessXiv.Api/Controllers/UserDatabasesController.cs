@@ -38,6 +38,33 @@ public class UserDatabasesController(
                 d.Name,
                 d.IsPublic,
                 d.OwnerUserId,
+                dbContext.Users
+                    .Where(u => u.Id == d.OwnerUserId)
+                    .Select(u => u.UserName)
+                    .FirstOrDefault() ?? d.OwnerUserId,
+                d.UserDatabaseGames.Count,
+                d.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        return Ok(items);
+    }
+
+    [HttpGet("public")]
+    public async Task<IActionResult> GetPublic(CancellationToken cancellationToken)
+    {
+        var items = await dbContext.UserDatabases
+            .AsNoTracking()
+            .Where(d => d.IsPublic)
+            .OrderBy(d => d.Name)
+            .Select(d => new UserDatabaseDto(
+                d.Id,
+                d.Name,
+                d.IsPublic,
+                d.OwnerUserId,
+                dbContext.Users
+                    .Where(u => u.Id == d.OwnerUserId)
+                    .Select(u => u.UserName)
+                    .FirstOrDefault() ?? d.OwnerUserId,
                 d.UserDatabaseGames.Count,
                 d.CreatedAtUtc))
             .ToListAsync(cancellationToken);
@@ -65,6 +92,10 @@ public class UserDatabasesController(
                 b.UserDatabase.Name,
                 b.UserDatabase.IsPublic,
                 b.UserDatabase.OwnerUserId,
+                dbContext.Users
+                    .Where(u => u.Id == b.UserDatabase.OwnerUserId)
+                    .Select(u => u.UserName)
+                    .FirstOrDefault() ?? b.UserDatabase.OwnerUserId,
                 b.UserDatabase.UserDatabaseGames.Count,
                 b.UserDatabase.CreatedAtUtc,
                 b.CreatedAtUtc))
@@ -86,6 +117,10 @@ public class UserDatabasesController(
                 d.Name,
                 d.IsPublic,
                 d.OwnerUserId,
+                dbContext.Users
+                    .Where(u => u.Id == d.OwnerUserId)
+                    .Select(u => u.UserName)
+                    .FirstOrDefault() ?? d.OwnerUserId,
                 d.UserDatabaseGames.Count,
                 d.CreatedAtUtc))
             .FirstOrDefaultAsync(cancellationToken);
@@ -419,7 +454,13 @@ public class UserDatabasesController(
         dbContext.UserDatabases.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        var dto = new UserDatabaseDto(entity.Id, entity.Name, entity.IsPublic, entity.OwnerUserId, 0, entity.CreatedAtUtc);
+        var ownerUserName = await dbContext.Users
+            .Where(u => u.Id == entity.OwnerUserId)
+            .Select(u => u.UserName)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? entity.OwnerUserId;
+
+        var dto = new UserDatabaseDto(entity.Id, entity.Name, entity.IsPublic, entity.OwnerUserId, ownerUserName, 0, entity.CreatedAtUtc);
         return CreatedAtAction(nameof(GetById), new { id = entity.Id }, dto);
     }
 

@@ -5,6 +5,7 @@ public sealed record BookmarkedUserDatabaseDto(
     string Name,
     bool IsPublic,
     string OwnerUserId,
+    string OwnerUserName,
     int GameCount,
     DateTime CreatedAtUtc,
     DateTime BookmarkedAtUtc);

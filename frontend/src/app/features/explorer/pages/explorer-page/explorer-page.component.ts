@@ -169,6 +169,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         this.activeUserDatabaseId.set(null);
         this.detachProgressSubscription();
         void this.draftImportProgress.disconnect();
+        this.loadPublicDatabases();
         return;
       }
 
@@ -803,7 +804,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         const mineMapped: Database[] = mine.map(db => ({
           id: db.id,
           name: db.name,
-          owner: this.currentUserName() ?? db.ownerUserId,
+          owner: db.ownerUserName || this.currentUserName() || db.ownerUserId,
           creationDate: new Date(db.createdAtUtc),
           gamesCount: db.gameCount
         }));
@@ -813,7 +814,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
           .map(bookmark => ({
             id: bookmark.id,
             name: bookmark.name,
-            owner: bookmark.ownerUserId,
+            owner: bookmark.ownerUserName || bookmark.ownerUserId,
             creationDate: new Date(bookmark.createdAtUtc),
             gamesCount: bookmark.gameCount
           }));
@@ -824,6 +825,25 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       },
       error: () => {
         this.loadedForCurrentSession.set(false);
+      }
+    });
+  }
+
+  private loadPublicDatabases(): void {
+    this.userDatabasesApi.getPublic().subscribe({
+      next: publicDbs => {
+        const mapped: Database[] = publicDbs.map(db => ({
+          id: db.id,
+          name: db.name,
+          owner: db.ownerUserName || db.ownerUserId,
+          creationDate: new Date(db.createdAtUtc),
+          gamesCount: db.gameCount
+        }));
+
+        this.panelDatabases.set(mapped);
+      },
+      error: () => {
+        this.panelDatabases.set([]);
       }
     });
   }
@@ -840,7 +860,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       const mineMapped: Database[] = mine.map(db => ({
         id: db.id,
         name: db.name,
-        owner: this.currentUserName() ?? db.ownerUserId,
+        owner: db.ownerUserName || this.currentUserName() || db.ownerUserId,
         creationDate: new Date(db.createdAtUtc),
         gamesCount: db.gameCount
       }));
@@ -850,7 +870,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         .map(bookmark => ({
           id: bookmark.id,
           name: bookmark.name,
-          owner: bookmark.ownerUserId,
+          owner: bookmark.ownerUserName || bookmark.ownerUserId,
           creationDate: new Date(bookmark.createdAtUtc),
           gamesCount: bookmark.gameCount
         }));

@@ -15,6 +15,7 @@ export interface UserDatabaseDto {
   name: string;
   isPublic: boolean;
   ownerUserId: string;
+  ownerUserName: string;
   gameCount: number;
   createdAtUtc: string;
 }
@@ -35,6 +36,10 @@ export class UserDatabasesApiService {
 
   getMine(): Observable<UserDatabaseDto[]> {
     return this.http.get<UserDatabaseDto[]>(`${this.baseUrl}/user-databases/mine`);
+  }
+
+  getPublic(): Observable<UserDatabaseDto[]> {
+    return this.http.get<UserDatabaseDto[]>(`${this.baseUrl}/user-databases/public`);
   }
 
   getBookmarks(): Observable<BookmarkedUserDatabaseDto[]> {
