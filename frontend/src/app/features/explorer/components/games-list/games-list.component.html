@@ -16,69 +16,54 @@
 
   @if (activeTab === 'databases') {
   <div class="tab-body" role="tabpanel" aria-label="Databases tab content">
-    <app-databases-panel
-      [databases]="panelDatabases"
-      [currentUser]="currentUserName"
-      [activeDatabaseId]="activeDatabaseId"
-      (openDatabase)="selectTab('games'); openDatabase.emit($event)"
-      (deleteDatabase)="deleteDatabase.emit($event)" />
+    <app-databases-panel [databases]="panelDatabases" [currentUser]="currentUserName"
+      [activeDatabaseId]="activeDatabaseId" (openDatabase)="selectTab('games'); openDatabase.emit($event)"
+      (deleteDatabase)="deleteDatabase.emit($event)" (refreshDatabases)="refreshDatabases.emit()"
+      (updateDatabase)="updateDatabase.emit($event)" />
   </div>
   } @else if (activeTab === 'games') {
   <div class="tab-body" role="tabpanel" aria-label="Games tab content">
     @if (gamesLoaded) {
-      <header class="panel-header db-summary">
-        <div class="db-summary-main">
-          <h2>{{ databaseName }}</h2>
-          <p>{{ totalCount }} games</p>
-        </div>
-        <div class="db-summary-actions">
-          @if (sourceType === 'imported') {
-            <button type="button" class="summary-btn" (click)="closeDatabase.emit()">Close</button>
-          } @else if (sourceType === 'external') {
-            <button type="button" class="summary-btn" (click)="addBookmark.emit()">Add bookmark</button>
-          }
+    <header class="panel-header db-summary">
+      <div class="db-summary-main">
+        <h2>{{ databaseName }}</h2>
+        <p>{{ totalCount }} games</p>
+      </div>
+      <div class="db-summary-actions">
+        @if (sourceType === 'imported') {
+        <button type="button" class="summary-btn" (click)="closeDatabase.emit()">Close</button>
+        } @else if (sourceType === 'external') {
+        <button type="button" class="summary-btn" (click)="addBookmark.emit()">Add bookmark</button>
+        }
 
-          @if (sourceType === 'userDatabase') {
-            <button type="button" class="summary-btn" (click)="closeDatabase.emit()">Close</button>
-          }
-        </div>
-      </header>
+        @if (sourceType === 'userDatabase') {
+        <button type="button" class="summary-btn" (click)="closeDatabase.emit()">Close</button>
+        }
+      </div>
+    </header>
     } @else {
-      <header class="panel-header">
-        <h2>Games</h2>
-        <p>No games loaded yet.</p>
-      </header>
+    <header class="panel-header">
+      <h2>Games</h2>
+      <p>No games loaded yet.</p>
+    </header>
     }
 
     @if (!gamesLoaded) {
-      <app-empty-games-state (importDatabase)="importDatabase.emit()"
-        (searchCommunityDatabase)="selectTab('databases'); searchCommunityDatabase.emit()" />
+    <app-empty-games-state (importDatabase)="importDatabase.emit()"
+      (searchCommunityDatabase)="selectTab('databases'); searchCommunityDatabase.emit()" />
     } @else {
-      <app-games-table
-        [games]="games"
-        [totalCount]="totalCount"
-        [page]="page"
-        [pageSize]="pageSize"
-        [selectedGameId]="selectedGameId"
-        [resultSortMode]="resultSortMode"
-        [sortBy]="sortBy"
-        [sortDirection]="sortDirection"
-        (resultSortModeChange)="gamesResultSortModeChange.emit($event)"
-        (sortChange)="gamesSortChange.emit($event)"
-        (pageSizeChange)="gamesPageSizeChange.emit($event)"
-        (pageChange)="gamesPageChange.emit($event)"
-        (gameSelected)="gameSelected.emit($event)" />
+    <app-games-table [games]="games" [totalCount]="totalCount" [page]="page" [pageSize]="pageSize"
+      [selectedGameId]="selectedGameId" [resultSortMode]="resultSortMode" [sortBy]="sortBy"
+      [sortDirection]="sortDirection" (resultSortModeChange)="gamesResultSortModeChange.emit($event)"
+      (sortChange)="gamesSortChange.emit($event)" (pageSizeChange)="gamesPageSizeChange.emit($event)"
+      (pageChange)="gamesPageChange.emit($event)" (gameSelected)="gameSelected.emit($event)" />
     }
   </div>
   } @else {
   <div class="tab-body" role="tabpanel" aria-label="Filters tab content">
-    <app-filters-panel
-      [gamesLoaded]="gamesLoaded || sourceType === 'userDatabase'"
-      [boardFen]="boardFen"
-      [value]="filters"
-      (valueChange)="filtersChange.emit($event)"
-      (apply)="selectTab('games'); filtersApply.emit($event)"
-      (reset)="filtersReset.emit()" />
+    <app-filters-panel [gamesLoaded]="gamesLoaded || sourceType === 'userDatabase'" [boardFen]="boardFen"
+      [value]="filters" (valueChange)="filtersChange.emit($event)"
+      (apply)="selectTab('games'); filtersApply.emit($event)" (reset)="filtersReset.emit()" />
   </div>
   }
 </article>

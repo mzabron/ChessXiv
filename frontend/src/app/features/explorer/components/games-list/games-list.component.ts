@@ -58,6 +58,8 @@ export class GamesListComponent {
   @Output() addBookmark = new EventEmitter<void>();
   @Output() openDatabase = new EventEmitter<Database>();
   @Output() deleteDatabase = new EventEmitter<Database>();
+  @Output() refreshDatabases = new EventEmitter<void>();
+  @Output() updateDatabase = new EventEmitter<{ database: Database; name: string; isPublic: boolean }>();
   @Output() closeDatabase = new EventEmitter<void>();
   @Output() saveDatabaseRequest = new EventEmitter<SaveDatabaseRequestPayload>();
   @Output() gamesResultSortModeChange = new EventEmitter<DraftGamesResultSortMode>();

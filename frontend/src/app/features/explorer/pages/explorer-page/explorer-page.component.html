@@ -1,14 +1,9 @@
 <main class="layout animate-layout" [class.focus-mode]="isFocusMode" #layoutRoot [class.resizing]="isResizing"
   [style.--left-pane-width.px]="leftPaneWidth">
-  <input
-    #pgnFileInput
-    type="file"
-    accept=".pgn"
-    class="visually-hidden"
-    (change)="onPgnFileSelected($event)" />
+  <input #pgnFileInput type="file" accept=".pgn" class="visually-hidden" (change)="onPgnFileSelected($event)" />
 
   @if (importError()) {
-    <div class="import-alert" [class.visible]="importErrorVisible()" role="status">{{ importError() }}</div>
+  <div class="import-alert" [class.visible]="importErrorVisible()" role="status">{{ importError() }}</div>
   }
 
   <!-- LEFT COLUMN -->
@@ -16,42 +11,23 @@
 
     <!-- Default Mode Board Row -->
     <div class="board-moves-row" #boardMovesRow *ngIf="!isFocusMode">
-      <app-chessboard
-        #mainChessboard
-        [navigationRequest]="navigationRequest"
-        [sanMoveRequest]="boardSanMoveRequest()"
-        [replayData]="selectedGameReplay()"
-        (moveRowsChanged)="onMoveRowsChanged($event)"
-        (currentPlyChanged)="onCurrentPlyChanged($event)"
-        (currentFenChanged)="onBoardFenChanged($event)" />
-      <app-move-list
-        #mainMoveList
-        [moveRows]="moveRows"
-        [currentPly]="currentPly"
-        [gameResult]="selectedGameReplay()?.result ?? null"
-        (plySelected)="onPlySelected($event)" />
+      <app-chessboard #mainChessboard [navigationRequest]="navigationRequest" [sanMoveRequest]="boardSanMoveRequest()"
+        [replayData]="selectedGameReplay()" (moveRowsChanged)="onMoveRowsChanged($event)"
+        (currentPlyChanged)="onCurrentPlyChanged($event)" (currentFenChanged)="onBoardFenChanged($event)" />
+      <app-move-list #mainMoveList [moveRows]="moveRows" [currentPly]="currentPly"
+        [gameResult]="selectedGameReplay()?.result ?? null" (plySelected)="onPlySelected($event)" />
     </div>
 
     <!-- Focus Mode Board -->
-    <app-chessboard
-      *ngIf="isFocusMode"
-      class="full-size-board"
-      [navigationRequest]="navigationRequest"
-      [sanMoveRequest]="boardSanMoveRequest()"
-      [replayData]="selectedGameReplay()"
-      (moveRowsChanged)="onMoveRowsChanged($event)"
-      (currentPlyChanged)="onCurrentPlyChanged($event)"
+    <app-chessboard *ngIf="isFocusMode" class="full-size-board" [navigationRequest]="navigationRequest"
+      [sanMoveRequest]="boardSanMoveRequest()" [replayData]="selectedGameReplay()"
+      (moveRowsChanged)="onMoveRowsChanged($event)" (currentPlyChanged)="onCurrentPlyChanged($event)"
       (currentFenChanged)="onBoardFenChanged($event)" />
 
     <!-- Default Mode Tree -->
-    <app-games-tree
-      *ngIf="!isFocusMode"
-      [sourceType]="currentGamesSource"
-      [gamesLoaded]="gamesLoaded || currentGamesSource === 'userDatabase'"
-      [loading]="moveTreeLoading()"
-      [error]="moveTreeError()"
-      [moveTree]="moveTreeData()"
-      (moveSelected)="onTreeMoveSelected($event)" />
+    <app-games-tree *ngIf="!isFocusMode" [sourceType]="currentGamesSource"
+      [gamesLoaded]="gamesLoaded || currentGamesSource === 'userDatabase'" [loading]="moveTreeLoading()"
+      [error]="moveTreeError()" [moveTree]="moveTreeData()" (moveSelected)="onTreeMoveSelected($event)" />
   </section>
 
   <div class="resize-handle" role="separator" aria-label="Resize board and games list panels"
@@ -59,48 +35,33 @@
 
   <!-- RIGHT COLUMN -->
   <section class="right-column fade-in" aria-label="Games list">
-    <app-games-list
-      *ngIf="!isFocusMode"
-      [gamesLoaded]="gamesLoaded"
-      [games]="draftGames()"
-      [totalCount]="draftGamesTotalCount()"
-      [page]="draftGamesPage()"
-      [pageSize]="draftGamesPageSize()"
-      [resultSortMode]="draftGamesResultSortMode()"
-      [sortBy]="draftGamesSortBy()"
-      [sortDirection]="draftGamesSortDirection()"
-      [selectedGameId]="selectedGameId()"
-      [databaseName]="currentDatabaseName"
-      [sourceType]="currentGamesSource"
-      [activeDatabaseId]="activeUserDatabaseId()"
-      [myDatabases]="myDatabases()"
-      [panelDatabases]="panelDatabases()"
-      [currentUserName]="currentUserName() ?? ''"
-      [boardFen]="boardFen()"
-      [filters]="gamesFilters()"
-      (importDatabase)="importDatabase()"
-      (searchCommunityDatabase)="searchCommunityDatabase()"
-      (saveDatabase)="saveCurrentDatabase()"
-      (openDatabase)="onDatabaseSelected($event)"
-      (deleteDatabase)="onDatabaseDeleteRequested($event)"
-      (closeDatabase)="closeCurrentDatabase()"
-      (saveDatabaseRequest)="onSaveDatabaseRequest($event)"
+    <app-games-list *ngIf="!isFocusMode" [gamesLoaded]="gamesLoaded" [games]="draftGames()"
+      [totalCount]="draftGamesTotalCount()" [page]="draftGamesPage()" [pageSize]="draftGamesPageSize()"
+      [resultSortMode]="draftGamesResultSortMode()" [sortBy]="draftGamesSortBy()"
+      [sortDirection]="draftGamesSortDirection()" [selectedGameId]="selectedGameId()"
+      [databaseName]="currentDatabaseName" [sourceType]="currentGamesSource" [activeDatabaseId]="activeUserDatabaseId()"
+      [myDatabases]="myDatabases()" [panelDatabases]="panelDatabases()" [currentUserName]="currentUserName() ?? ''"
+      [boardFen]="boardFen()" [filters]="gamesFilters()" (importDatabase)="importDatabase()"
+      (searchCommunityDatabase)="searchCommunityDatabase()" (saveDatabase)="saveCurrentDatabase()"
+      (openDatabase)="onDatabaseSelected($event)" (deleteDatabase)="onDatabaseDeleteRequested($event)"
+      (refreshDatabases)="onDatabasesRefreshRequested()"
+      (updateDatabase)="onDatabaseUpdateRequested($event)"
+      (closeDatabase)="closeCurrentDatabase()" (saveDatabaseRequest)="onSaveDatabaseRequest($event)"
       (addBookmark)="addCurrentDatabaseBookmark()"
       (gamesResultSortModeChange)="onDraftGamesResultSortModeChanged($event)"
-      (gamesSortChange)="onDraftGamesSortChanged($event)"
-      (gamesPageSizeChange)="onDraftGamesPageSizeChanged($event)"
-      (gamesPageChange)="onDraftGamesPageChanged($event)"
-      (gameSelected)="onGameSelected($event)"
-      (filtersChange)="onGamesFiltersChanged($event)"
-      (filtersApply)="onGamesFiltersApplied($event)"
+      (gamesSortChange)="onDraftGamesSortChanged($event)" (gamesPageSizeChange)="onDraftGamesPageSizeChanged($event)"
+      (gamesPageChange)="onDraftGamesPageChanged($event)" (gameSelected)="onGameSelected($event)"
+      (filtersChange)="onGamesFiltersChanged($event)" (filtersApply)="onGamesFiltersApplied($event)"
       (filtersReset)="onGamesFiltersReset()" />
 
     <!-- Focus Mode Side Panel -->
     <div class="focus-side-panel panel fade-in" *ngIf="isFocusMode">
       <div class="tabs-shell">
-        <button type="button" class="tabs-nav tabs-nav-left" aria-label="Scroll tabs left" (click)="scrollFocusTabs('left')">&#9664;</button>
+        <button type="button" class="tabs-nav tabs-nav-left" aria-label="Scroll tabs left"
+          (click)="scrollFocusTabs('left')">&#9664;</button>
         <div class="tabs" #focusTabs>
-          <button class="tab-btn" [class.active]="focusRightTab === 'tree'" (click)="focusRightTab = 'tree'">Tree</button>
+          <button class="tab-btn" [class.active]="focusRightTab === 'tree'"
+            (click)="focusRightTab = 'tree'">Tree</button>
           <button class="tab-btn" [class.active]="focusRightTab === 'moves'"
             (click)="focusRightTab = 'moves'">Moves</button>
           <button class="tab-btn" [class.active]="focusRightTab === 'games'"
@@ -110,32 +71,22 @@
           <button class="tab-btn" [class.active]="focusRightTab === 'databases'"
             (click)="focusRightTab = 'databases'">Databases</button>
         </div>
-        <button type="button" class="tabs-nav tabs-nav-right" aria-label="Scroll tabs right" (click)="scrollFocusTabs('right')">&#9654;</button>
+        <button type="button" class="tabs-nav tabs-nav-right" aria-label="Scroll tabs right"
+          (click)="scrollFocusTabs('right')">&#9654;</button>
       </div>
       <div class="tab-body fade-in">
         <div *ngIf="focusRightTab === 'databases'" class="full-height-child">
-          <app-databases-panel
-            [databases]="panelDatabases()"
-            [currentUser]="currentUserName() ?? ''"
-            [activeDatabaseId]="activeUserDatabaseId()"
-            (openDatabase)="onDatabaseSelected($event)"
-            (deleteDatabase)="onDatabaseDeleteRequested($event)" />
+          <app-databases-panel [databases]="panelDatabases()" [currentUser]="currentUserName() ?? ''"
+            [activeDatabaseId]="activeUserDatabaseId()" (openDatabase)="onDatabaseSelected($event)"
+            (deleteDatabase)="onDatabaseDeleteRequested($event)"
+            (refreshDatabases)="onDatabasesRefreshRequested()"
+            (updateDatabase)="onDatabaseUpdateRequested($event)" />
         </div>
-        <app-games-tree
-          *ngIf="focusRightTab === 'tree'"
-          class="full-height-child"
-          [sourceType]="currentGamesSource"
-          [gamesLoaded]="gamesLoaded || currentGamesSource === 'userDatabase'"
-          [loading]="moveTreeLoading()"
-          [error]="moveTreeError()"
-          [moveTree]="moveTreeData()"
-          (moveSelected)="onTreeMoveSelected($event)" />
-        <app-move-list
-          *ngIf="focusRightTab === 'moves'"
-          class="full-height-child"
-          [moveRows]="moveRows"
-          [currentPly]="currentPly"
-          [gameResult]="selectedGameReplay()?.result ?? null"
+        <app-games-tree *ngIf="focusRightTab === 'tree'" class="full-height-child" [sourceType]="currentGamesSource"
+          [gamesLoaded]="gamesLoaded || currentGamesSource === 'userDatabase'" [loading]="moveTreeLoading()"
+          [error]="moveTreeError()" [moveTree]="moveTreeData()" (moveSelected)="onTreeMoveSelected($event)" />
+        <app-move-list *ngIf="focusRightTab === 'moves'" class="full-height-child" [moveRows]="moveRows"
+          [currentPly]="currentPly" [gameResult]="selectedGameReplay()?.result ?? null"
           (plySelected)="onPlySelected($event)" />
 
         <div *ngIf="focusRightTab === 'games'" class="full-height-child" style="display: flex; flex-direction: column;">
@@ -143,38 +94,28 @@
             <h2
               style="margin: 0; font-family: 'Space Grotesk', 'Segoe UI', sans-serif; font-weight: 700; font-size: 1rem; letter-spacing: 0.02em;">
               Games</h2>
-            <p style="margin: 0.35rem 0 0; color: var(--muted); font-size: 0.9rem;">{{ gamesLoaded ? draftGamesTotalCount() + ' games loaded.' : 'No games loaded yet.' }}</p>
+            <p style="margin: 0.35rem 0 0; color: var(--muted); font-size: 0.9rem;">{{ gamesLoaded ?
+              draftGamesTotalCount() + ' games loaded.' : 'No games loaded yet.' }}</p>
           </header>
-          
+
           @if (!gamesLoaded) {
-            <app-empty-games-state (importDatabase)="importDatabase()"
-              (searchCommunityDatabase)="focusRightTab = 'databases'; searchCommunityDatabase()" />
+          <app-empty-games-state (importDatabase)="importDatabase()"
+            (searchCommunityDatabase)="focusRightTab = 'databases'; searchCommunityDatabase()" />
           } @else {
-            <app-games-table
-              [games]="draftGames()"
-              [totalCount]="draftGamesTotalCount()"
-              [page]="draftGamesPage()"
-              [pageSize]="draftGamesPageSize()"
-              [selectedGameId]="selectedGameId()"
-              [resultSortMode]="draftGamesResultSortMode()"
-              [sortBy]="draftGamesSortBy()"
-              [sortDirection]="draftGamesSortDirection()"
-              (resultSortModeChange)="onDraftGamesResultSortModeChanged($event)"
-              (sortChange)="onDraftGamesSortChanged($event)"
-              (pageSizeChange)="onDraftGamesPageSizeChanged($event)"
-              (pageChange)="onDraftGamesPageChanged($event)"
-              (gameSelected)="onGameSelected($event)" />
+          <app-games-table [games]="draftGames()" [totalCount]="draftGamesTotalCount()" [page]="draftGamesPage()"
+            [pageSize]="draftGamesPageSize()" [selectedGameId]="selectedGameId()"
+            [resultSortMode]="draftGamesResultSortMode()" [sortBy]="draftGamesSortBy()"
+            [sortDirection]="draftGamesSortDirection()"
+            (resultSortModeChange)="onDraftGamesResultSortModeChanged($event)"
+            (sortChange)="onDraftGamesSortChanged($event)" (pageSizeChange)="onDraftGamesPageSizeChanged($event)"
+            (pageChange)="onDraftGamesPageChanged($event)" (gameSelected)="onGameSelected($event)" />
           }
         </div>
 
         <div *ngIf="focusRightTab === 'filters'" class="full-height-child">
-          <app-filters-panel
-            [gamesLoaded]="gamesLoaded || currentGamesSource === 'userDatabase'"
-            [boardFen]="boardFen()"
-            [value]="gamesFilters()"
-            (valueChange)="onGamesFiltersChanged($event)"
-            (apply)="onGamesFiltersApplied($event)"
-            (reset)="onGamesFiltersReset()" />
+          <app-filters-panel [gamesLoaded]="gamesLoaded || currentGamesSource === 'userDatabase'"
+            [boardFen]="boardFen()" [value]="gamesFilters()" (valueChange)="onGamesFiltersChanged($event)"
+            (apply)="onGamesFiltersApplied($event)" (reset)="onGamesFiltersReset()" />
         </div>
       </div>
     </div>
@@ -182,61 +123,61 @@
 </main>
 
 @if (isImporting()) {
-  <div class="import-progress-overlay" role="dialog" aria-modal="true" aria-label="Import progress">
-    <div class="import-progress-card">
-      <h3>Importing PGN</h3>
-      <p class="status-line">{{ importProgress()?.message ?? 'Processing games...' }}</p>
-      <dl>
-        <div>
-          <dt>Parsed</dt>
-          <dd>{{ importProgress()?.parsedCount ?? 0 }}</dd>
-        </div>
-        <div>
-          <dt>Imported</dt>
-          <dd>{{ importProgress()?.importedCount ?? 0 }}</dd>
-        </div>
-        <div>
-          <dt>Skipped</dt>
-          <dd>{{ importProgress()?.skippedCount ?? 0 }}</dd>
-        </div>
-      </dl>
-    </div>
+<div class="import-progress-overlay" role="dialog" aria-modal="true" aria-label="Import progress">
+  <div class="import-progress-card">
+    <h3>Importing PGN</h3>
+    <p class="status-line">{{ importProgress()?.message ?? 'Processing games...' }}</p>
+    <dl>
+      <div>
+        <dt>Parsed</dt>
+        <dd>{{ importProgress()?.parsedCount ?? 0 }}</dd>
+      </div>
+      <div>
+        <dt>Imported</dt>
+        <dd>{{ importProgress()?.importedCount ?? 0 }}</dd>
+      </div>
+      <div>
+        <dt>Skipped</dt>
+        <dd>{{ importProgress()?.skippedCount ?? 0 }}</dd>
+      </div>
+    </dl>
   </div>
+</div>
 }
 
 @if (isSavingDraft() || saveDraftCompleted()) {
-  <div class="import-progress-overlay" role="dialog" aria-modal="true" aria-label="Save progress">
-    <div class="save-status-card">
-      @if (isSavingDraft()) {
-        <div class="loading-spinner" aria-hidden="true"></div>
-        <p class="save-status-text">Saving games</p>
-      } @else {
-        <p class="save-status-success">Success</p>
-        <button type="button" class="save-status-close" (click)="closeSaveDraftModal()">Close</button>
-      }
-    </div>
+<div class="import-progress-overlay" role="dialog" aria-modal="true" aria-label="Save progress">
+  <div class="save-status-card">
+    @if (isSavingDraft()) {
+    <div class="loading-spinner" aria-hidden="true"></div>
+    <p class="save-status-text">Saving games</p>
+    } @else {
+    <p class="save-status-success">Success</p>
+    <button type="button" class="save-status-close" (click)="closeSaveDraftModal()">Close</button>
+    }
   </div>
+</div>
 }
 
 @if (deleteConfirmationVisible()) {
-  <div class="import-progress-overlay" role="dialog" aria-modal="true" aria-label="Delete confirmation">
-    <div class="delete-confirm-card">
-      @if (deleteConfirmationKind() === 'draft') {
-        <h3>Delete Imported Draft?</h3>
-        <p>This will remove all currently imported draft games.</p>
-      } @else {
-        <h3>Delete Database?</h3>
-        <p>
-          This will permanently delete
-          <strong>{{ deleteConfirmationDatabaseName() }}</strong>
-          and its games.
-        </p>
-      }
+<div class="import-progress-overlay" role="dialog" aria-modal="true" aria-label="Delete confirmation">
+  <div class="delete-confirm-card">
+    @if (deleteConfirmationKind() === 'draft') {
+    <h3>Delete Imported Draft?</h3>
+    <p>This will remove all currently imported draft games.</p>
+    } @else {
+    <h3>Delete Database?</h3>
+    <p>
+      This will permanently delete
+      <strong>{{ deleteConfirmationDatabaseName() }}</strong>
+      and its games.
+    </p>
+    }
 
-      <div class="delete-confirm-actions">
-        <button type="button" class="confirm-btn" (click)="cancelDeleteConfirmation()">Cancel</button>
-        <button type="button" class="confirm-btn danger" (click)="confirmDeleteConfirmation()">Delete</button>
-      </div>
+    <div class="delete-confirm-actions">
+      <button type="button" class="confirm-btn" (click)="cancelDeleteConfirmation()">Cancel</button>
+      <button type="button" class="confirm-btn danger" (click)="confirmDeleteConfirmation()">Delete</button>
     </div>
   </div>
+</div>
 }

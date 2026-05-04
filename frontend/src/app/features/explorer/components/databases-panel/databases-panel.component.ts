@@ -6,6 +6,7 @@ export interface Database {
   id: string;
   name: string;
   owner: string;
+  isPublic: boolean;
   creationDate: Date;
   gamesCount: number;
 }
@@ -25,11 +26,20 @@ export class DatabasesPanelComponent {
   }
   @Output() openDatabase = new EventEmitter<Database>();
   @Output() deleteDatabase = new EventEmitter<Database>();
+  @Output() refreshDatabases = new EventEmitter<void>();
+  @Output() updateDatabase = new EventEmitter<{ database: Database; name: string; isPublic: boolean }>();
 
   searchQuery = signal('');
-  sortByCreationDesc = signal(true);
+  sortOption = signal<'createdDesc' | 'createdAsc' | 'nameAsc' | 'nameDesc' | 'gamesDesc' | 'gamesAsc'>('createdDesc');
+  isSortMenuOpen = signal(false);
+  isRefreshing = signal(false);
+  isSettingsOpen = signal(false);
+  settingsName = signal('');
+  settingsVisibility = signal<'private' | 'public'>('private');
+  selectedDatabase = signal<Database | null>(null);
 
   private readonly databasesSignal = signal<Database[]>([]);
+  private refreshTimerId: number | null = null;
 
   filteredAndSortedDatabases = computed(() => {
     let result = this.databasesSignal();
@@ -43,15 +53,83 @@ export class DatabasesPanelComponent {
     }
 
     result = [...result].sort((a, b) => {
-      const timeA = a.creationDate.getTime();
-      const timeB = b.creationDate.getTime();
-      return this.sortByCreationDesc() ? timeB - timeA : timeA - timeB;
+      const option = this.sortOption();
+
+      switch (option) {
+        case 'createdAsc':
+          return a.creationDate.getTime() - b.creationDate.getTime();
+        case 'createdDesc':
+          return b.creationDate.getTime() - a.creationDate.getTime();
+        case 'nameAsc':
+          return a.name.localeCompare(b.name);
+        case 'nameDesc':
+          return b.name.localeCompare(a.name);
+        case 'gamesAsc':
+          return a.gamesCount - b.gamesCount;
+        case 'gamesDesc':
+          return b.gamesCount - a.gamesCount;
+        default:
+          return 0;
+      }
     });
 
     return result;
   });
 
-  toggleSort() {
-    this.sortByCreationDesc.update(val => !val);
+  toggleSortMenu(): void {
+    this.isSortMenuOpen.update(open => !open);
+  }
+
+  selectSort(option: 'createdDesc' | 'createdAsc' | 'nameAsc' | 'nameDesc' | 'gamesDesc' | 'gamesAsc'): void {
+    this.sortOption.set(option);
+    this.isSortMenuOpen.set(false);
+  }
+
+  requestRefresh(): void {
+    if (this.refreshTimerId !== null) {
+      window.clearTimeout(this.refreshTimerId);
+    }
+
+    this.isRefreshing.set(true);
+    this.refreshDatabases.emit();
+    this.refreshTimerId = window.setTimeout(() => {
+      this.isRefreshing.set(false);
+      this.refreshTimerId = null;
+    }, 900);
+  }
+
+  openSettings(database: Database): void {
+    this.selectedDatabase.set(database);
+    this.settingsName.set(database.name);
+    this.settingsVisibility.set(database.isPublic ? 'public' : 'private');
+    this.isSettingsOpen.set(true);
+  }
+
+  closeSettings(): void {
+    this.isSettingsOpen.set(false);
+  }
+
+  confirmSettings(): void {
+    const selected = this.selectedDatabase();
+    if (!selected) {
+      return;
+    }
+
+    this.updateDatabase.emit({
+      database: selected,
+      name: this.settingsName().trim() || selected.name,
+      isPublic: this.settingsVisibility() === 'public'
+    });
+    this.closeSettings();
+  }
+
+  confirmDelete(): void {
+    const selected = this.selectedDatabase();
+    if (!selected) {
+      return;
+    }
+
+    this.deleteDatabase.emit(selected);
+    this.closeSettings();
   }
 }

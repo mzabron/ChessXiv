@@ -29,6 +29,11 @@ export interface CreateUserDatabaseRequest {
   isPublic: boolean;
 }
 
+export interface UpdateUserDatabaseRequest {
+  name: string;
+  isPublic: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class UserDatabasesApiService {
   private readonly http = inject(HttpClient);
@@ -52,6 +57,10 @@ export class UserDatabasesApiService {
 
   delete(userDatabaseId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/user-databases/${userDatabaseId}`);
+  }
+
+  update(userDatabaseId: string, request: UpdateUserDatabaseRequest): Observable<void> {
+    return this.http.put<void>(`${this.baseUrl}/user-databases/${userDatabaseId}`, request);
   }
 
   getGames(

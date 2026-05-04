@@ -4,8 +4,31 @@
       <input type="text" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)"
         placeholder="Search by name or owner..." class="search-input" />
     </div>
-    <button class="sort-btn" (click)="toggleSort()">
-      Sort: {{ sortByCreationDesc() ? 'Newest First' : 'Oldest First' }}
+    <div class="sort-menu" [class.open]="isSortMenuOpen()">
+      <button type="button" class="sort-btn" (click)="toggleSortMenu()">
+        Sort: @switch (sortOption()) {
+        @case ('createdDesc') { Newest first }
+        @case ('createdAsc') { Oldest first }
+        @case ('nameAsc') { Name (A-Z) }
+        @case ('nameDesc') { Name (Z-A) }
+        @case ('gamesDesc') { Games (most-fewest) }
+        @case ('gamesAsc') { Games (fewest-most) }
+        }
+      </button>
+      @if (isSortMenuOpen()) {
+      <div class="sort-options" role="listbox">
+        <button type="button" class="sort-option" (click)="selectSort('createdDesc')">Newest first</button>
+        <button type="button" class="sort-option" (click)="selectSort('createdAsc')">Oldest first</button>
+        <button type="button" class="sort-option" (click)="selectSort('nameAsc')">Name (A-Z)</button>
+        <button type="button" class="sort-option" (click)="selectSort('nameDesc')">Name (Z-A)</button>
+        <button type="button" class="sort-option" (click)="selectSort('gamesDesc')">Games (most-fewest)</button>
+        <button type="button" class="sort-option" (click)="selectSort('gamesAsc')">Games (fewest-most)</button>
+      </div>
+      }
+    </div>
+    <button type="button" class="refresh-btn" [class.is-refreshing]="isRefreshing()" (click)="requestRefresh()"
+      aria-label="Refresh databases" title="Refresh databases">
+      <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
     </button>
   </div>
 
@@ -17,20 +40,22 @@
         <div class="db-actions">
           <span class="db-games-count">{{ db.gamesCount }} games</span>
           @if (db.owner === currentUser) {
-            <button
-              type="button"
-              class="delete-db-btn"
-              (click)="$event.stopPropagation(); deleteDatabase.emit(db)"
-              aria-label="Delete database"
-              title="Delete database">
-              <span class="material-symbols-outlined" aria-hidden="true">delete</span>
-            </button>
+          <button type="button" class="settings-btn" (click)="$event.stopPropagation(); openSettings(db)"
+            aria-label="Open database settings" title="Database settings">
+            <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+          </button>
           }
         </div>
       </div>
       <div class="db-meta">
         <span class="db-owner"><i class="icon-user"></i> {{ db.owner }}</span>
         <span class="db-date"><i class="icon-calendar"></i> {{ db.creationDate | date:'mediumDate' }}</span>
+        @if (db.owner === currentUser) {
+        <span class="db-visibility" [class.is-public]="db.isPublic">
+          <span class="material-symbols-outlined" aria-hidden="true">{{ db.isPublic ? 'visibility' : 'lock' }}</span>
+          {{ db.isPublic ? 'Public' : 'Private' }}
+        </span>
+        }
       </div>
     </div>
     } @empty {
@@ -40,3 +65,35 @@
     }
   </div>
 </div>
+
+@if (isSettingsOpen()) {
+<div class="settings-overlay" (click)="closeSettings()">
+  <div class="settings-card" role="dialog" aria-modal="true" aria-label="Database settings"
+    (click)="$event.stopPropagation()">
+    <div class="settings-header">
+      <h3>Database settings</h3>
+      <p>Manage name, visibility, or delete this database.</p>
+    </div>
+    <div class="settings-body">
+      <label class="settings-label">
+        Name
+        <input type="text" class="settings-input" [ngModel]="settingsName()"
+          (ngModelChange)="settingsName.set($event)" />
+      </label>
+      <label class="settings-label">
+        Visibility
+        <select class="settings-select" [ngModel]="settingsVisibility()"
+          (ngModelChange)="settingsVisibility.set($event)">
+          <option value="private">Private</option>
+          <option value="public">Public</option>
+        </select>
+      </label>
+    </div>
+    <div class="settings-actions">
+      <button type="button" class="settings-btn-secondary" (click)="closeSettings()">Cancel</button>
+      <button type="button" class="settings-btn-primary" (click)="confirmSettings()">Save</button>
+      <button type="button" class="settings-btn-danger" (click)="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+}

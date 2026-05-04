@@ -375,6 +375,44 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.openDeleteConfirmation('database');
   }
 
+  protected onDatabasesRefreshRequested(): void {
+    if (this.authState.isAuthenticated()) {
+      void this.reloadUserDatabases();
+      return;
+    }
+
+    this.loadPublicDatabases();
+  }
+
+  protected async onDatabaseUpdateRequested(payload: { database: Database; name: string; isPublic: boolean }): Promise<void> {
+    if (payload.database.owner !== (this.currentUserName() ?? '')) {
+      return;
+    }
+
+    const updated = {
+      ...payload.database,
+      name: payload.name.trim() || payload.database.name,
+      isPublic: payload.isPublic
+    };
+    const previous = this.panelDatabases();
+    const next = previous.map(db => (db.id === payload.database.id ? updated : db));
+    this.panelDatabases.set(next);
+
+    if (this.activeUserDatabaseId() === updated.id) {
+      this.currentDatabaseName = updated.name;
+    }
+
+    try {
+      await firstValueFrom(this.userDatabasesApi.update(updated.id, {
+        name: updated.name,
+        isPublic: updated.isPublic
+      }));
+    } catch {
+      this.panelDatabases.set(previous);
+      this.showImportError('Unable to update database settings. Please try again.');
+    }
+  }
+
   protected cancelDeleteConfirmation(): void {
     this.pendingDeleteDatabase = null;
     this.deleteConfirmationVisible.set(false);
@@ -443,6 +481,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         name: payload.mode === 'create'
           ? (payload.newDatabaseName ?? 'Imported Games')
           : (this.myDatabases().find(db => db.id === userDatabaseId)?.name ?? 'Saved Database'),
+        isPublic: payload.visibility === 'public',
         owner: this.currentUserName() ?? '',
         creationDate: new Date(),
         gamesCount: 0
@@ -804,6 +843,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         const mineMapped: Database[] = mine.map(db => ({
           id: db.id,
           name: db.name,
+          isPublic: db.isPublic,
           owner: db.ownerUserName || this.currentUserName() || db.ownerUserId,
           creationDate: new Date(db.createdAtUtc),
           gamesCount: db.gameCount
@@ -814,6 +854,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
           .map(bookmark => ({
             id: bookmark.id,
             name: bookmark.name,
+            isPublic: bookmark.isPublic,
             owner: bookmark.ownerUserName || bookmark.ownerUserId,
             creationDate: new Date(bookmark.createdAtUtc),
             gamesCount: bookmark.gameCount
@@ -835,6 +876,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         const mapped: Database[] = publicDbs.map(db => ({
           id: db.id,
           name: db.name,
+          isPublic: db.isPublic,
           owner: db.ownerUserName || db.ownerUserId,
           creationDate: new Date(db.createdAtUtc),
           gamesCount: db.gameCount
@@ -860,6 +902,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       const mineMapped: Database[] = mine.map(db => ({
         id: db.id,
         name: db.name,
+        isPublic: db.isPublic,
         owner: db.ownerUserName || this.currentUserName() || db.ownerUserId,
         creationDate: new Date(db.createdAtUtc),
         gamesCount: db.gameCount
@@ -870,6 +913,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         .map(bookmark => ({
           id: bookmark.id,
           name: bookmark.name,
+          isPublic: bookmark.isPublic,
           owner: bookmark.ownerUserName || bookmark.ownerUserId,
           creationDate: new Date(bookmark.createdAtUtc),
           gamesCount: bookmark.gameCount
