@@ -111,96 +111,107 @@ try
 		return;
 	}
 
-	Console.Write("New database name: ");
-	var dbName = Console.ReadLine()?.Trim();
-	if (string.IsNullOrWhiteSpace(dbName))
+	var useExisting = PromptUseExistingDatabase();
+	var userDatabaseId = Guid.Empty;
+	var userDatabaseName = string.Empty;
+
+	(Guid Id, string Name)? existing = null;
+	if (useExisting)
 	{
-		logger.LogError("Database name is required.");
+		existing = await PromptSelectUserDatabaseAsync(dbContext, user.Id);
+		if (existing is not null)
+		{
+			userDatabaseId = existing.Value.Id;
+			userDatabaseName = existing.Value.Name;
+		}
+		else
+		{
+			useExisting = false;
+		}
+	}
+
+	if (!useExisting)
+	{
+		Console.Write("New database name: ");
+		var dbName = Console.ReadLine()?.Trim();
+		if (string.IsNullOrWhiteSpace(dbName))
+		{
+			logger.LogError("Database name is required.");
+			return;
+		}
+
+		Console.Write("Make database public? (y/N): ");
+		var isPublicInput = Console.ReadLine();
+		var isPublic = !string.IsNullOrWhiteSpace(isPublicInput) && (isPublicInput.Trim().ToLowerInvariant() == "y" || isPublicInput.Trim().ToLowerInvariant() == "yes");
+
+		var pgnPath = ResolvePgnPath(args) ?? PromptForPgnPath();
+		if (pgnPath is null)
+		{
+			logger.LogError("PGN file not found. Provide a valid path.");
+			return;
+		}
+
+		var userDatabase = new UserDatabase
+		{
+			Id = Guid.NewGuid(),
+			Name = dbName,
+			OwnerUserId = user.Id,
+			IsPublic = isPublic,
+			CreatedAtUtc = DateTime.UtcNow
+		};
+
+		try
+		{
+			dbContext.UserDatabases.Add(userDatabase);
+			await unitOfWork.SaveChangesAsync();
+		}
+		catch (DbUpdateException ex)
+		{
+			logger.LogError(ex, "Failed to create user database. Name may already exist for this user.");
+			Environment.ExitCode = 1;
+			return;
+		}
+
+		userDatabaseId = userDatabase.Id;
+		userDatabaseName = userDatabase.Name;
+
+		logger.LogInformation("Created UserDatabase {Id} for user {User}", userDatabaseId, user.UserName);
+
+		logger.LogInformation("Importing games from {Path}", pgnPath);
+		await ImportGamesAsync(
+			pgnPath,
+			userDatabaseId,
+			pgnParser,
+			positionImportCoordinator,
+			gameRepository,
+			userDatabaseGameRepository,
+			unitOfWork,
+			logger);
 		return;
 	}
 
-	Console.Write("Make database public? (y/N): ");
-	var isPublicInput = Console.ReadLine();
-	var isPublic = !string.IsNullOrWhiteSpace(isPublicInput) && (isPublicInput.Trim().ToLowerInvariant() == "y" || isPublicInput.Trim().ToLowerInvariant() == "yes");
-
-	var pgnPath = ResolvePgnPath(args) ?? PromptForPgnPath();
-	if (pgnPath is null)
+	var pgnPathExisting = ResolvePgnPath(args) ?? PromptForPgnPath();
+	if (pgnPathExisting is null)
 	{
 		logger.LogError("PGN file not found. Provide a valid path.");
 		return;
 	}
 
-	var userDatabase = new UserDatabase
-	{
-		Id = Guid.NewGuid(),
-		Name = dbName,
-		OwnerUserId = user.Id,
-		IsPublic = isPublic,
-		CreatedAtUtc = DateTime.UtcNow
-	};
+	logger.LogInformation("Using UserDatabase {Name} ({Id})", userDatabaseName, userDatabaseId);
+	logger.LogInformation("Importing games from {Path}", pgnPathExisting);
 
-	try
-	{
-		dbContext.UserDatabases.Add(userDatabase);
-		await unitOfWork.SaveChangesAsync();
-	}
-	catch (DbUpdateException ex)
-	{
-		logger.LogError(ex, "Failed to create user database. Name may already exist for this user.");
-		Environment.ExitCode = 1;
-		return;
-	}
+	await ImportGamesAsync(
+		pgnPathExisting,
+		userDatabaseId,
+		pgnParser,
+		positionImportCoordinator,
+		gameRepository,
+		userDatabaseGameRepository,
+		unitOfWork,
+		logger);
 
-	logger.LogInformation("Importing games from {Path}", pgnPath);
-
-	using var reader = new StreamReader(pgnPath);
-	var parsedCount = 0;
-	var importedCount = 0;
-	var skippedCount = 0;
-	var batchSize = 500;
-	var batch = new List<Game>(batchSize);
-
-	await using var transaction = await unitOfWork.BeginTransactionAsync();
-	try
-	{
-		await foreach (var game in pgnParser.ParsePgnAsync(reader))
-		{
-			parsedCount++;
-			if (string.IsNullOrWhiteSpace(game.White) || string.IsNullOrWhiteSpace(game.Black))
-			{
-				skippedCount++;
-				continue;
-			}
-
-			game.IsMaster = true;
-			batch.Add(game);
-			importedCount++;
-
-			if (batch.Count >= batchSize)
-			{
-				await PersistBatchAndLinkAsync(batch, userDatabase.Id, positionImportCoordinator, gameRepository, userDatabaseGameRepository, unitOfWork);
-				batch.Clear();
-			}
-		}
-
-		if (batch.Count > 0)
-		{
-			await PersistBatchAndLinkAsync(batch, userDatabase.Id, positionImportCoordinator, gameRepository, userDatabaseGameRepository, unitOfWork);
-			batch.Clear();
-		}
-
-		await transaction.CommitAsync();
-	}
-	catch (Exception ex)
-	{
-		await transaction.RollbackAsync();
-		logger.LogError(ex, "Import failed.");
-		Environment.ExitCode = 1;
-		return;
-	}
-
-	logger.LogInformation("Import finished. Parsed: {Parsed}, Imported: {Imported}, Skipped: {Skipped}", parsedCount, importedCount, skippedCount);
-	logger.LogInformation("Created UserDatabase {Id} for user {User}", userDatabase.Id, user.UserName);
+	logger.LogInformation("Games added to existing database.");
+	return;
 }
 catch (Exception ex)
 {
@@ -236,6 +247,127 @@ static string ReadPassword()
 	}
 
 	return sb.ToString();
+}
+
+static bool PromptUseExistingDatabase()
+{
+	Console.Write("Use existing database? (y/N): ");
+	var input = Console.ReadLine();
+	if (string.IsNullOrWhiteSpace(input))
+	{
+		return false;
+	}
+
+	var normalized = input.Trim().ToLowerInvariant();
+	return normalized is "y" or "yes";
+}
+
+static async Task<(Guid Id, string Name)?> PromptSelectUserDatabaseAsync(
+	ChessXivDbContext dbContext,
+	string ownerUserId)
+{
+	var databases = await dbContext.UserDatabases
+		.AsNoTracking()
+		.Where(d => d.OwnerUserId == ownerUserId)
+		.OrderBy(d => d.Name)
+		.Select(d => new { d.Id, d.Name })
+		.ToListAsync();
+
+	if (databases.Count == 0)
+	{
+		Console.WriteLine("No existing databases found. You must create a new one.");
+		return null;
+	}
+
+	Console.WriteLine("Available databases:");
+	for (var i = 0; i < databases.Count; i++)
+	{
+		Console.WriteLine($"  {i + 1}. {databases[i].Name}");
+	}
+
+	while (true)
+	{
+		Console.Write("Choose database by number or name (empty to cancel): ");
+		var input = Console.ReadLine()?.Trim();
+		if (string.IsNullOrWhiteSpace(input))
+		{
+			return null;
+		}
+
+		if (int.TryParse(input, out var index) && index >= 1 && index <= databases.Count)
+		{
+			var selected = databases[index - 1];
+			return (selected.Id, selected.Name);
+		}
+
+		var nameMatch = databases.FirstOrDefault(d =>
+			string.Equals(d.Name, input, StringComparison.OrdinalIgnoreCase));
+		if (nameMatch is not null)
+		{
+			return (nameMatch.Id, nameMatch.Name);
+		}
+
+		Console.WriteLine("Invalid selection. Try again.");
+	}
+}
+
+static async Task ImportGamesAsync(
+	string pgnPath,
+	Guid userDatabaseId,
+	IPgnParser pgnParser,
+	IPositionImportCoordinator positionImportCoordinator,
+	IGameRepository gameRepository,
+	IUserDatabaseGameRepository userDatabaseGameRepository,
+	IUnitOfWork unitOfWork,
+	ILogger logger)
+{
+	using var reader = new StreamReader(pgnPath);
+	var parsedCount = 0;
+	var importedCount = 0;
+	var skippedCount = 0;
+	var batchSize = 500;
+	var batch = new List<Game>(batchSize);
+
+	await using var transaction = await unitOfWork.BeginTransactionAsync();
+	try
+	{
+		await foreach (var game in pgnParser.ParsePgnAsync(reader))
+		{
+			parsedCount++;
+			if (string.IsNullOrWhiteSpace(game.White) || string.IsNullOrWhiteSpace(game.Black))
+			{
+				skippedCount++;
+				continue;
+			}
+
+			game.IsMaster = true;
+			batch.Add(game);
+			importedCount++;
+
+			if (batch.Count >= batchSize)
+			{
+				await PersistBatchAndLinkAsync(batch, userDatabaseId, positionImportCoordinator, gameRepository, userDatabaseGameRepository, unitOfWork);
+				batch.Clear();
+			}
+		}
+
+		if (batch.Count > 0)
+		{
+			await PersistBatchAndLinkAsync(batch, userDatabaseId, positionImportCoordinator, gameRepository, userDatabaseGameRepository, unitOfWork);
+			batch.Clear();
+		}
+
+		await transaction.CommitAsync();
+	}
+	catch (Exception ex)
+	{
+		await transaction.RollbackAsync();
+		logger.LogError(ex, "Import failed.");
+		Environment.ExitCode = 1;
+		return;
+	}
+
+	logger.LogInformation("Import finished. Parsed: {Parsed}, Imported: {Imported}, Skipped: {Skipped}", parsedCount, importedCount, skippedCount);
 }
 
 static async Task PersistBatchAndLinkAsync(
