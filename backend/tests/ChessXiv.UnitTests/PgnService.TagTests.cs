@@ -45,6 +45,38 @@ public class PgnServiceTagTests
     }
 
     [Fact]
+    public void ParsePgn_SplitsGames_WithSingleBlankLineBetweenGames()
+    {
+        const string pgn = """
+            [Event "Berlin"]
+            [Site "Berlin GER"]
+            [Date "1890.01.01"]
+            [Round "1"]
+            [White "Goring, Marina"]
+            [Black "?"]
+            [Result "1-0"]
+
+            1. Nc3 Nc6 2. d4 d5 3. e4 dxe4 4. d5 Ne5 5. Bf4 Bg4 1-0
+
+            [Event "Paris"]
+            [Site "Paris FRA"]
+            [Date "1804.??.??"]
+            [Round "1"]
+            [White "Remusat, Claire"]
+            [Black "Napoleon, Bonaparte"]
+            [Result "0-1"]
+
+            1. d3 Nf6 2. e4 Nc6 3. f4 e5 4. fxe5 Nxe5 0-1
+            """;
+
+        var games = _service.ParsePgn(pgn).ToList();
+
+        Assert.Equal(2, games.Count);
+        Assert.Equal("Berlin", games[0].Event);
+        Assert.Equal("Paris", games[1].Event);
+    }
+
+    [Fact]
     public void ParsePgn_UsesDateTag_WhenUtcDateIsMissing()
     {
         var pgn = PgnServiceTestData.LoadGamesSamplePgn();

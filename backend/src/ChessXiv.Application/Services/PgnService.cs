@@ -9,7 +9,8 @@ namespace ChessXiv.Application.Services;
 
 public class PgnService : IPgnParser
 {
-    private static readonly Regex GameSeparatorRegex = new(@"(?:\r?\n[ \t]*){3,}", RegexOptions.Compiled);
+    private static readonly Regex GameSeparatorRegex = new(@"(?:\r?\n[ \t]*){2,}(?=[ \t]*\[)", RegexOptions.Compiled);
+    private static readonly Regex TagMovesSeparatorRegex = new(@"\r?\n[ \t]*\r?\n", RegexOptions.Compiled);
     private static readonly Regex TagRegex = new(@"^\[(\w+)\s+""(.*)""\]$", RegexOptions.Compiled);
     private static readonly Regex WhiteMoveNumberRegex = new(@"^(\d+)\.$", RegexOptions.Compiled);
     private static readonly Regex BlackMoveNumberRegex = new(@"^(\d+)\.\.\.$", RegexOptions.Compiled);
@@ -74,7 +75,7 @@ public class PgnService : IPgnParser
             var isBlank = string.IsNullOrWhiteSpace(line);
             var isTagLine = line.StartsWith("[", StringComparison.Ordinal);
 
-            if (!isBlank && isTagLine && seenMovesSection && blankStreak >= 2)
+            if (!isBlank && isTagLine && seenMovesSection && blankStreak >= 1)
             {
                 var completed = builder.ToString().Trim();
                 if (!string.IsNullOrWhiteSpace(completed))
@@ -126,9 +127,11 @@ public class PgnService : IPgnParser
             Pgn = gameBlock
         };
 
-        var splitIndex = gameBlock.IndexOf("\n\n", StringComparison.Ordinal);
-        var tagsPart = splitIndex >= 0 ? gameBlock[..splitIndex] : string.Empty;
-        var movesPart = splitIndex >= 0 ? gameBlock[(splitIndex + 2)..].Trim() : gameBlock.Trim();
+        var splitMatch = TagMovesSeparatorRegex.Match(gameBlock);
+        var tagsPart = splitMatch.Success ? gameBlock[..splitMatch.Index] : string.Empty;
+        var movesPart = splitMatch.Success
+            ? gameBlock[(splitMatch.Index + splitMatch.Length)..].Trim()
+            : gameBlock.Trim();
         
         var tags = ParseTags(tagsPart);
         ApplyTags(game, tags);
