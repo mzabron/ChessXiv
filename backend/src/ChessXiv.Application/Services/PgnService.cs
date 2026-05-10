@@ -15,6 +15,7 @@ public class PgnService : IPgnParser
     private static readonly Regex WhiteMoveNumberRegex = new(@"^(\d+)\.$", RegexOptions.Compiled);
     private static readonly Regex BlackMoveNumberRegex = new(@"^(\d+)\.\.\.$", RegexOptions.Compiled);
     private static readonly Regex ClockRegex = new(@"%clk\s+([^\]\s]+)", RegexOptions.Compiled);
+    private static readonly Regex NagRegex = new(@"^\$\d+$", RegexOptions.Compiled);
     private static readonly HashSet<string> ResultTokens =
     [
         "1-0",
@@ -235,11 +236,17 @@ public class PgnService : IPgnParser
         var expectingWhiteMove = true;
         Move? lastMove = null;
         Side? lastSide = null;
+        var variationDepth = 0;
 
         foreach (var token in tokens)
         {
             if (token.IsComment)
             {
+                if (variationDepth > 0)
+                {
+                    continue;
+                }
+
                 if (lastMove is not null && lastSide.HasValue)
                 {
                     ApplyMoveMetadata(lastMove, lastSide.Value, token.Value);
@@ -250,6 +257,27 @@ public class PgnService : IPgnParser
 
             var value = token.Value;
             if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            if (value == "(")
+            {
+                variationDepth++;
+                continue;
+            }
+
+            if (value == ")")
+            {
+                if (variationDepth > 0)
+                {
+                    variationDepth--;
+                }
+
+                continue;
+            }
+
+            if (variationDepth > 0)
             {
                 continue;
             }
@@ -273,7 +301,13 @@ public class PgnService : IPgnParser
                 continue;
             }
 
-            if (value is "(" or ")")
+            if (NagRegex.IsMatch(value))
+            {
+                continue;
+            }
+
+            value = TrimAnnotationGlyphs(value);
+            if (string.IsNullOrWhiteSpace(value))
             {
                 continue;
             }
@@ -356,8 +390,43 @@ public class PgnService : IPgnParser
                 continue;
             }
 
+            if (movesText[index] == ';')
+            {
+                var commentStart = ++index;
+                while (index < movesText.Length && movesText[index] != '\n' && movesText[index] != '\r')
+                {
+                    index++;
+                }
+
+                var commentLength = Math.Max(0, index - commentStart);
+                var comment = commentLength > 0
+                    ? movesText.Substring(commentStart, commentLength)
+                    : string.Empty;
+                yield return new Token(comment, isComment: true);
+                continue;
+            }
+
+            if (movesText[index] == '(')
+            {
+                index++;
+                yield return new Token("(", isComment: false);
+                continue;
+            }
+
+            if (movesText[index] == ')')
+            {
+                index++;
+                yield return new Token(")", isComment: false);
+                continue;
+            }
+
             var tokenStart = index;
-            while (index < movesText.Length && !char.IsWhiteSpace(movesText[index]) && movesText[index] != '{')
+            while (index < movesText.Length
+                && !char.IsWhiteSpace(movesText[index])
+                && movesText[index] != '{'
+                && movesText[index] != ';'
+                && movesText[index] != '('
+                && movesText[index] != ')')
             {
                 index++;
             }
@@ -365,6 +434,22 @@ public class PgnService : IPgnParser
             var token = movesText[tokenStart..index];
             yield return new Token(token, isComment: false);
         }
+    }
+
+    private static string TrimAnnotationGlyphs(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return token;
+        }
+
+        var end = token.Length - 1;
+        while (end >= 0 && (token[end] == '!' || token[end] == '?'))
+        {
+            end--;
+        }
+
+        return end < token.Length - 1 ? token[..(end + 1)] : token;
     }
 
     private static void ApplyMoveMetadata(Move move, Side side, string comment)
