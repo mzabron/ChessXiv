@@ -527,22 +527,25 @@ public class UserDatabasesController(
             return Forbid();
         }
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        // Ensure long-running deletes complete even if the client disconnects.
+        var deleteToken = CancellationToken.None;
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(deleteToken);
 
         var linkedGameIds = await dbContext.UserDatabaseGames
             .AsNoTracking()
             .Where(x => x.UserDatabaseId == id)
             .Select(x => x.GameId)
             .Distinct()
-            .ToArrayAsync(cancellationToken);
+            .ToArrayAsync(deleteToken);
 
         await dbContext.UserDatabaseGames
             .Where(x => x.UserDatabaseId == id)
-            .ExecuteDeleteAsync(cancellationToken);
+            .ExecuteDeleteAsync(deleteToken);
 
         await dbContext.UserDatabases
             .Where(d => d.Id == id)
-            .ExecuteDeleteAsync(cancellationToken);
+            .ExecuteDeleteAsync(deleteToken);
 
         if (linkedGameIds.Length > 0)
         {
@@ -562,7 +565,7 @@ public class UserDatabasesController(
                     from gameLink in gameLinks.DefaultIfEmpty()
                     where gameLink == null
                     select game.Id)
-                    .ToArrayAsync(cancellationToken);
+                    .ToArrayAsync(deleteToken);
 
                 if (orphanIds.Length == 0)
                 {
@@ -571,11 +574,11 @@ public class UserDatabasesController(
 
                 await dbContext.Games
                     .Where(g => orphanIds.Contains(g.Id))
-                    .ExecuteDeleteAsync(cancellationToken);
+                    .ExecuteDeleteAsync(deleteToken);
             }
         }
 
-        await transaction.CommitAsync(cancellationToken);
+        await transaction.CommitAsync(deleteToken);
 
         return NoContent();
     }

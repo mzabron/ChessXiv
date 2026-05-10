@@ -53,6 +53,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   private readonly loadedForCurrentSession = signal(false);
   protected readonly activeUserDatabaseId = signal<string | null>(null);
   private static readonly activeDatabaseStorageKey = 'chessxiv.explorer.active-user-database';
+  private static readonly deletedDatabaseStorageKey = 'chessxiv.explorer.deleted-user-databases';
   private progressSubscription: Subscription | null = null;
 
   @Input() isFocusMode = false;
@@ -837,6 +838,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       bookmarks: this.userDatabasesApi.getBookmarks()
     }).subscribe({
       next: ({ mine, bookmarks }) => {
+        const deletedIds = this.readDeletedDatabaseIds();
         this.loadedForCurrentSession.set(true);
         this.myDatabases.set(mine.map(db => ({ id: db.id, name: db.name })));
 
@@ -860,7 +862,8 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
             gamesCount: bookmark.gameCount
           }));
 
-        const allDatabases = [...mineMapped, ...bookmarkMapped];
+        const allDatabases = this.filterDeletedDatabases([...mineMapped, ...bookmarkMapped], deletedIds);
+        this.persistDeletedDatabaseIds(this.pruneDeletedDatabaseIds(deletedIds, [...mineMapped, ...bookmarkMapped]));
         this.panelDatabases.set(allDatabases);
         void this.initializeGamesSourceForSession(allDatabases);
       },
@@ -873,6 +876,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   private loadPublicDatabases(): void {
     this.userDatabasesApi.getPublic().subscribe({
       next: publicDbs => {
+        const deletedIds = this.readDeletedDatabaseIds();
         const mapped: Database[] = publicDbs.map(db => ({
           id: db.id,
           name: db.name,
@@ -882,7 +886,9 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
           gamesCount: db.gameCount
         }));
 
-        this.panelDatabases.set(mapped);
+        const filtered = this.filterDeletedDatabases(mapped, deletedIds);
+        this.persistDeletedDatabaseIds(this.pruneDeletedDatabaseIds(deletedIds, mapped));
+        this.panelDatabases.set(filtered);
       },
       error: () => {
         this.panelDatabases.set([]);
@@ -896,6 +902,8 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         firstValueFrom(this.userDatabasesApi.getMine()),
         firstValueFrom(this.userDatabasesApi.getBookmarks())
       ]);
+
+      const deletedIds = this.readDeletedDatabaseIds();
 
       this.myDatabases.set(mine.map(db => ({ id: db.id, name: db.name })));
 
@@ -919,7 +927,9 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
           gamesCount: bookmark.gameCount
         }));
 
-      this.panelDatabases.set([...mineMapped, ...bookmarkMapped]);
+      const allDatabases = [...mineMapped, ...bookmarkMapped];
+      this.panelDatabases.set(this.filterDeletedDatabases(allDatabases, deletedIds));
+      this.persistDeletedDatabaseIds(this.pruneDeletedDatabaseIds(deletedIds, allDatabases));
     } catch {
       this.showImportError('Unable to refresh user databases after save.');
     }
@@ -1084,6 +1094,8 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     const previousMyDatabases = this.myDatabases();
     const deletingActive = this.activeUserDatabaseId() === database.id;
 
+    this.trackDeletedDatabase(database.id);
+
     this.panelDatabases.set(previousPanelDatabases.filter(db => db.id !== database.id));
     this.myDatabases.set(previousMyDatabases.filter(db => db.id !== database.id));
 
@@ -1095,6 +1107,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       await firstValueFrom(this.userDatabasesApi.delete(database.id));
       await this.reloadUserDatabases();
     } catch {
+      this.untrackDeletedDatabase(database.id);
       this.panelDatabases.set(previousPanelDatabases);
       this.myDatabases.set(previousMyDatabases);
 
@@ -1104,6 +1117,73 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
       this.showImportError('Unable to delete database. Please try again.');
     }
+  }
+
+  private readDeletedDatabaseIds(): Set<string> {
+    const raw = localStorage.getItem(ExplorerPageComponent.deletedDatabaseStorageKey);
+    if (!raw) {
+      return new Set();
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) {
+        return new Set();
+      }
+
+      return new Set(parsed.filter(id => typeof id === 'string'));
+    } catch {
+      return new Set();
+    }
+  }
+
+  private persistDeletedDatabaseIds(ids: Set<string>): void {
+    if (ids.size === 0) {
+      localStorage.removeItem(ExplorerPageComponent.deletedDatabaseStorageKey);
+      return;
+    }
+
+    localStorage.setItem(ExplorerPageComponent.deletedDatabaseStorageKey, JSON.stringify([...ids]));
+  }
+
+  private trackDeletedDatabase(databaseId: string): void {
+    const ids = this.readDeletedDatabaseIds();
+    ids.add(databaseId);
+    this.persistDeletedDatabaseIds(ids);
+  }
+
+  private untrackDeletedDatabase(databaseId: string): void {
+    const ids = this.readDeletedDatabaseIds();
+    if (!ids.delete(databaseId)) {
+      return;
+    }
+
+    this.persistDeletedDatabaseIds(ids);
+  }
+
+  private filterDeletedDatabases(databases: Database[], deletedIds: Set<string>): Database[] {
+    if (deletedIds.size === 0) {
+      return databases;
+    }
+
+    return databases.filter(db => !deletedIds.has(db.id));
+  }
+
+  private pruneDeletedDatabaseIds(deletedIds: Set<string>, databases: Database[]): Set<string> {
+    if (deletedIds.size === 0) {
+      return deletedIds;
+    }
+
+    const availableIds = new Set(databases.map(db => db.id));
+    const remaining = new Set<string>();
+
+    for (const id of deletedIds) {
+      if (availableIds.has(id)) {
+        remaining.add(id);
+      }
+    }
+
+    return remaining;
   }
 
   private openDeleteConfirmation(kind: 'draft' | 'database'): void {
