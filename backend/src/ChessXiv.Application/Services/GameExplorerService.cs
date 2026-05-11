@@ -86,14 +86,35 @@ public class GameExplorerService(
 
     public async Task<MoveTreeResponse> GetMoveTreeAsync(
         MoveTreeRequest request,
-        string ownerUserId,
+        string? ownerUserId,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (string.IsNullOrWhiteSpace(ownerUserId))
+        if (request.Source == MoveTreeSource.StagingSession && string.IsNullOrWhiteSpace(ownerUserId))
         {
-            throw new ArgumentException("Owner user id is required.", nameof(ownerUserId));
+            return new MoveTreeResponse();
+        }
+
+        if (request.Source == MoveTreeSource.UserDatabase
+            && request.UserDatabaseId.HasValue
+            && request.UserDatabaseId != Guid.Empty)
+        {
+            var userDatabaseId = request.UserDatabaseId.Value;
+            var accessStatus = await gameExplorerRepository.GetUserDatabaseAccessStatusAsync(
+                userDatabaseId,
+                ownerUserId,
+                cancellationToken);
+
+            if (accessStatus == UserDatabaseAccessStatus.NotFound)
+            {
+                throw new KeyNotFoundException("User database was not found.");
+            }
+
+            if (accessStatus == UserDatabaseAccessStatus.Forbidden)
+            {
+                throw new ForbiddenException("You do not have access to this user database.");
+            }
         }
 
         var normalizedFen = request.Fen?.Trim();

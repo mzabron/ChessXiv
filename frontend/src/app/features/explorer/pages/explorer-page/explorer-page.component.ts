@@ -1027,12 +1027,12 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   }
 
   private async loadMoveTree(): Promise<void> {
-    if (!this.authState.isAuthenticated()) {
+    if (this.currentGamesSource === 'external') {
       this.clearMoveTree();
       return;
     }
 
-    if (this.currentGamesSource === 'external') {
+    if (this.currentGamesSource === 'imported' && !this.authState.isAuthenticated()) {
       this.clearMoveTree();
       return;
     }

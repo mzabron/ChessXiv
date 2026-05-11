@@ -22,7 +22,7 @@ public interface IGameExplorerRepository
 
     Task<MoveTreeResponse> GetMoveTreeAsync(
         MoveTreeRequest request,
-        string ownerUserId,
+        string? ownerUserId,
         string? normalizedWhiteFirstName,
         string? normalizedWhiteLastName,
         string? normalizedBlackFirstName,

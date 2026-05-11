@@ -56,7 +56,7 @@ public class GameExplorerController(
         return Ok(result);
     }
 
-    [Authorize]
+    [AllowAnonymous]
     [HttpPost("move-tree")]
     public async Task<IActionResult> MoveTree([FromBody] MoveTreeRequest request, CancellationToken cancellationToken)
     {
@@ -86,13 +86,24 @@ public class GameExplorerController(
         }
 
         var userId = GetCurrentUserId();
-        if (userId is null)
+        if (request.Source == MoveTreeSource.StagingSession && userId is null)
         {
             return Unauthorized();
         }
 
-        var result = await gameExplorerService.GetMoveTreeAsync(request, userId, cancellationToken);
-        return Ok(result);
+        try
+        {
+            var result = await gameExplorerService.GetMoveTreeAsync(request, userId, cancellationToken);
+            return Ok(result);
+        }
+        catch (ForbiddenException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound("User database was not found.");
+        }
     }
 
     private string? GetCurrentUserId()

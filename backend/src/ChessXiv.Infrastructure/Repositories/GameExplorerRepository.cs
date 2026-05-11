@@ -119,7 +119,7 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
 
     public Task<MoveTreeResponse> GetMoveTreeAsync(
         MoveTreeRequest request,
-        string ownerUserId,
+        string? ownerUserId,
         string? normalizedWhiteFirstName,
         string? normalizedWhiteLastName,
         string? normalizedBlackFirstName,
@@ -162,7 +162,7 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
 
     private async Task<MoveTreeResponse> GetUserDatabaseMoveTreeAsync(
         MoveTreeRequest request,
-        string ownerUserId,
+        string? ownerUserId,
         string? normalizedWhiteFirstName,
         string? normalizedWhiteLastName,
         string? normalizedBlackFirstName,
@@ -179,11 +179,8 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
         }
 
         var userDatabaseId = request.UserDatabaseId.Value;
-        var hasAccess = await dbContext.UserDatabases
-            .AsNoTracking()
-            .AnyAsync(d => d.Id == userDatabaseId && d.OwnerUserId == ownerUserId, cancellationToken);
-
-        if (!hasAccess)
+        var accessStatus = await GetUserDatabaseAccessStatusAsync(userDatabaseId, ownerUserId, cancellationToken);
+        if (accessStatus != UserDatabaseAccessStatus.Accessible)
         {
             return new MoveTreeResponse();
         }
@@ -265,7 +262,7 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
 
     private async Task<MoveTreeResponse> GetStagingMoveTreeAsync(
         MoveTreeRequest request,
-        string ownerUserId,
+        string? ownerUserId,
         string? normalizedWhiteFirstName,
         string? normalizedWhiteLastName,
         string? normalizedBlackFirstName,
@@ -276,6 +273,11 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
         long? filterFenHash,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(ownerUserId))
+        {
+            return new MoveTreeResponse();
+        }
+
         var filteredGames = dbContext.StagingGames
             .AsNoTracking()
             .Where(game => game.OwnerUserId == ownerUserId)
