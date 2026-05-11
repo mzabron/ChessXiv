@@ -522,7 +522,13 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   }
 
   protected onBoardFenChanged(fen: string): void {
-    this.boardFen.set(fen ?? '');
+    const nextFen = (fen ?? '').trim();
+    const currentFen = this.boardFen().trim();
+    if (nextFen === currentFen) {
+      return;
+    }
+
+    this.boardFen.set(nextFen);
     void this.loadMoveTree();
   }
 
