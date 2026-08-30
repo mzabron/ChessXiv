@@ -78,20 +78,15 @@ Endpoints consumed:
 
 - /api/auth/register
 - /api/auth/login
+- /api/auth/guest-session
 - /api/auth/forgot-password
 - /api/auth/reset-password
 - /api/auth/resend-confirmation
 - /api/auth/change-pending-email
 - /api/auth/confirm-email
 
-Base URL strategy:
-
-- localhost/127.0.0.1/::1 -> http://<host>:5027/api
-- non-local -> /api
-
-Note:
-
-- Enables local development against backend API port without extra environment config.
+All services use a relative `/api` base URL, so local development needs a dev-server proxy
+to the backend.
 
 ### 4.2 Auth state service
 
@@ -122,8 +117,16 @@ frontend/src/app/core/auth/auth-session.service.ts
 
 Storage keys:
 
-- chessxiv.auth.token
-- chessxiv.auth.expiresAtUtc
+- `chessxiv.auth.token` / `chessxiv.auth.expiresAtUtc` in **localStorage** (registered user)
+- `chessxiv.guest.token` / `chessxiv.guest.expiresAtUtc` in **sessionStorage** (guest)
+
+`getAccessToken()` returns the user token when there is one, otherwise the guest token, so
+the interceptor and SignalR work unchanged for both.
+
+Guest tokens live in sessionStorage on purpose: closing the tab drops the token, which makes
+the guest's uploaded draft unreachable at once. The backend then sweeps it once idle.
+
+Signing in or out clears the guest session, so a draft never carries across identities.
 
 Session validity:
 
@@ -203,9 +206,10 @@ frontend/src/app/features/explorer/services/draft-import-api.service.ts
 
 Calls:
 
-- POST /api/pgn/drafts/import
+- POST /api/pgn/drafts/import-file (multipart; returns 202, progress arrives over SignalR)
+- POST /api/pgn/import-to-database-file (multipart)
 - POST /api/pgn/drafts/promote
-- POST /api/pgn/import-to-database
+- GET /api/pgn/drafts/import-progress
 - GET /api/pgn/drafts/games
 - GET /api/pgn/drafts/games/{id}
 - DELETE /api/pgn/drafts
@@ -264,10 +268,12 @@ Service: user-databases-api.service.ts
 
 Used endpoints:
 
-- GET /api/user-databases/mine
-- GET /api/user-databases/bookmarks
+- GET /api/user-databases (one list for guests and signed-in users alike)
 - POST /api/user-databases
+- PUT /api/user-databases/{id}
 - DELETE /api/user-databases/{id}
+- POST /api/user-databases/{id}/bookmark, DELETE /api/user-databases/{id}/bookmark
+- POST /api/user-databases/{id}/games/from-selection
 - GET /api/user-databases/{id}/games
 - GET /api/user-databases/{id}/games/{gameId}
 
@@ -288,17 +294,11 @@ Implication:
 
 - App currently behaves as a route-less SPA shell with URL checks in root component for confirmation/reset screens.
 
-## 11. Local API Base URL Resolution
+## 11. API Base URL
 
-Most services follow:
-
-- if hostname is localhost/127.0.0.1/::1 -> explicit http://host:5027 path
-- else -> relative /api path
-
-Note:
-
-- Services can operate independently without centralized environment injection.
-- Avoids accidental hard-coded localhost paths in production.
+All services use a relative `/api` base URL. The per-service `resolveBaseUrl()` helpers that
+used to switch on hostname were dead code and have been removed, so local development needs a
+dev-server proxy pointing `/api` at the backend.
 
 ## 12. UX and Error Handling Patterns
 
@@ -343,3 +343,57 @@ Shared UI:
 - frontend/src/app/shared/components/sidebar/sidebar.ts
 - frontend/src/app/shared/components/login-modal/login-modal.ts
 - frontend/src/app/shared/components/about-modal/about-modal.ts
+
+
+## 14. Guests and view resets
+
+`ExplorerPageComponent` runs one effect on the authentication signal. Any change of session
+resets the *entire* view — database list, loaded games, current database name, selected game,
+move rows and the move-tree cache — before loading anything for the new caller. Resetting only
+part of it is what previously left a signed-out visitor looking at a database header with no
+games behind it.
+
+When there is no signed-in user, the effect first calls `AuthStateService.ensureGuestSession()`,
+so a visitor can upload and explore a PGN without an account. Saving is gated on
+`isRegisteredUser`; the UI offers "Sign in to save" instead of hiding the flow.
+
+## 15. Move-tree caching
+
+`ExplorerBoardApiService` memoises move-tree responses keyed by (source, database, filters,
+position), with LRU eviction. A move tree is a pure function of those inputs, so the only
+thing that can invalidate it is a change to the pool of games: a completed import, a save, a
+database deletion, a cleared draft, or a change of session. `invalidateMoveTreeCache()` is
+called at each of those points.
+
+This is what stops the expensive start-position tree from being recomputed every time the
+user opens a game, which resets the board to ply 0.
+
+## 16. Saving and adding games
+
+`GamesListComponent` hosts one modal used in two modes:
+
+- **Save imported games** — promotes the whole draft into a new or existing database.
+- **Add to database** — copies the current selection into one of the user's databases.
+
+"Add" defaults to *every game matching the active filters*, not just the visible page; the
+server resolves that set. Tick-boxes in the games table narrow it to an explicit selection.
+Either way the backend skips games already present rather than duplicating them.
+
+## 17. Position search
+
+The Filters → Board section searches for the position on the board, and lets the two fields
+that are part of a position's identity but not of its piece placement be varied:
+
+- **Castling rights** — four chips (K/Q/k/q), disabled when the king or rook has left its
+  home square and the right therefore cannot exist.
+- **En-passant square** — only squares a pawn could actually capture on are offered, matching
+  the backend rule. A target nobody can take is not part of the position.
+
+Both override the corresponding FEN field, and the "Position searched for" box shows the
+resulting FEN, so what is being searched for is always visible. `board-fen.utils.ts` holds the
+FEN parsing and the availability rules.
+
+Two match modes:
+
+- **Same position, any move order** (default) — finds transpositions.
+- **Same position, same move number** — additionally pins the ply.
