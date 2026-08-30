@@ -5,8 +5,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using ChessXiv.Infrastructure.Data;
 using ChessXiv.Infrastructure.Repositories;
+using ChessXiv.Infrastructure.Services;
 using ChessXiv.Application.Abstractions;
 using ChessXiv.Application.Abstractions.Repositories;
+using ChessXiv.Application.Contracts;
 using ChessXiv.Application.Services;
 using ChessXiv.Domain.Engine.Abstractions;
 using ChessXiv.Domain.Engine.Factories;
@@ -19,6 +21,17 @@ using System.Text;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Configuration.AddUserSecrets<Program>();
+// Windows consoles default to an OEM code page, which turns accented player names in the
+// log into question marks. Redirected output can refuse the change, hence the guard.
+try
+{
+	Console.OutputEncoding = Encoding.UTF8;
+}
+catch (IOException)
+{
+	// Not a console (piped or redirected) - leave whatever the host gave us.
+}
+
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options =>
 {
@@ -47,10 +60,15 @@ builder.Services.AddScoped<IPositionImportCoordinator, PositionImportCoordinator
 builder.Services.AddScoped<IBoardStateSerializer, FenBoardStateSerializer>();
 builder.Services.AddScoped<IBoardStateFactory, BoardStateFactory>();
 builder.Services.AddScoped<IBoardStateTransition, BitboardBoardStateTransition>();
-builder.Services.AddScoped<IPositionHasher, ZobristPositionHasher>();
+builder.Services.AddScoped<IPositionKeyCalculator, ZobristPositionKeyCalculator>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-builder.Services.AddScoped<IPgnImportService, PgnImportService>();
 builder.Services.AddScoped<IUserDatabaseGameRepository, UserDatabaseGameRepository>();
+builder.Services.AddScoped<IDraftPromotionRepository, DraftPromotionRepository>();
+builder.Services.AddScoped<IDirectDatabaseImportService, DirectDatabaseImportService>();
+builder.Services.AddScoped<IImportStatisticsRefresher, PostgresImportStatisticsRefresher>();
+builder.Services.AddScoped<IGameSourceRepository, GameSourceRepository>();
+builder.Services.AddScoped<IPositionRebuildRepository, PositionRebuildRepository>();
+builder.Services.AddScoped<IPositionRebuildService, PositionRebuildService>();
 
 builder.Services
 	.AddIdentityCore<ApplicationUser>(options =>
@@ -76,12 +94,41 @@ try
 	using var scope = host.Services.CreateScope();
 	var services = scope.ServiceProvider;
 
+	// Maintenance mode: regenerate Positions from the PGNs already in Games. Needed once
+	// after the storage-format change, and useful as a repair tool afterwards.
+	if (args.Contains("--rebuild-positions", StringComparer.OrdinalIgnoreCase))
+	{
+		var rebuildService = services.GetRequiredService<IPositionRebuildService>();
+		var progressReporter = new Progress<PositionRebuildProgress>(p =>
+			logger.LogInformation("Rebuilt positions for {Processed}/{Total} games.", p.GamesProcessed, p.TotalGames));
+
+		var rebuiltCount = await rebuildService.RebuildAsync(batchSize: 500, progressReporter);
+		logger.LogInformation("Position rebuild finished for {Count} games.", rebuiltCount);
+		return;
+	}
+
+	// Resolved before anything else so a typo fails immediately rather than after the
+	// credentials and database prompts.
+	var encodingName = ReadOptionValue(args, "--encoding");
+	Encoding? forcedEncoding = null;
+	if (encodingName is not null)
+	{
+		if (!PgnEncoding.TryResolve(encodingName, out var resolved))
+		{
+			logger.LogError(
+				"Unknown encoding '{Encoding}'. Use a name such as utf-8, windows-1250, windows-1252 or iso-8859-2.",
+				encodingName);
+			Environment.ExitCode = 1;
+			return;
+		}
+
+		forcedEncoding = resolved;
+	}
+
 	var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
 	var dbContext = services.GetRequiredService<ChessXivDbContext>();
-	var pgnParser = services.GetRequiredService<IPgnParser>();
-	var positionImportCoordinator = services.GetRequiredService<IPositionImportCoordinator>();
-	var gameRepository = services.GetRequiredService<IGameRepository>();
-	var userDatabaseGameRepository = services.GetRequiredService<IUserDatabaseGameRepository>();
+	var importService = services.GetRequiredService<IDirectDatabaseImportService>();
+	var statisticsRefresher = services.GetRequiredService<IImportStatisticsRefresher>();
 	var unitOfWork = services.GetRequiredService<IUnitOfWork>();
 
 	Console.Write("Username or email: ");
@@ -178,15 +225,19 @@ try
 		logger.LogInformation("Created UserDatabase {Id} for user {User}", userDatabaseId, user.UserName);
 
 		logger.LogInformation("Importing games from {Path}", pgnPath);
-		await ImportGamesAsync(
-			pgnPath,
-			userDatabaseId,
-			pgnParser,
-			positionImportCoordinator,
-			gameRepository,
-			userDatabaseGameRepository,
-			unitOfWork,
-			logger);
+		var imported = await ImportGamesAsync(
+			pgnPath, user.Id, userDatabaseId, importService, statisticsRefresher, forcedEncoding, logger);
+
+		if (!imported)
+		{
+			// The database was created a moment ago purely to hold this import. Leaving it
+			// behind would litter the user's database list with an empty entry they never
+			// asked for - the same rollback the web save flow does.
+			dbContext.UserDatabases.Remove(userDatabase);
+			await unitOfWork.SaveChangesAsync();
+			logger.LogInformation("Rolled back the empty database {Name} created for this import.", userDatabaseName);
+		}
+
 		return;
 	}
 
@@ -200,17 +251,12 @@ try
 	logger.LogInformation("Using UserDatabase {Name} ({Id})", userDatabaseName, userDatabaseId);
 	logger.LogInformation("Importing games from {Path}", pgnPathExisting);
 
-	await ImportGamesAsync(
-		pgnPathExisting,
-		userDatabaseId,
-		pgnParser,
-		positionImportCoordinator,
-		gameRepository,
-		userDatabaseGameRepository,
-		unitOfWork,
-		logger);
+	if (await ImportGamesAsync(
+		pgnPathExisting, user.Id, userDatabaseId, importService, statisticsRefresher, forcedEncoding, logger))
+	{
+		logger.LogInformation("Games added to existing database.");
+	}
 
-	logger.LogInformation("Games added to existing database.");
 	return;
 }
 catch (Exception ex)
@@ -222,6 +268,15 @@ catch (Exception ex)
 
 static string ReadPassword()
 {
+	// A multi-gigabyte import runs for hours, so it has to be possible to start it from a
+	// script, an ssh command or under nohup. Console.ReadKey throws outright when stdin is
+	// redirected, which made every one of those impossible.
+	if (Console.IsInputRedirected)
+	{
+		Console.WriteLine();
+		return Console.ReadLine() ?? string.Empty;
+	}
+
 	var sb = new StringBuilder();
 	while (true)
 	{
@@ -237,7 +292,7 @@ static string ReadPassword()
 			if (sb.Length > 0)
 			{
 				sb.Length--;
-				Console.Write("\\b \\b");
+				Console.Write("\b \b");
 			}
 			continue;
 		}
@@ -311,196 +366,106 @@ static async Task<(Guid Id, string Name)?> PromptSelectUserDatabaseAsync(
 	}
 }
 
-static async Task ImportGamesAsync(
+static async Task<bool> ImportGamesAsync(
 	string pgnPath,
+	string ownerUserId,
 	Guid userDatabaseId,
-	IPgnParser pgnParser,
-	IPositionImportCoordinator positionImportCoordinator,
-	IGameRepository gameRepository,
-	IUserDatabaseGameRepository userDatabaseGameRepository,
-	IUnitOfWork unitOfWork,
+	IDirectDatabaseImportService importService,
+	IImportStatisticsRefresher statisticsRefresher,
+	Encoding? forcedEncoding,
 	ILogger logger)
 {
-	using var reader = new StreamReader(pgnPath);
-	var parsedCount = 0;
-	var importedCount = 0;
-	var skippedCount = 0;
-	var batchSize = 500;
-	var batch = new List<Game>(batchSize);
+	// The CLI runs the same import the web upload does, so both get binary COPY and
+	// per-batch commits, and there is one code path to keep correct.
+	using var fileStream = File.OpenRead(pgnPath);
+	using var reader = PgnEncoding.OpenReader(fileStream, forcedEncoding, out var encoding);
+	logger.LogInformation(
+		"Reading {Path} as {Encoding}{Source}.",
+		pgnPath,
+		encoding.WebName,
+		forcedEncoding is null ? " (detected)" : " (--encoding)");
 
-	await using var transaction = await unitOfWork.BeginTransactionAsync();
+	var progress = new Progress<ImportProgress>(p =>
+		logger.LogInformation(
+			"Imported {Imported} games ({Parsed} parsed, {Skipped} skipped)...",
+			p.ImportedCount,
+			p.ParsedCount,
+			p.SkippedCount));
+
 	try
 	{
-		await foreach (var game in pgnParser.ParsePgnAsync(reader))
-		{
-			parsedCount++;
-			if (string.IsNullOrWhiteSpace(game.White) || string.IsNullOrWhiteSpace(game.Black))
-			{
-				skippedCount++;
-				continue;
-			}
+		var result = await importService.ImportToDatabaseAsync(
+			reader,
+			ownerUserId,
+			userDatabaseId,
+			batchSize: 500,
+			progress: progress);
 
-			game.IsMaster = true;
-			batch.Add(game);
-			importedCount++;
+		// Same post-import ANALYZE the web worker runs. Skipping it here left the planner
+		// working from stale statistics after the largest imports in the system.
+		await statisticsRefresher.RefreshAfterDatabaseImportAsync();
 
-			if (batch.Count >= batchSize)
-			{
-				await PersistBatchAndLinkAsync(batch, userDatabaseId, positionImportCoordinator, gameRepository, userDatabaseGameRepository, unitOfWork);
-				batch.Clear();
-			}
-		}
-
-		if (batch.Count > 0)
-		{
-			await PersistBatchAndLinkAsync(batch, userDatabaseId, positionImportCoordinator, gameRepository, userDatabaseGameRepository, unitOfWork);
-			batch.Clear();
-		}
-
-		await transaction.CommitAsync();
+		logger.LogInformation(
+			"Import finished. Parsed: {Parsed}, Imported: {Imported}, Skipped: {Skipped}",
+			result.ParsedCount,
+			result.ImportedCount,
+			result.SkippedCount);
+		return true;
 	}
 	catch (Exception ex)
 	{
-		await transaction.RollbackAsync();
 		logger.LogError(ex, "Import failed.");
 		Environment.ExitCode = 1;
-		return;
+		return false;
 	}
-
-	logger.LogInformation("Import finished. Parsed: {Parsed}, Imported: {Imported}, Skipped: {Skipped}", parsedCount, importedCount, skippedCount);
 }
 
-static async Task PersistBatchAndLinkAsync(
-	IReadOnlyCollection<Game> games,
-	Guid userDatabaseId,
-	IPositionImportCoordinator positionImportCoordinator,
-	IGameRepository gameRepository,
-	IUserDatabaseGameRepository userDatabaseGameRepository,
-	IUnitOfWork unitOfWork)
+/// <summary>
+/// Reads "--name value" or "--name=value" out of the argument list.
+/// </summary>
+static string? ReadOptionValue(string[] args, string name)
 {
-	var addedAtUtc = DateTime.UtcNow;
-
-	foreach (var game in games)
+	for (var i = 0; i < args.Length; i++)
 	{
-		if (game.Date.HasValue)
+		if (args[i].StartsWith(name + "=", StringComparison.OrdinalIgnoreCase))
 		{
-			game.Year = game.Date.Value.Year;
+			return args[i][(name.Length + 1)..];
 		}
 
-		game.MoveCount = game.Moves.Count;
-		ApplyNormalizedNames(game);
-		game.GameHash = GameHashCalculator.Compute(game);
+		if (string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+		{
+			return args[i + 1];
+		}
 	}
 
-	await positionImportCoordinator.PopulateAsync(games);
-	await gameRepository.AddRangeAsync(games);
-
-	var links = games.Select(g => new UserDatabaseGame
-	{
-		UserDatabaseId = userDatabaseId,
-		GameId = g.Id,
-		AddedAtUtc = addedAtUtc,
-		Date = g.Date,
-		Year = g.Year <= 0 ? null : g.Year,
-		Event = g.Event,
-		Round = g.Round,
-		Site = g.Site
-	}).ToArray();
-
-	await userDatabaseGameRepository.AddRangeAsync(links);
-	await unitOfWork.SaveChangesAsync();
-	unitOfWork.ClearTracker();
-}
-
-static void ApplyNormalizedNames(Game game)
-{
-	static (string? FirstName, string? LastName) ParseNameParts(string fullName)
-	{
-		if (string.IsNullOrWhiteSpace(fullName))
-		{
-			return (null, null);
-		}
-
-		var normalized = fullName.Trim();
-		if (normalized.Contains(','))
-		{
-			var parts = normalized.Split(',', 2, StringSplitOptions.TrimEntries);
-			var last = parts[0];
-			var first = parts.Length > 1 ? parts[1] : null;
-			return (string.IsNullOrWhiteSpace(first) ? null : first, string.IsNullOrWhiteSpace(last) ? null : last);
-		}
-
-		var tokens = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-		if (tokens.Length == 1)
-		{
-			return (tokens[0], null);
-		}
-
-		var firstName = tokens[0];
-		var lastName = tokens[^1];
-		return (firstName, lastName);
-	}
-
-	static string NormalizeName(string raw)
-	{
-		if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
-		var trimmed = raw.Trim();
-		var normalized = trimmed.Normalize(System.Text.NormalizationForm.FormD);
-		var builder = new StringBuilder(normalized.Length);
-
-		foreach (var ch in normalized)
-		{
-			var category = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch);
-			if (category == System.Globalization.UnicodeCategory.NonSpacingMark) continue;
-			var lowered = char.ToLowerInvariant(ch);
-			builder.Append(lowered switch
-			{
-				'ł' => 'l',
-				'đ' => 'd',
-				'ð' => 'd',
-				_ => lowered
-			});
-		}
-
-		var compact = System.Text.RegularExpressions.Regex.Replace(builder.ToString(), "\\s+", " ").Trim();
-		return compact;
-	}
-
-	void Apply(string rawName, out string full, out string? first, out string? last)
-	{
-		var (parsedFirst, parsedLast) = ParseNameParts(rawName);
-		first = parsedFirst is null ? null : NormalizeName(parsedFirst);
-		last = parsedLast is null ? null : NormalizeName(parsedLast);
-
-		if (first is not null && last is not null)
-		{
-			full = NormalizeName($"{parsedFirst} {parsedLast}");
-			return;
-		}
-
-		full = NormalizeName(rawName);
-	}
-
-	Apply(game.White, out var wf, out var w1, out var w2);
-	Apply(game.Black, out var bf, out var b1, out var b2);
-
-	game.WhiteNormalizedFullName = wf;
-	game.WhiteNormalizedFirstName = w1;
-	game.WhiteNormalizedLastName = w2;
-	game.BlackNormalizedFullName = bf;
-	game.BlackNormalizedFirstName = b1;
-	game.BlackNormalizedLastName = b2;
+	return null;
 }
 
 static string? ResolvePgnPath(string[] args)
 {
-	if (args.Length > 0 && !args[0].StartsWith("--", StringComparison.Ordinal))
+	// The path is the first token that is neither a flag nor the value belonging to one,
+	// so "--encoding windows-1250 games.pgn" resolves the same as "games.pgn".
+	for (var i = 0; i < args.Length; i++)
 	{
-		var candidate = Path.GetFullPath(args[0]);
+		if (args[i].StartsWith("--", StringComparison.Ordinal))
+		{
+			// Skip this flag's separate value, if it takes one.
+			if (!args[i].Contains('=', StringComparison.Ordinal)
+				&& string.Equals(args[i], "--encoding", StringComparison.OrdinalIgnoreCase))
+			{
+				i++;
+			}
+
+			continue;
+		}
+
+		var candidate = Path.GetFullPath(args[i]);
 		if (File.Exists(candidate))
 		{
 			return candidate;
 		}
+
+		break;
 	}
 
 	var envPath = Environment.GetEnvironmentVariable("CHESSXIV_PGN_PATH");
