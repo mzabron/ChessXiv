@@ -21,6 +21,27 @@ export class FiltersPanelComponent implements OnChanges {
   protected model: ExplorerGamesFilterState = createDefaultExplorerGamesFilterState();
   protected validationError = '';
 
+
+  /**
+   * The FEN searched for is simply the board's own position. Castling, en-passant and
+   * side-to-move overrides used to be editable here; they are set on the board itself via
+   * Set Position instead, which keeps one place to define a position rather than two that
+   * can disagree.
+   */
+  protected get effectiveFen(): string {
+    return this.boardFen;
+  }
+
+
+
+
+
+
+
+
+
+
+
   ngOnChanges(changes: SimpleChanges): void {
     if (!('value' in changes)) {
       return;
@@ -89,7 +110,7 @@ export class FiltersPanelComponent implements OnChanges {
       blackLastName: model.blackLastName.trim(),
       ecoCode: model.ecoCode.trim(),
       result: model.result.trim(),
-      fen: model.searchByPosition ? this.boardFen.trim() : model.fen.trim(),
+      fen: model.searchByPosition ? this.effectiveFen.trim() : model.fen.trim(),
       eloFrom: this.coerceNullableNumber(model.eloFrom),
       eloTo: this.coerceNullableNumber(model.eloTo),
       yearFrom: this.coerceNullableNumber(model.yearFrom),

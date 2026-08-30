@@ -97,22 +97,18 @@
 
       <fieldset class="filters-grid section-body" [disabled]="!model.searchByPosition">
         <label class="control wide">
-          <span>Search by position on the board</span>
-          <textarea rows="2" [value]="boardFen || 'No active board position yet.'" readonly></textarea>
+          <span>Position searched for</span>
+          <textarea rows="2" [value]="effectiveFen || 'No active board position yet.'" readonly></textarea>
         </label>
 
-        <label class="control wide">
-          <span class="position-mode-title">
-            Position mode
-            <span class="help-icon" tabindex="0" aria-label="Position mode help">?
-              <span class="help-tooltip">Exact matches full FEN including move counters. Same position uses Zobrist key to identify identical positions across different paths, so even with a different move number the position can still be found.</span>
-            </span>
-          </span>
-          <select [(ngModel)]="model.positionMode" (ngModelChange)="onModelChanged()">
-            <option value="exact">Exact</option>
-            <option value="samePosition">Same position (Zobrist)</option>
+        <label class="control wide board-meta">
+          <span class="board-meta-title">Match</span>
+          <select class="ui-select" [(ngModel)]="model.positionMode" (ngModelChange)="onModelChanged()">
+            <option value="samePosition">Same position, regardless of moves</option>
+            <option value="exactPly">Same position, on this move number</option>
           </select>
         </label>
+
       </fieldset>
     </section>
 

@@ -1,4 +1,22 @@
 <div class="databases-container">
+  <div class="scope-tabs" role="tablist" aria-label="Database scope">
+    <button type="button" role="tab" class="scope-tab" [class.active]="scope() === 'all'"
+      [attr.aria-selected]="scope() === 'all'" (click)="selectScope('all')">
+      All
+      <span class="ui-badge">{{ allCount() }}</span>
+    </button>
+    <button type="button" role="tab" class="scope-tab" [class.active]="scope() === 'mine'"
+      [attr.aria-selected]="scope() === 'mine'" (click)="selectScope('mine')">
+      My databases
+      <span class="ui-badge">{{ ownedCount() }}</span>
+    </button>
+    <button type="button" role="tab" class="scope-tab" [class.active]="scope() === 'bookmarks'"
+      [attr.aria-selected]="scope() === 'bookmarks'" (click)="selectScope('bookmarks')">
+      Bookmarks
+      <span class="ui-badge">{{ bookmarkedCount() }}</span>
+    </button>
+  </div>
+
   <div class="toolbar">
     <div class="search-box">
       <input type="text" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)"
@@ -26,6 +44,12 @@
       </div>
       }
     </div>
+    <button type="button" class="create-btn" (click)="onCreateDatabaseClicked()"
+      [attr.aria-label]="isRegisteredUser ? 'Create a new database' : 'Sign in to create a database'"
+      [title]="isRegisteredUser ? 'Create a new database' : 'Sign in to create a database'">
+      <span class="material-symbols-outlined" aria-hidden="true">add</span>
+      {{ isRegisteredUser ? 'New database' : 'Sign in to create' }}
+    </button>
     <button type="button" class="refresh-btn" [class.is-refreshing]="isRefreshing()" (click)="requestRefresh()"
       aria-label="Refresh databases" title="Refresh databases">
       <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
@@ -38,21 +62,36 @@
       <div class="db-header">
         <h3 class="db-name">{{ db.name }}</h3>
         <div class="db-actions">
-          <span class="db-games-count">{{ db.gamesCount }} games</span>
-          @if (db.owner === currentUser) {
-          <button type="button" class="settings-btn" (click)="$event.stopPropagation(); openSettings(db)"
+          @if (!db.isOwner) {
+          <button type="button" class="ui-btn ui-btn--ghost ui-btn--icon ui-btn--sm"
+            [class.is-bookmarked]="db.isBookmarked"
+            [attr.aria-pressed]="db.isBookmarked"
+            [attr.aria-label]="db.isBookmarked ? 'Remove bookmark' : 'Bookmark this database'"
+            [title]="db.isBookmarked ? 'Remove bookmark' : 'Bookmark this database'"
+            (click)="onToggleBookmark(db, $event)">
+            <span class="material-symbols-outlined" aria-hidden="true">
+              {{ db.isBookmarked ? 'bookmark_added' : 'bookmark_add' }}
+            </span>
+          </button>
+          }
+          @if (db.isOwner) {
+          <button type="button" class="ui-btn ui-btn--ghost ui-btn--icon ui-btn--sm"
+            (click)="$event.stopPropagation(); openSettings(db)"
             aria-label="Open database settings" title="Database settings">
-            <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+            <span class="material-symbols-outlined" aria-hidden="true">settings</span>
           </button>
           }
         </div>
       </div>
       <div class="db-meta">
-        <span class="db-owner"><i class="icon-user"></i> {{ db.owner }}</span>
-        <span class="db-date"><i class="icon-calendar"></i> {{ db.creationDate | date:'mediumDate' }}</span>
-        @if (db.owner === currentUser) {
+        <span class="db-owner">{{ db.owner }}</span>
+        <span class="db-games-count">{{ db.gamesCount | number }} games</span>
+        <span class="db-date" [title]="'Games last changed ' + (db.contentUpdatedDate | date:'medium')">
+          Updated {{ db.contentUpdatedDate | date:'mediumDate' }}
+        </span>
+        @if (db.isOwner) {
         <span class="db-visibility" [class.is-public]="db.isPublic">
-          <span class="material-symbols-outlined" aria-hidden="true">{{ db.isPublic ? 'visibility' : 'lock' }}</span>
+          <span class="material-symbols-outlined" aria-hidden="true">{{ db.isPublic ? 'public' : 'lock' }}</span>
           {{ db.isPublic ? 'Public' : 'Private' }}
         </span>
         }
@@ -60,7 +99,18 @@
     </div>
     } @empty {
     <div class="empty-state">
-      <p>No databases found matching your search.</p>
+      @if (searchQuery().trim()) {
+      <p>No databases match your search.</p>
+      } @else if (scope() === 'bookmarks') {
+      <p>No bookmarks yet.</p>
+      <p class="empty-hint">Find a database under All and bookmark it to keep it here.</p>
+      } @else if (scope() === 'all') {
+      <p>No databases available yet.</p>
+      <p class="empty-hint">Public databases shared by any user show up here.</p>
+      } @else {
+      <p>You haven't created any databases yet.</p>
+      <p class="empty-hint">Create one here, or save an imported PGN from the Games tab.</p>
+      }
     </div>
     }
   </div>
@@ -93,6 +143,40 @@
       <button type="button" class="settings-btn-secondary" (click)="closeSettings()">Cancel</button>
       <button type="button" class="settings-btn-primary" (click)="confirmSettings()">Save</button>
       <button type="button" class="settings-btn-danger" (click)="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+}
+
+@if (isCreateOpen()) {
+<div class="settings-overlay" (click)="closeCreateDatabase()">
+  <div class="settings-card" role="dialog" aria-modal="true" aria-label="Create a new database"
+    (click)="$event.stopPropagation()">
+    <div class="settings-header">
+      <h3>New database</h3>
+      <p>Creates an empty database you can add games to later.</p>
+    </div>
+    <div class="settings-body">
+      <label class="settings-label">
+        Name
+        <input type="text" class="settings-input" [ngModel]="createName()"
+          (ngModelChange)="createName.set($event)" placeholder="e.g. My openings" />
+      </label>
+      <label class="settings-label">
+        Visibility
+        <select class="settings-select" [ngModel]="createVisibility()"
+          (ngModelChange)="createVisibility.set($event)">
+          <option value="private">Private</option>
+          <option value="public">Public</option>
+        </select>
+      </label>
+      @if (createError()) {
+      <p class="settings-error" role="alert">{{ createError() }}</p>
+      }
+    </div>
+    <div class="settings-actions">
+      <button type="button" class="settings-btn-secondary" (click)="closeCreateDatabase()">Cancel</button>
+      <button type="button" class="settings-btn-primary" (click)="confirmCreateDatabase()">Create</button>
     </div>
   </div>
 </div>
