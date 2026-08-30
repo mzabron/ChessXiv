@@ -3,11 +3,12 @@ import { Component, EventEmitter, Input, OnInit, Output, inject, signal } from '
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { AuthStateService } from '../../../core/auth/auth-state.service';
+import { ModalBehaviorDirective } from '../../directives/modal-behavior.directive';
 
 @Component({
   selector: 'app-login-modal',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, ModalBehaviorDirective],
   templateUrl: './login-modal.html',
   styleUrl: './login-modal.scss',
 })

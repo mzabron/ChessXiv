@@ -23,21 +23,15 @@
   bottom: 10px;
   width: 42px;
   height: 42px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: #ffffff;
-  color: #374151;
+  background: var(--surface);
+  color: var(--text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.16);
+  box-shadow: var(--shadow-md);
   z-index: 40;
-}
-
-:host-context(body.dark-theme) .mobile-sidebar-toggle {
-  background: #111827;
-  border-color: #374151;
-  color: #e5e7eb;
 }
 
 .confirm-email-view {
@@ -45,46 +39,44 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  background: radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.18), transparent 45%), #f8fafc;
+  padding: var(--space-5);
+  background:
+    radial-gradient(circle at 10% 10%, var(--accent-soft), transparent 45%),
+    var(--bg);
 }
 
 .confirm-email-card {
   max-width: 460px;
   width: 100%;
-  border-radius: 16px;
-  padding: 28px;
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
 
   h1 {
-    margin: 0 0 10px;
-    font-size: 24px;
+    margin: 0 0 var(--space-2);
+    font: 700 1.5rem / 1.25 var(--font-display);
+    color: var(--text);
   }
 
   p {
     margin: 0;
-    color: #475569;
+    color: var(--text-muted);
     line-height: 1.45;
   }
 
+  /* The status border is the only signal here, so it uses the full-strength semantic
+     colour rather than the soft variant. */
   &.success {
-    border-color: #86efac;
+    border-color: var(--success);
   }
 
   &.error {
-    border-color: #fecaca;
+    border-color: var(--danger);
   }
 }
 
 .confirm-action {
-  margin-top: 18px;
-  padding: 10px 14px;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  background: #2563eb;
-  color: #ffffff;
-  font-weight: 600;
+  margin-top: var(--space-4);
 }

@@ -1,0 +1,140 @@
+/**
+ * Design tokens for the whole application.
+ *
+ * These used to live on the explorer page's :host, which meant the sidebar, the modals and
+ * every shared component simply could not see them - so they each hardcoded their own hex
+ * values, and the dark theme only ever half-worked. Defining them on :root instead makes
+ * one palette authoritative everywhere, including inside component styles.
+ *
+ * Naming is by role, not by appearance: `--surface-raised`, not `--cream`. A role survives
+ * a theme switch; a colour name does not.
+ */
+
+:root {
+  /* Surfaces, from furthest back to closest to the reader. */
+  --bg: #f5f0e5;
+  --surface: #fffdf7;
+  --surface-raised: #f7f1e6;
+  --surface-sunken: #efe7d8;
+
+  /* Text, in descending prominence. */
+  --text: #2b2118;
+  --text-muted: #6f604e;
+  --text-subtle: #8a7a66;
+  --text-on-accent: #ffffff;
+
+  /* Lines and separators. */
+  --line: #d8ccba;
+  --line-strong: #c3b39c;
+
+  /* The single accent, plus the states derived from it. */
+  --accent: #2e6f56;
+  --accent-strong: #215040;
+  --accent-soft: rgb(46 111 86 / 12%);
+  --accent-ring: rgb(46 111 86 / 35%);
+
+  /* Semantic feedback. */
+  --danger: #b3261e;
+  --danger-soft: rgb(179 38 30 / 10%);
+  --success: #2e6f56;
+  --warning: #8a6d1f;
+
+  /* Board squares - not surfaces, they follow their own logic. */
+  --square-light: #e2d5bf;
+  --square-dark: #806245;
+
+  /* Win/draw/loss bar (opening tree). Deliberately literal white/gray/black rather than
+     theme tokens: it represents chess results (white win / draw / black win), not UI
+     chrome, so it must read the same in both themes. */
+  --winbar-white: #ffffff;
+  --winbar-draw: #9a9184;
+  --winbar-black: #2a2620;
+
+  /* Hairline around the bar. Neutral on purpose: the warm --line-strong read as a brown
+     rim around the dark end of the bar rather than as part of it. */
+  --winbar-edge: rgb(0 0 0 / 26%);
+
+  /* Backdrop for the Set Position piece tray. Kept separate from --square-light because
+     the tray is chrome, not board: it needs to stay warm-neutral in both themes so the
+     black piece artwork reads against it. */
+  --piece-tray: #e6dcc8;
+
+  /* Elevation. Three steps is enough; more just looks noisy. */
+  --shadow-sm: 0 1px 2px rgb(43 33 24 / 6%);
+  --shadow-md: 0 6px 16px rgb(43 33 24 / 8%);
+  --shadow-lg: 0 20px 40px rgb(43 33 24 / 14%);
+
+  /* Shape. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* Type. */
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 0.9rem;
+  --text-lg: 1rem;
+
+  /* Spacing, on a 4px grid. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+
+  /* Controls. One height for every input, button and select that sits in a row together. */
+  --control-height: 2.25rem;
+  --control-height-sm: 1.85rem;
+
+  --transition: 0.18s ease;
+}
+
+body.dark-theme {
+  --bg: #17181c;
+  --surface: #202127;
+  --surface-raised: #282a31;
+  --surface-sunken: #1a1b20;
+
+  /* Deliberately higher contrast than before: the old dark palette used #858585 for muted
+     text and a mid-blue accent, both of which sat below a comfortable contrast ratio. */
+  --text: #e8e6e3;
+  --text-muted: #a9a49c;
+  --text-subtle: #8b867e;
+  --text-on-accent: #10221b;
+
+  --line: #383a42;
+  --line-strong: #4a4d57;
+
+  /* A desaturated green rather than the old blue: it keeps the light theme's identity and
+     reads far better against a warm-neutral dark surface than #3b82f6 did. */
+  --accent: #6fc79b;
+  --accent-strong: #8fd9b3;
+  --accent-soft: rgb(111 199 155 / 14%);
+  --accent-ring: rgb(111 199 155 / 40%);
+
+  --danger: #f2837b;
+  --danger-soft: rgb(242 131 123 / 14%);
+  --success: #6fc79b;
+  --warning: #d9b45f;
+
+  --square-light: #8ca2ad;
+  --square-dark: #55697a;
+
+  /* The win/draw/loss bar keeps its identity here - lightest band is white wins, darkest
+     is black wins - but the darkest band has to be lifted off #2a2620, which is close
+     enough to the dark row behind it that the band and its legend swatch both read as
+     empty. It stays clearly the darkest of the three. */
+  --winbar-black: #4d463b;
+  --winbar-edge: rgb(255 255 255 / 30%);
+
+  /* Slightly muted, still light enough for black pieces to show. Following --square-light
+     here made the tray blue, which clashed with the warm palette everywhere else. */
+  --piece-tray: #cdc3b2;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
+  --shadow-md: 0 6px 16px rgb(0 0 0 / 38%);
+  --shadow-lg: 0 20px 40px rgb(0 0 0 / 48%);
+}

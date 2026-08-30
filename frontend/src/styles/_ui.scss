@@ -1,0 +1,332 @@
+/**
+ * Shared UI primitives.
+ *
+ * Angular's default view encapsulation scopes component styles, so these live in the global
+ * stylesheet to be usable from any template. They exist because the same button, input and
+ * card were previously redefined in eight component stylesheets with slightly different
+ * padding, radius and colour each time - which is exactly why Set Position ended up with
+ * three different button colours side by side.
+ *
+ * Rule of thumb: if a control appears in more than one component, it belongs here.
+ */
+
+/* ---------- Buttons ---------- */
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: 600 var(--text-sm) / 1 var(--font-display);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+
+  &:hover:not(:disabled) {
+    background: var(--surface-raised);
+    border-color: var(--line-strong);
+  }
+
+  /* One focus treatment for every control in the app. */
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-ring);
+    border-color: var(--accent);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.ui-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+
+  &:hover:not(:disabled) {
+    background: var(--accent-strong);
+    border-color: var(--accent-strong);
+  }
+}
+
+.ui-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+
+  &:hover:not(:disabled) {
+    background: var(--surface-raised);
+    color: var(--text);
+  }
+}
+
+.ui-btn--danger {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--danger);
+
+  &:hover:not(:disabled) {
+    background: var(--danger-soft);
+    border-color: var(--danger);
+  }
+}
+
+.ui-btn--sm {
+  height: var(--control-height-sm);
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+/** Square icon-only button. */
+.ui-btn--icon {
+  width: var(--control-height);
+  padding: 0;
+
+  &.ui-btn--sm {
+    width: var(--control-height-sm);
+  }
+
+  .material-symbols-outlined {
+    font-size: 1.15rem;
+  }
+}
+
+/* ---------- Toggle chips ---------- */
+
+/**
+ * A pressed-state chip, for toggles that are not checkboxes - castling rights, side to move.
+ * Uses aria-pressed rather than a class so the state is exposed to assistive tech too.
+ */
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  height: var(--control-height-sm);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font: 600 var(--text-xs) / 1 var(--font-display);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+
+  &:hover:not(:disabled) {
+    border-color: var(--line-strong);
+    color: var(--text);
+  }
+
+  &[aria-pressed='true'] {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-ring);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+/* ---------- Form controls ---------- */
+
+.ui-input,
+.ui-select,
+.ui-textarea {
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: 500 var(--text-base) / 1.3 var(--font-sans);
+  transition: border-color var(--transition), box-shadow var(--transition);
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-ring);
+  }
+
+  &::placeholder {
+    color: var(--text-subtle);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.ui-textarea {
+  padding: var(--space-2);
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.ui-select {
+  cursor: pointer;
+}
+
+/** Checkbox / radio with its label, aligned on one baseline. */
+.ui-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text);
+  font: 500 var(--text-sm) / 1 var(--font-sans);
+  cursor: pointer;
+  user-select: none;
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  &:has(input:disabled) {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.ui-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--text-muted);
+  font: 600 var(--text-xs) / 1.2 var(--font-sans);
+}
+
+.ui-hint {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font: 500 var(--text-xs) / 1.4 var(--font-sans);
+}
+
+.ui-error {
+  margin: var(--space-1) 0 0;
+  color: var(--danger);
+  font: 600 var(--text-xs) / 1.4 var(--font-sans);
+}
+
+/* ---------- Surfaces ---------- */
+
+.ui-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.ui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgb(20 15 10 / 45%);
+  z-index: 1200;
+}
+
+.ui-modal {
+  width: min(440px, 100%);
+  max-height: min(85vh, 720px);
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ui-modal-title {
+  margin: 0;
+  font: 700 var(--text-lg) / 1.25 var(--font-display);
+  color: var(--text);
+}
+
+.ui-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+/** Small count/status pill, e.g. "5 916 games". */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.15rem var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font: 600 var(--text-xs) / 1.5 var(--font-sans);
+  white-space: nowrap;
+}
+
+.ui-badge--accent {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+/* ---------- Utility ---------- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Motion ---------- */
+
+/**
+ * Respect the OS-level "reduce motion" setting. Spinners still need to convey that work is
+ * happening, so they are slowed to a near-static pulse rather than stopped outright.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Indefinite progress indicators are the one exception: without any motion they read as
+     a frozen UI. Slowed right down instead. */
+  .loading-spinner,
+  .is-refreshing .material-symbols-outlined {
+    animation-duration: 2s !important;
+    animation-iteration-count: infinite !important;
+  }
+}

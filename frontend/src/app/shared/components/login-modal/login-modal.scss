@@ -1,31 +1,11 @@
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  animation: fadeIn 0.3s ease-out;
-}
-
-.modal-container {
+/* Panel, backdrop and buttons come from the shared .ui-modal / .ui-btn primitives; only
+   this dialog's own layout stays here. The local --modal-bg / --text-color custom
+   properties that used to drive it had dark-theme values pointing at surface colours,
+   which is why text lost contrast when the theme switched. */
+.login-modal {
   position: relative;
-  width: 100%;
-  max-width: 430px;
-  background: var(--modal-bg, rgba(255, 255, 255, 0.85));
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--modal-border, rgba(255, 255, 255, 0.3));
-  border-radius: 20px;
-  padding: 30px 28px 28px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  width: min(430px, 100%);
+  gap: var(--space-3);
 }
 
 .close-btn {
@@ -35,17 +15,22 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  color: var(--text-muted, #6b7280);
-  border-radius: 50%;
-  padding: 8px;
+  color: var(--text-muted);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: background var(--transition), color var(--transition);
 
   &:hover {
-    background: var(--hover-bg, rgba(0, 0, 0, 0.05));
-    color: var(--text-color, #111827);
+    background: var(--surface-raised);
+    color: var(--text);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-ring);
   }
 }
 
@@ -62,12 +47,12 @@
   margin-bottom: 16px;
 }
 
-.modal-container.has-close-button .mode-switch {
+.login-modal.has-close-button .mode-switch {
   padding-right: 44px;
 }
 
 .mode-btn {
-  border: 1px solid var(--input-border, #d1d5db);
+  border: 1px solid var(--line);
   background: transparent;
   border-radius: 10px;
   font-size: 13px;
@@ -75,9 +60,9 @@
   padding: 8px 10px;
 
   &.active {
-    background: #111827;
-    color: #ffffff;
-    border-color: #111827;
+    background: var(--text);
+    color: var(--surface);
+    border-color: var(--text);
   }
 }
 
@@ -89,18 +74,18 @@
 
   &.error {
     background: rgba(220, 38, 38, 0.1);
-    color: #991b1b;
+    color: var(--danger);
     border: 1px solid rgba(220, 38, 38, 0.25);
   }
 
   &.info {
     background: rgba(37, 99, 235, 0.1);
-    color: #1d4ed8;
+    color: var(--accent);
     border: 1px solid rgba(37, 99, 235, 0.25);
   }
 }
 
-.modal-container.has-close-button .feedback {
+.login-modal.has-close-button .feedback {
   max-width: calc(100% - 44px);
   margin-right: 44px;
 }
@@ -119,23 +104,23 @@
   label {
     font-size: 14px;
     font-weight: 500;
-    color: var(--text-color, #374151);
+    color: var(--text);
   }
 
   input {
     padding: 12px 16px;
     border-radius: 12px;
-    border: 1px solid var(--input-border, #d1d5db);
-    background: var(--input-bg, rgba(255, 255, 255, 0.5));
+    border: 1px solid var(--line);
+    background: var(--bg);
     font-size: 15px;
-    color: var(--text-color, #111827);
+    color: var(--text);
     outline: none;
     transition: all 0.2s ease;
 
     &:focus {
-      border-color: #3b82f6;
+      border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-      background: var(--input-focus-bg, #ffffff);
+      background: var(--surface);
     }
   }
 }
@@ -155,38 +140,19 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.btn-primary {
+.login-submit {
   width: 100%;
-  border: none;
-  padding: 13px 14px;
-  border-radius: 12px;
-  background: #2563eb;
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 700;
-  margin-top: 4px;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
-
-  &:hover {
-    background: #1d4ed8;
-    transform: translateY(-1px);
-    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.3);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
+  margin-top: var(--space-1);
 }
 
 .field-error {
-  color: #b91c1c;
+  color: var(--danger);
   font-size: 12px;
   margin-top: -2px;
 }
 
 .field-hint {
-  color: var(--text-muted, #6b7280);
+  color: var(--text-muted);
   font-size: 12px;
   margin-top: -2px;
 }
@@ -197,7 +163,7 @@ button:disabled {
   align-self: flex-start;
   padding: 0;
   margin: -2px 0 2px;
-  color: #3359b8;
+  color: var(--accent);
   font-size: 13px;
   text-decoration: underline;
   cursor: pointer;
@@ -215,12 +181,12 @@ button:disabled {
   h3 {
     margin: 0;
     font-size: 18px;
-    color: var(--text-color, #111827);
+    color: var(--text);
   }
 
   p {
     margin: 0;
-    color: var(--text-muted, #6b7280);
+    color: var(--text-muted);
     font-size: 14px;
     line-height: 1.45;
   }
@@ -238,14 +204,14 @@ button:disabled {
   margin: 0;
   font-size: 13px;
   font-weight: 700;
-  color: var(--text-color, #111827);
+  color: var(--text);
 }
 
 .verify-email-help-card {
   margin-top: 6px;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid var(--input-border, #d1d5db);
+  border: 1px solid var(--line);
   background: rgba(37, 99, 235, 0.06);
 }
 
@@ -254,7 +220,7 @@ button:disabled {
   border: none;
   padding: 0;
   margin-left: 6px;
-  color: #3359b8;
+  color: var(--accent);
   font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
@@ -263,7 +229,7 @@ button:disabled {
 .verify-email-change-form {
   margin-top: 2px;
   padding-top: 10px;
-  border-top: 1px dashed var(--input-border, #d1d5db);
+  border-top: 1px dashed var(--line);
 }
 
 .btn-text {
@@ -271,7 +237,7 @@ button:disabled {
   padding: 0;
   border: none;
   background: none;
-  color: var(--text-muted, #6b7280);
+  color: var(--text-muted);
   font-size: 13px;
   text-decoration: underline;
   cursor: pointer;
@@ -279,11 +245,11 @@ button:disabled {
 
 .btn-secondary {
   background: transparent;
-  color: #111827;
-  border: 1px solid #d1d5db !important;
+  color: var(--text);
+  border: 1px solid var(--line) !important;
 
   &:hover {
-    background: var(--hover-bg, rgba(0, 0, 0, 0.03));
+    background: var(--surface-raised);
   }
 }
 
@@ -297,12 +263,12 @@ button:disabled {
   &::after {
     content: '';
     flex: 1;
-    border-bottom: 1px solid var(--input-border, #e5e7eb);
+    border-bottom: 1px solid var(--line);
   }
 
   span {
     padding: 0 10px;
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted);
     font-size: 13px;
     font-weight: 500;
   }
@@ -325,70 +291,9 @@ button:disabled {
 }
 
 // Dark theme support
-:host-context(body.dark-theme) {
-  .modal-overlay {
-    background: rgba(0, 0, 0, 0.6);
-  }
-  
-  --modal-bg: rgba(31, 41, 55, 0.85);
-  --modal-border: rgba(255, 255, 255, 0.1);
-  --text-color: #f9fafb;
-  --text-muted: #9ca3af;
-  --input-bg: rgba(17, 24, 39, 0.5);
-  --input-focus-bg: #111827;
-  --input-border: #4b5563;
-  --hover-bg: rgba(255, 255, 255, 0.1);
-
-  .btn-primary {
-    background: #2563eb;
-    color: #ffffff;
-    
-    &:hover {
-      background: #2563eb;
-    }
-  }
-
-  .field-error {
-    color: #fca5a5;
-  }
-
-  .btn-secondary {
-    color: #f9fafb;
-    border-color: #4b5563 !important;
-  }
-
-  .mode-btn.active {
-    background: #3b82f6;
-    border-color: #3b82f6;
-  }
-
-  .feedback.error {
-    color: #fecaca;
-    border-color: rgba(248, 113, 113, 0.35);
-  }
-
-  .feedback.info {
-    color: #bfdbfe;
-    border-color: rgba(96, 165, 250, 0.35);
-  }
-
-  .forgot-link {
-    color: #93c5fd;
-
-    &:hover {
-      color: #dbeafe;
-    }
-  }
-
-  .inline-action {
-    color: #93c5fd;
-
-    &:hover {
-      color: #dbeafe;
-    }
-  }
-
-  .verify-email-help-card {
-    background: rgba(96, 165, 250, 0.12);
-  }
-}
+/*
+ * No dark-theme block. Every colour above resolves from the global tokens, which the theme
+ * already swaps. The old block set --text-color to a *surface* colour and defined
+ * --text-muted in terms of itself, so body text and hints were close to invisible in dark
+ * mode - the exact symptom being fixed here.
+ */

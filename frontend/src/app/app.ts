@@ -100,6 +100,10 @@ export class App implements OnInit {
     this.isLoginModalOpen = !this.isLoginModalOpen;
   }
 
+  openLoginModal() {
+    this.isLoginModalOpen = true;
+  }
+
   toggleFocusMode() {
     this.isFocusMode = !this.isFocusMode;
   }

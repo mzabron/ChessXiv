@@ -209,9 +209,11 @@ export class Sidebar {
   }
 
   protected formatQuota(used: number, limit: number): string {
-    const usedText = used.toLocaleString();
-    const limitText = limit === 2147483647 ? 'unlimited' : limit.toLocaleString();
-    return `${usedText}/${limitText}`;
+    return `${used.toLocaleString()} / ${limit.toLocaleString()}`;
+  }
+
+  protected formatUploadLimit(maxUploadBytes: number): string {
+    return `${Math.round(maxUploadBytes / (1024 * 1024))} MB`;
   }
 
   private loadSummary(): void {

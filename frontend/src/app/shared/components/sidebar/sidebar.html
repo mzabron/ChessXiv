@@ -37,6 +37,16 @@
           } @else if (accountSummary(); as summary) {
             <div class="menu-profile">
               <p class="menu-nickname">{{ summary.nickname || userName }}</p>
+              <dl class="menu-limits">
+                <div>
+                  <dt>Saved games</dt>
+                  <dd>{{ formatQuota(summary.savedGamesUsed, summary.savedGamesLimit) }}</dd>
+                </div>
+                <div>
+                  <dt>Max upload</dt>
+                  <dd>{{ formatUploadLimit(summary.maxUploadBytes) }}</dd>
+                </div>
+              </dl>
             </div>
           }
 

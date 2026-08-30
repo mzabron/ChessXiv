@@ -2,9 +2,9 @@
   display: block;
   height: 100vh;
   width: 64px;
-  background-color: var(--sidebar-bg, var(--panel, #fbf8f1));
-  border-left: 1px solid var(--sidebar-border, #e5e7eb);
-  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.05);
+  background-color: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: -4px 0 15px rgb(0 0 0 / 5%);
   transition: background-color 0.3s ease, border-color 0.3s ease;
   z-index: 10;
 }
@@ -30,15 +30,15 @@
   cursor: pointer;
   padding: 10px;
   border-radius: 12px;
-  color: var(--icon-color, #4b5563);
+  color: var(--text-muted);
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
 
   &:hover {
-    background-color: var(--icon-hover-bg, #f3f4f6);
-    color: var(--icon-hover-color, #111827);
+    background-color: var(--surface-raised);
+    color: var(--text);
     transform: scale(1.05);
   }
 
@@ -86,22 +86,22 @@
   max-width: 280px;
   padding: 10px;
   border-radius: 10px;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
+  border: 1px solid var(--line);
+  background: var(--surface);
   box-shadow: 0 10px 24px rgba(17, 24, 39, 0.12);
 }
 
 .menu-loading {
   margin: 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .menu-profile {
   padding: 8px;
   border-radius: 8px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
   margin-bottom: 8px;
 }
 
@@ -109,13 +109,13 @@
   margin: 0 0 6px;
   font-size: 13px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text);
 }
 
 .menu-quota {
   margin: 0;
   font-size: 12px;
-  color: #475569;
+  color: var(--text-muted);
 }
 
 .menu-actions,
@@ -128,10 +128,10 @@
 .menu-btn,
 .signout-btn {
   width: 100%;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--surface);
+  color: var(--text);
   font-size: 13px;
   font-weight: 600;
   padding: 8px 10px;
@@ -139,14 +139,14 @@
   text-align: left;
 
   &:hover {
-    background: #f3f4f6;
+    background: var(--surface-raised);
   }
 }
 
 .menu-btn.primary {
-  background: #111827;
-  color: #ffffff;
-  border-color: #111827;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--text);
 }
 
 .menu-btn.ghost {
@@ -154,16 +154,16 @@
 }
 
 .menu-btn.danger {
-  color: #b91c1c;
+  color: var(--danger);
 }
 
 .menu-form label {
   font-size: 12px;
-  color: #374151;
+  color: var(--text);
 }
 
 .menu-form input {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px;
   font-size: 12px;
@@ -172,13 +172,13 @@
 .menu-warning {
   margin: 0;
   font-size: 12px;
-  color: #b91c1c;
+  color: var(--danger);
 }
 
 .menu-current-email {
   margin: 0;
   font-size: 12px;
-  color: #475569;
+  color: var(--text-muted);
 }
 
 .menu-feedback {
@@ -190,84 +190,41 @@
 
 .menu-feedback.error {
   background: rgba(220, 38, 38, 0.1);
-  color: #991b1b;
+  color: var(--danger);
   border: 1px solid rgba(220, 38, 38, 0.25);
 }
 
 .menu-feedback.info {
   background: rgba(37, 99, 235, 0.1);
-  color: #1d4ed8;
+  color: var(--accent);
   border: 1px solid rgba(37, 99, 235, 0.25);
 }
 
 // Dark theme variables
-:host-context(body.dark-theme) {
-  --sidebar-bg: #1f2937;
-  --sidebar-border: #374151;
-  --icon-color: #9ca3af;
-  --icon-hover-bg: #374151;
-  --icon-hover-color: #f9fafb;
+/* No dark-theme block: every colour above resolves from the global tokens, which the
+   theme already swaps. Re-declaring them here is what let the two drift apart. */
 
-  .user-menu {
-    background: #111827;
-    border-color: #374151;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+.menu-limits {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.4rem 0 0;
+
+  div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
   }
 
-  .signout-btn {
-    color: #f9fafb;
-    border-color: #374151;
-    background: #111827;
-
-    &:hover {
-      background: #1f2937;
-    }
+  dt {
+    margin: 0;
+    color: var(--text-muted);
+    font: 500 0.72rem/1.2 'IBM Plex Sans', 'Segoe UI', sans-serif;
   }
 
-  .menu-btn {
-    color: #f9fafb;
-    border-color: #374151;
-    background: #111827;
-
-    &:hover {
-      background: #1f2937;
-    }
-  }
-
-  .menu-btn.primary {
-    background: #1d4ed8;
-    border-color: #1d4ed8;
-  }
-
-  .menu-profile {
-    background: #0f172a;
-    border-color: #334155;
-  }
-
-  .menu-nickname {
-    color: #f8fafc;
-  }
-
-  .menu-quota,
-  .menu-loading,
-  .menu-form label,
-  .menu-current-email {
-    color: #cbd5e1;
-  }
-
-  .menu-form input {
-    background: #0f172a;
-    color: #f8fafc;
-    border-color: #334155;
-  }
-
-  .menu-feedback.error {
-    color: #fecaca;
-    border-color: rgba(248, 113, 113, 0.35);
-  }
-
-  .menu-feedback.info {
-    color: #bfdbfe;
-    border-color: rgba(96, 165, 250, 0.35);
+  dd {
+    margin: 0;
+    color: var(--text);
+    font: 600 0.72rem/1.2 'IBM Plex Sans', 'Segoe UI', sans-serif;
   }
 }

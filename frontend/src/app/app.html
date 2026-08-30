@@ -1,6 +1,6 @@
 <main *ngIf="!isResetPasswordView && !isConfirmEmailView && !isConfirmEmailChangeView" class="app-layout">
   <div class="content-area">
-    <app-explorer-page [isFocusMode]="effectiveFocusMode" />
+    <app-explorer-page [isFocusMode]="effectiveFocusMode" (signInRequested)="openLoginModal()" />
   </div>
 
   @if (showMainSidebar) {
@@ -36,7 +36,7 @@
   <div class="confirm-email-card" [class.error]="confirmStatus === 'error'" [class.success]="confirmStatus === 'success'">
     <h1>{{ isConfirmEmailChangeView ? 'Email change confirmation' : 'Email confirmation' }}</h1>
     <p>{{ confirmMessage }}</p>
-    <button *ngIf="confirmStatus !== 'pending'" type="button" class="confirm-action" (click)="openLoginFromConfirmation()">
+    <button *ngIf="confirmStatus !== 'pending'" type="button" class="ui-btn ui-btn--primary confirm-action" (click)="openLoginFromConfirmation()">
       {{ isConfirmEmailChangeView ? 'Go to app' : 'Go to sign in' }}
     </button>
   </div>

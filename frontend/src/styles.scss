@@ -1,3 +1,6 @@
+@use 'styles/tokens';
+@use 'styles/ui';
+
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 * {
@@ -12,7 +15,9 @@ body {
 }
 
 body {
-	font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+	font-family: var(--font-sans);
+	background: var(--bg);
+	color: var(--text);
 }
 
 .material-symbols-outlined {
