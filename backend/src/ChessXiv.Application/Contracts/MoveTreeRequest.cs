@@ -29,5 +29,5 @@ public class MoveTreeRequest
 
     public bool SearchByPosition { get; set; }
     public string? FilterFen { get; set; }
-    public PositionSearchMode PositionMode { get; set; } = PositionSearchMode.Exact;
+    public PositionSearchMode PositionMode { get; set; } = PositionSearchMode.SamePosition;
 }

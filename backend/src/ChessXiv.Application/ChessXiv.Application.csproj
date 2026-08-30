@@ -4,6 +4,12 @@
     <ProjectReference Include="..\ChessXiv.Domain\ChessXiv.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Legacy single-byte code pages (windows-1250/1252, iso-8859-2, ...). PGN files
+         exported by desktop chess software are very often one of these rather than UTF-8. -->
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.0" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

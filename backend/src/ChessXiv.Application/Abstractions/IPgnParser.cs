@@ -1,8 +1,11 @@
-using ChessXiv.Domain.Entities;
+using ChessXiv.Application.Contracts;
 
 namespace ChessXiv.Application.Abstractions;
 
 public interface IPgnParser
 {
-    IAsyncEnumerable<Game> ParsePgnAsync(TextReader reader, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<ParsedGame> ParsePgnAsync(TextReader reader, CancellationToken cancellationToken = default);
+
+    /// <summary>Parses an in-memory PGN. Used to rebuild a single game for replay.</summary>
+    IReadOnlyCollection<ParsedGame> ParsePgn(string pgn);
 }

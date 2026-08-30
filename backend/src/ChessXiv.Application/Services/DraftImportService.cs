@@ -10,7 +10,7 @@ public sealed class DraftImportService(
     IPgnParser pgnParser,
     IPositionImportCoordinator positionImportCoordinator,
     IDraftImportRepository draftImportRepository,
-    IQuotaService quotaService,
+    IDraftSessionTracker draftSessionTracker,
     IUnitOfWork unitOfWork,
     IDraftImportProgressPublisher? progressPublisher = null) : IDraftImportService
 {
@@ -33,18 +33,11 @@ public sealed class DraftImportService(
         }
 
         var now = DateTime.UtcNow;
-        var maxDraftImportGames = await quotaService.GetMaxDraftImportGamesAsync(ownerUserId, cancellationToken);
-
-        if (maxDraftImportGames <= 0)
-        {
-            return new DraftImportResult(0, 0, 0);
-        }
 
         var parsedCount = 0;
         var importedCount = 0;
         var skippedCount = 0;
-        var batch = new List<StagingGame>(batchSize);
-        var remainingCapacity = maxDraftImportGames;
+        var batch = new List<ParsedGame>(batchSize);
         var progressStopwatch = Stopwatch.StartNew();
         var lastProgressPublishMs = 0L;
 
@@ -53,29 +46,24 @@ public sealed class DraftImportService(
         try
         {
             await draftImportRepository.ClearStagingGamesAsync(ownerUserId, cancellationToken);
+            await draftSessionTracker.TouchAsync(ownerUserId, cancellationToken);
             await PublishProgressAsync(ownerUserId, parsedCount, importedCount, skippedCount, isCompleted: false, isFailed: false, message: "Import started.", cancellationToken);
 
             await foreach (var parsedGame in pgnParser.ParsePgnAsync(reader, cancellationToken))
             {
                 parsedCount++;
-                if (string.IsNullOrWhiteSpace(parsedGame.White) || string.IsNullOrWhiteSpace(parsedGame.Black))
+                if (string.IsNullOrWhiteSpace(parsedGame.Game.White) || string.IsNullOrWhiteSpace(parsedGame.Game.Black))
                 {
                     skippedCount++;
                     continue;
                 }
 
-                if (importedCount >= remainingCapacity)
-                {
-                    throw new InvalidOperationException($"Import exceeds allowed draft quota ({maxDraftImportGames} games). No games were imported.");
-                }
-
-                var stagingGame = MapToStagingGame(parsedGame, ownerUserId, now);
-                batch.Add(stagingGame);
+                batch.Add(parsedGame);
                 importedCount++;
 
                 if (batch.Count >= batchSize)
                 {
-                    await PersistBatchAsync(batch, cancellationToken);
+                    await PersistBatchAsync(batch, ownerUserId, now, cancellationToken);
                     batch.Clear();
                     var forcePublishMs = progressStopwatch.ElapsedMilliseconds;
                     lastProgressPublishMs = forcePublishMs;
@@ -94,7 +82,7 @@ public sealed class DraftImportService(
 
             if (batch.Count > 0)
             {
-                await PersistBatchAsync(batch, cancellationToken);
+                await PersistBatchAsync(batch, ownerUserId, now, cancellationToken);
                 batch.Clear();
             }
 
@@ -136,53 +124,26 @@ public sealed class DraftImportService(
         await progressPublisher.PublishAsync(ownerUserId, update, cancellationToken);
     }
 
-    private async Task PersistBatchAsync(IReadOnlyCollection<StagingGame> stagingGames, CancellationToken cancellationToken)
+    private async Task PersistBatchAsync(
+        IReadOnlyCollection<ParsedGame> parsedGames,
+        string ownerUserId,
+        DateTime createdAtUtc,
+        CancellationToken cancellationToken)
     {
-        var stagingArray = stagingGames as StagingGame[] ?? stagingGames.ToArray();
-        var transientGames = stagingArray.Select(MapToTransientGame).ToArray();
-        await positionImportCoordinator.PopulateAsync(transientGames, cancellationToken);
+        await positionImportCoordinator.PopulateAsync(parsedGames, cancellationToken);
 
-        for (var i = 0; i < stagingArray.Length; i++)
-        {
-            var stagingGame = stagingArray[i];
-            var transientGame = transientGames[i];
+        var stagingGames = parsedGames.Select(parsed => MapToStagingGame(parsed, ownerUserId, createdAtUtc)).ToArray();
 
-            stagingGame.Positions = transientGame.Positions.Select(p => new StagingPosition
-            {
-                Id = Guid.NewGuid(),
-                StagingGameId = stagingGame.Id,
-                Fen = p.Fen,
-                FenHash = p.FenHash,
-                PlyCount = p.PlyCount,
-                LastMove = p.LastMove,
-                SideToMove = p.SideToMove
-            }).ToArray();
-        }
-
-        await draftImportRepository.AddStagingGamesAsync(stagingArray, cancellationToken);
+        await draftImportRepository.AddStagingGamesAsync(stagingGames, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         unitOfWork.ClearTracker();
-
-        foreach (var stagingGame in stagingArray)
-        {
-            stagingGame.Moves = Array.Empty<StagingMove>();
-            stagingGame.Positions = Array.Empty<StagingPosition>();
-        }
-
-        Array.Clear(transientGames, 0, transientGames.Length);
     }
 
-    internal static StagingGame MapToStagingGame(Game game, string ownerUserId, DateTime createdAtUtc)
+    internal static StagingGame MapToStagingGame(ParsedGame parsedGame, string ownerUserId, DateTime createdAtUtc)
     {
-        if (game.Date.HasValue)
-        {
-            game.Year = game.Date.Value.Year;
-        }
+        var game = ParsedGameFinalizer.Finalize(parsedGame);
 
-        game.MoveCount = game.Moves.Count;
-        ApplyNormalizedNames(game);
-
-        return new StagingGame
+        var stagingGame = new StagingGame
         {
             Id = game.Id,
             OwnerUserId = ownerUserId,
@@ -210,67 +171,20 @@ public sealed class DraftImportService(
             Result = game.Result,
             Pgn = game.Pgn,
             MoveCount = game.MoveCount,
-            GameHash = GameHashCalculator.Compute(game),
-            Moves = game.Moves.Select(m => new StagingMove
-            {
-                Id = m.Id,
-                StagingGameId = game.Id,
-                MoveNumber = m.MoveNumber,
-                WhiteMove = m.WhiteMove,
-                BlackMove = m.BlackMove,
-                WhiteClk = m.WhiteClk,
-                BlackClk = m.BlackClk
-            }).ToArray()
+            GameHash = game.GameHash
         };
-    }
 
-    private static void ApplyNormalizedNames(Game game)
-    {
-        ApplyNormalizedName(game.White, out var whiteFull, out var whiteFirst, out var whiteLast);
-        ApplyNormalizedName(game.Black, out var blackFull, out var blackFirst, out var blackLast);
-
-        game.WhiteNormalizedFullName = whiteFull;
-        game.WhiteNormalizedFirstName = whiteFirst;
-        game.WhiteNormalizedLastName = whiteLast;
-        game.BlackNormalizedFullName = blackFull;
-        game.BlackNormalizedFirstName = blackFirst;
-        game.BlackNormalizedLastName = blackLast;
-    }
-
-    private static void ApplyNormalizedName(string rawName, out string full, out string? first, out string? last)
-    {
-        var (parsedFirst, parsedLast) = PlayerNameNormalizer.ParseNameParts(rawName);
-        first = parsedFirst is null ? null : PlayerNameNormalizer.Normalize(parsedFirst);
-        last = parsedLast is null ? null : PlayerNameNormalizer.Normalize(parsedLast);
-
-        if (first is not null && last is not null)
-        {
-            full = PlayerNameNormalizer.Normalize($"{parsedFirst} {parsedLast}");
-            return;
-        }
-
-        full = PlayerNameNormalizer.Normalize(rawName);
-    }
-
-    internal static Game MapToTransientGame(StagingGame stagingGame)
-    {
-        return new Game
-        {
-            Id = stagingGame.Id,
-            White = stagingGame.White,
-            Black = stagingGame.Black,
-            Result = stagingGame.Result,
-            Pgn = stagingGame.Pgn,
-            Moves = stagingGame.Moves.Select(m => new Move
+        stagingGame.Positions = game.Positions
+            .Select(p => new StagingPosition
             {
-                Id = m.Id,
-                GameId = stagingGame.Id,
-                MoveNumber = m.MoveNumber,
-                WhiteMove = m.WhiteMove,
-                BlackMove = m.BlackMove,
-                WhiteClk = m.WhiteClk,
-                BlackClk = m.BlackClk
-            }).ToArray()
-        };
+                StagingGameId = stagingGame.Id,
+                PlyCount = p.PlyCount,
+                PosKey = p.PosKey,
+                NextMove = p.NextMove,
+                Result = p.Result
+            })
+            .ToArray();
+
+        return stagingGame;
     }
 }

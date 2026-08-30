@@ -5,5 +5,4 @@ public sealed record AccountSummaryResponse(
     string Email,
     int SavedGamesUsed,
     int SavedGamesLimit,
-    int ImportedGamesUsed,
-    int ImportedGamesLimit);
+    long MaxUploadBytes);

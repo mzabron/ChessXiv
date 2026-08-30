@@ -5,6 +5,10 @@ using ChessXiv.Domain.Entities;
 
 namespace ChessXiv.Application.Services;
 
+/// <summary>
+/// The single non-staging import path: parses a PGN straight into a user's database.
+/// Used by the web upload and by the CLI importer.
+/// </summary>
 public sealed class DirectDatabaseImportService(
     IPgnParser pgnParser,
     IPositionImportCoordinator positionImportCoordinator,
@@ -18,6 +22,7 @@ public sealed class DirectDatabaseImportService(
         string ownerUserId,
         Guid userDatabaseId,
         int batchSize = 500,
+        IProgress<ImportProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(reader);
@@ -46,109 +51,82 @@ public sealed class DirectDatabaseImportService(
         var parsedCount = 0;
         var importedCount = 0;
         var skippedCount = 0;
-        var batch = new List<Game>(batchSize);
+        var batch = new List<ParsedGame>(batchSize);
+
+        // Each batch commits on its own. A single transaction spanning a 100 MB PGN would
+        // hold locks and block autovacuum for minutes, and lose the whole import on any
+        // failure; per-batch commits keep the transaction short and the progress durable.
+        await foreach (var parsedGame in pgnParser.ParsePgnAsync(reader, cancellationToken))
+        {
+            parsedCount++;
+            if (string.IsNullOrWhiteSpace(parsedGame.Game.White) || string.IsNullOrWhiteSpace(parsedGame.Game.Black))
+            {
+                skippedCount++;
+                continue;
+            }
+
+            batch.Add(parsedGame);
+            importedCount++;
+
+            if (batch.Count >= batchSize)
+            {
+                await PersistBatchAsync(batch, userDatabaseId, cancellationToken);
+                batch.Clear();
+                progress?.Report(new ImportProgress(parsedCount, importedCount, skippedCount));
+            }
+        }
+
+        if (batch.Count > 0)
+        {
+            await PersistBatchAsync(batch, userDatabaseId, cancellationToken);
+            progress?.Report(new ImportProgress(parsedCount, importedCount, skippedCount));
+        }
+
+        await draftPromotionRepository.SyncGameCountAsync(userDatabaseId, cancellationToken);
+
+        return new DraftImportResult(parsedCount, importedCount, skippedCount);
+    }
+
+    private async Task PersistBatchAsync(
+        IReadOnlyCollection<ParsedGame> parsedGames,
+        Guid userDatabaseId,
+        CancellationToken cancellationToken)
+    {
+        var addedAtUtc = DateTime.UtcNow;
+        var games = parsedGames.Select(ParsedGameFinalizer.Finalize).ToArray();
+
+        await positionImportCoordinator.PopulateAsync(parsedGames, cancellationToken);
 
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
 
         try
         {
-            await foreach (var game in pgnParser.ParsePgnAsync(reader, cancellationToken))
+            await gameRepository.AddRangeAsync(games, cancellationToken);
+
+            var links = games.Select(g => new UserDatabaseGame
             {
-                parsedCount++;
-                if (string.IsNullOrWhiteSpace(game.White) || string.IsNullOrWhiteSpace(game.Black))
-                {
-                    skippedCount++;
-                    continue;
-                }
+                UserDatabaseId = userDatabaseId,
+                GameId = g.Id,
+                AddedAtUtc = addedAtUtc,
+                Date = g.Date,
+                Year = g.Year <= 0 ? null : g.Year,
+                Event = g.Event,
+                Round = g.Round,
+                Site = g.Site
+            }).ToArray();
 
-                batch.Add(game);
-                importedCount++;
-
-                if (batch.Count >= batchSize)
-                {
-                    await PersistBatchAsync(batch, userDatabaseId, cancellationToken);
-                    batch.Clear();
-                }
-            }
-
-            if (batch.Count > 0)
-            {
-                await PersistBatchAsync(batch, userDatabaseId, cancellationToken);
-                batch.Clear();
-            }
-
+            await userDatabaseGameRepository.AddRangeAsync(links, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-
-            return new DraftImportResult(parsedCount, importedCount, skippedCount);
         }
         catch
         {
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
-    }
-
-    private async Task PersistBatchAsync(IReadOnlyCollection<Game> games, Guid userDatabaseId, CancellationToken cancellationToken)
-    {
-        var addedAtUtc = DateTime.UtcNow;
-
-        foreach (var game in games)
+        finally
         {
-            if (game.Date.HasValue)
-            {
-                game.Year = game.Date.Value.Year;
-            }
-
-            game.MoveCount = game.Moves.Count;
-            ApplyNormalizedNames(game);
-            game.GameHash = GameHashCalculator.Compute(game);
+            unitOfWork.ClearTracker();
         }
-
-        await positionImportCoordinator.PopulateAsync(games, cancellationToken);
-        await gameRepository.AddRangeAsync(games, cancellationToken);
-
-        var links = games.Select(g => new UserDatabaseGame
-        {
-            UserDatabaseId = userDatabaseId,
-            GameId = g.Id,
-            AddedAtUtc = addedAtUtc,
-            Date = g.Date,
-            Year = g.Year <= 0 ? null : g.Year,
-            Event = g.Event,
-            Round = g.Round,
-            Site = g.Site
-        }).ToArray();
-
-        await userDatabaseGameRepository.AddRangeAsync(links, cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        unitOfWork.ClearTracker();
-    }
-
-    private static void ApplyNormalizedNames(Game game)
-    {
-        ApplyNormalizedName(game.White, out var whiteFull, out var whiteFirst, out var whiteLast);
-        ApplyNormalizedName(game.Black, out var blackFull, out var blackFirst, out var blackLast);
-
-        game.WhiteNormalizedFullName = whiteFull;
-        game.WhiteNormalizedFirstName = whiteFirst;
-        game.WhiteNormalizedLastName = whiteLast;
-        game.BlackNormalizedFullName = blackFull;
-        game.BlackNormalizedFirstName = blackFirst;
-        game.BlackNormalizedLastName = blackLast;
-    }
-
-    private static void ApplyNormalizedName(string rawName, out string full, out string? first, out string? last)
-    {
-        var (parsedFirst, parsedLast) = PlayerNameNormalizer.ParseNameParts(rawName);
-        first = parsedFirst is null ? null : PlayerNameNormalizer.Normalize(parsedFirst);
-        last = parsedLast is null ? null : PlayerNameNormalizer.Normalize(parsedLast);
-
-        if (first is not null && last is not null)
-        {
-            full = PlayerNameNormalizer.Normalize($"{parsedFirst} {parsedLast}");
-            return;
-        }
-
-        full = PlayerNameNormalizer.Normalize(rawName);
     }
 }

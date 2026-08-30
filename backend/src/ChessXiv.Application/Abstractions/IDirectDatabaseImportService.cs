@@ -9,5 +9,6 @@ public interface IDirectDatabaseImportService
         string ownerUserId,
         Guid userDatabaseId,
         int batchSize = 500,
+        IProgress<ImportProgress>? progress = null,
         CancellationToken cancellationToken = default);
 }

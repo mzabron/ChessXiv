@@ -9,81 +9,8 @@ namespace ChessXiv.Application.Services;
 public class GameExplorerService(
     IGameExplorerRepository gameExplorerRepository,
     IBoardStateSerializer boardStateSerializer,
-    IPositionHasher positionHasher) : IGameExplorerService
+    IPositionKeyCalculator positionKeyCalculator) : IGameExplorerService
 {
-    public async Task<PagedResult<GameExplorerItemDto>> SearchAsync(
-        GameExplorerSearchRequest request,
-        string? ownerUserId,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        if (request.UserDatabaseId.HasValue && request.UserDatabaseId != Guid.Empty)
-        {
-            var userDatabaseId = request.UserDatabaseId.Value;
-            var accessStatus = await gameExplorerRepository.GetUserDatabaseAccessStatusAsync(
-                userDatabaseId,
-                ownerUserId,
-                cancellationToken);
-
-            if (accessStatus == UserDatabaseAccessStatus.NotFound)
-            {
-                throw new KeyNotFoundException("User database was not found.");
-            }
-
-            if (accessStatus == UserDatabaseAccessStatus.Forbidden)
-            {
-                throw new ForbiddenException("You do not have access to this user database.");
-            }
-        }
-
-        request.Page = request.Page <= 0 ? 1 : request.Page;
-        request.PageSize = request.PageSize <= 0 ? 50 : Math.Min(request.PageSize, 200);
-
-        var normalizedWhiteFirstName = NormalizeOptional(request.WhiteFirstName);
-        var normalizedWhiteLastName = NormalizeOptional(request.WhiteLastName);
-        var normalizedBlackFirstName = NormalizeOptional(request.BlackFirstName);
-        var normalizedBlackLastName = NormalizeOptional(request.BlackLastName);
-
-        var normalizedFen = request.SearchByPosition && !string.IsNullOrWhiteSpace(request.Fen)
-            ? request.Fen.Trim()
-            : null;
-
-        long? fenHash = null;
-        if (request.SearchByPosition
-            && (request.PositionMode == PositionSearchMode.Exact || request.PositionMode == PositionSearchMode.SamePosition)
-            && normalizedFen is not null)
-        {
-            try
-            {
-                var state = boardStateSerializer.FromFen(normalizedFen);
-                fenHash = unchecked((long)positionHasher.Compute(state));
-            }
-            catch (FormatException)
-            {
-                return new PagedResult<GameExplorerItemDto>();
-            }
-        }
-
-        if (request.SearchByPosition
-            && (request.PositionMode == PositionSearchMode.Exact || request.PositionMode == PositionSearchMode.SamePosition)
-            && normalizedFen is null)
-        {
-            return new PagedResult<GameExplorerItemDto>();
-        }
-
-        return await gameExplorerRepository.SearchAsync(
-            request,
-            ownerUserId,
-            normalizedWhiteFirstName,
-            normalizedWhiteLastName,
-            normalizedBlackFirstName,
-            normalizedBlackLastName,
-            normalizedFen,
-            fenHash,
-            cancellationToken);
-    }
-
     public async Task<MoveTreeResponse> GetMoveTreeAsync(
         MoveTreeRequest request,
         string? ownerUserId,
@@ -100,9 +27,8 @@ public class GameExplorerService(
             && request.UserDatabaseId.HasValue
             && request.UserDatabaseId != Guid.Empty)
         {
-            var userDatabaseId = request.UserDatabaseId.Value;
             var accessStatus = await gameExplorerRepository.GetUserDatabaseAccessStatusAsync(
-                userDatabaseId,
+                request.UserDatabaseId.Value,
                 ownerUserId,
                 cancellationToken);
 
@@ -117,75 +43,81 @@ public class GameExplorerService(
             }
         }
 
-        var normalizedFen = request.Fen?.Trim();
-        if (string.IsNullOrWhiteSpace(normalizedFen))
+        if (!TryComputePositionKey(request.Fen, out var posKey))
         {
             return new MoveTreeResponse();
         }
 
-        var normalizedWhiteFirstName = NormalizeOptional(request.WhiteFirstName);
-        var normalizedWhiteLastName = NormalizeOptional(request.WhiteLastName);
-        var normalizedBlackFirstName = NormalizeOptional(request.BlackFirstName);
-        var normalizedBlackLastName = NormalizeOptional(request.BlackLastName);
-
-        var normalizedFilterFen = request.SearchByPosition && !string.IsNullOrWhiteSpace(request.FilterFen)
-            ? request.FilterFen.Trim()
-            : null;
-
-        long? filterFenHash = null;
-        if (request.SearchByPosition
-            && (request.PositionMode == PositionSearchMode.Exact || request.PositionMode == PositionSearchMode.SamePosition)
-            && normalizedFilterFen is not null)
+        // The board position is always matched exactly; the mode applies to the optional
+        // secondary "games that also reached position X" filter.
+        PositionSearchTarget? filterTarget = null;
+        if (request.SearchByPosition)
         {
-            try
-            {
-                var filterState = boardStateSerializer.FromFen(normalizedFilterFen);
-                filterFenHash = unchecked((long)positionHasher.Compute(filterState));
-            }
-            catch (FormatException)
+            filterTarget = PositionSearchTarget.Resolve(
+                true,
+                request.FilterFen,
+                boardStateSerializer,
+                positionKeyCalculator);
+
+            if (filterTarget is null)
             {
                 return new MoveTreeResponse();
             }
         }
 
-        if (request.SearchByPosition
-            && (request.PositionMode == PositionSearchMode.Exact || request.PositionMode == PositionSearchMode.SamePosition)
-            && normalizedFilterFen is null)
-        {
-            return new MoveTreeResponse();
-        }
-
         request.MaxMoves = request.MaxMoves <= 0 ? 20 : Math.Min(request.MaxMoves, 100);
-
-        var state = boardStateSerializer.FromFen(normalizedFen);
-        var fenHash = unchecked((long)positionHasher.Compute(state));
 
         var response = await gameExplorerRepository.GetMoveTreeAsync(
             request,
             ownerUserId,
-            normalizedWhiteFirstName,
-            normalizedWhiteLastName,
-            normalizedBlackFirstName,
-            normalizedBlackLastName,
-            normalizedFen,
-            fenHash,
-            normalizedFilterFen,
-            filterFenHash,
+            NormalizeOptional(request.WhiteFirstName),
+            NormalizeOptional(request.WhiteLastName),
+            NormalizeOptional(request.BlackFirstName),
+            NormalizeOptional(request.BlackLastName),
+            posKey!,
+            filterTarget,
             cancellationToken);
 
         foreach (var move in response.Moves)
         {
-            if (move.Games <= 0)
+            // Denominated by games that actually have a result, not by move.Games. Games
+            // whose PGN result is "*" (unfinished, or simply missing from the tags) are
+            // counted in Games but in none of the three buckets, so dividing by Games made
+            // the three percentages sum to less than 100 - which is not a win ratio, and
+            // showed up in the UI as an unexplained gap at the end of the win/draw bar.
+            var decided = move.WhiteWins + move.Draws + move.BlackWins;
+            if (decided <= 0)
             {
                 continue;
             }
 
-            move.WhiteWinPct = Math.Round(move.WhiteWins * 100m / move.Games, 2);
-            move.DrawPct = Math.Round(move.Draws * 100m / move.Games, 2);
-            move.BlackWinPct = Math.Round(move.BlackWins * 100m / move.Games, 2);
+            move.WhiteWinPct = Math.Round(move.WhiteWins * 100m / decided, 2);
+            move.DrawPct = Math.Round(move.Draws * 100m / decided, 2);
+            move.BlackWinPct = Math.Round(move.BlackWins * 100m / decided, 2);
         }
 
         return response;
+    }
+
+    private bool TryComputePositionKey(string? fen, out byte[]? posKey)
+    {
+        posKey = null;
+        var normalized = fen?.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        try
+        {
+            posKey = positionKeyCalculator.Compute(boardStateSerializer.FromFen(normalized));
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     private static string? NormalizeOptional(string? value)

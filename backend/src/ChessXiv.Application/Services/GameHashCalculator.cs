@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using ChessXiv.Domain.Engine.Models;
 using ChessXiv.Domain.Entities;
 
 namespace ChessXiv.Application.Services;
@@ -11,13 +12,14 @@ public static class GameHashCalculator
     private static readonly Regex UciRegex = new("^[a-h][1-8][a-h][1-8][nbrq]?$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex AnnotationRegex = new("[+#?!]", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    public static string Compute(Game game)
+    public static string Compute(Game game, IEnumerable<ParsedMove> moves)
     {
         ArgumentNullException.ThrowIfNull(game);
+        ArgumentNullException.ThrowIfNull(moves);
 
         var normalizedWhite = NormalizePlayerNameForHash(game.White);
         var normalizedBlack = NormalizePlayerNameForHash(game.Black);
-        var normalizedMoves = NormalizeMoves(game.Moves);
+        var normalizedMoves = NormalizeMoves(moves);
 
         var payload = $"{normalizedWhite}|{normalizedBlack}|{normalizedMoves}";
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
@@ -36,7 +38,7 @@ public static class GameHashCalculator
         return PlayerNameNormalizer.Normalize(rawName);
     }
 
-    private static string NormalizeMoves(IEnumerable<Move> moves)
+    private static string NormalizeMoves(IEnumerable<ParsedMove> moves)
     {
         var ordered = moves.OrderBy(m => m.MoveNumber).ToArray();
         var parts = new List<string>(ordered.Length * 2);

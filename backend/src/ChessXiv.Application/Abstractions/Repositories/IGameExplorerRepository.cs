@@ -1,4 +1,5 @@
 using ChessXiv.Application.Contracts;
+using ChessXiv.Application.Services;
 
 namespace ChessXiv.Application.Abstractions.Repositories;
 
@@ -9,17 +10,6 @@ public interface IGameExplorerRepository
         string? ownerUserId,
         CancellationToken cancellationToken = default);
 
-    Task<PagedResult<GameExplorerItemDto>> SearchAsync(
-        GameExplorerSearchRequest request,
-        string? ownerUserId,
-        string? normalizedWhiteFirstName,
-        string? normalizedWhiteLastName,
-        string? normalizedBlackFirstName,
-        string? normalizedBlackLastName,
-        string? normalizedFen,
-        long? fenHash,
-        CancellationToken cancellationToken = default);
-
     Task<MoveTreeResponse> GetMoveTreeAsync(
         MoveTreeRequest request,
         string? ownerUserId,
@@ -27,9 +17,7 @@ public interface IGameExplorerRepository
         string? normalizedWhiteLastName,
         string? normalizedBlackFirstName,
         string? normalizedBlackLastName,
-        string normalizedFen,
-        long fenHash,
-        string? normalizedFilterFen,
-        long? filterFenHash,
+        byte[] posKey,
+        PositionSearchTarget? filterTarget,
         CancellationToken cancellationToken = default);
 }

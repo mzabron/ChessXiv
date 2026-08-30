@@ -1,4 +1,5 @@
 using ChessXiv.Application.Abstractions;
+using ChessXiv.Application.Contracts;
 using ChessXiv.Domain.Engine.Abstractions;
 using ChessXiv.Domain.Engine.Models;
 using ChessXiv.Domain.Engine.Types;
@@ -8,11 +9,16 @@ namespace ChessXiv.Application.Services;
 
 public class PositionImportCoordinator(
     IBoardStateFactory boardStateFactory,
-    IBoardStateSerializer boardStateSerializer,
     IBoardStateTransition boardStateTransition,
-    IPositionHasher positionHasher) : IPositionImportCoordinator
+    IPositionKeyCalculator positionKeyCalculator) : IPositionImportCoordinator
 {
-    public Task PopulateAsync(IReadOnlyCollection<Game> games, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Below this many games per batch the coordination overhead outweighs the gain, so the
+    /// work stays on the calling thread.
+    /// </summary>
+    private const int ParallelThreshold = 32;
+
+    public Task PopulateAsync(IReadOnlyCollection<ParsedGame> games, CancellationToken cancellationToken = default)
     {
         if (games.Count == 0)
         {
@@ -20,7 +26,20 @@ public class PositionImportCoordinator(
         }
 
         var initialStateTemplate = boardStateFactory.CreateInitial();
-        initialStateTemplate.ZobristKey = positionHasher.Compute(initialStateTemplate);
+
+        // Replaying a game is CPU-bound and each game is completely independent of the
+        // others, so a batch fans out across cores. This is the dominant cost of an import.
+        if (games.Count >= ParallelThreshold)
+        {
+            var parallelOptions = new ParallelOptions
+            {
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = Environment.ProcessorCount
+            };
+
+            Parallel.ForEach(games, parallelOptions, game => PopulateSingleGame(game, initialStateTemplate));
+            return Task.CompletedTask;
+        }
 
         foreach (var game in games)
         {
@@ -31,55 +50,71 @@ public class PositionImportCoordinator(
         return Task.CompletedTask;
     }
 
-    private void PopulateSingleGame(Game game, BoardState initialStateTemplate)
+    private void PopulateSingleGame(ParsedGame parsedGame, BoardState initialStateTemplate)
     {
-        game.Positions.Clear();
+        var game = parsedGame.Game;
+        var result = ToGameResult(game.Result);
+        var positions = new List<Position>(parsedGame.Moves.Count * 2 + 1);
 
         var state = CloneState(initialStateTemplate);
-        AddPosition(game, state, plyCount: 0, lastMove: null);
+        positions.Add(CreatePosition(game.Id, state, plyCount: 0, result));
 
         var plyCount = 0;
-        foreach (var move in game.Moves.OrderBy(m => m.MoveNumber))
+        foreach (var move in parsedGame.Moves.OrderBy(m => m.MoveNumber))
         {
             if (!string.IsNullOrWhiteSpace(move.WhiteMove))
             {
+                // The move is recorded on the position it was played *from*, which is the
+                // previous row; that is what makes the opening tree a single index scan.
+                positions[^1].NextMove = move.WhiteMove;
+
                 if (!boardStateTransition.TryApplySan(state, move.WhiteMove))
                 {
+                    positions[^1].NextMove = null;
                     break;
                 }
 
                 plyCount++;
-                AddPosition(game, state, plyCount, move.WhiteMove);
+                positions.Add(CreatePosition(game.Id, state, plyCount, result));
             }
 
             if (!string.IsNullOrWhiteSpace(move.BlackMove))
             {
+                positions[^1].NextMove = move.BlackMove;
+
                 if (!boardStateTransition.TryApplySan(state, move.BlackMove))
                 {
+                    positions[^1].NextMove = null;
                     break;
                 }
 
                 plyCount++;
-                AddPosition(game, state, plyCount, move.BlackMove);
+                positions.Add(CreatePosition(game.Id, state, plyCount, result));
             }
         }
+
+        game.Positions = positions;
     }
 
-    private void AddPosition(Game game, BoardState state, int plyCount, string? lastMove)
+    private Position CreatePosition(Guid gameId, BoardState state, int plyCount, GameResult result)
     {
-        var fen = boardStateSerializer.ToFen(state);
-
-        game.Positions.Add(new Position
+        return new Position
         {
-            Id = Guid.NewGuid(),
-            GameId = game.Id,
-            Fen = fen,
-            FenHash = unchecked((long)state.ZobristKey),
-            PlyCount = plyCount,
-            LastMove = lastMove,
-            SideToMove = state.SideToMove == Color.White ? 'w' : 'b'
-        });
+            GameId = gameId,
+            PlyCount = (short)plyCount,
+            PosKey = positionKeyCalculator.Compute(state),
+            NextMove = null,
+            Result = result
+        };
     }
+
+    internal static GameResult ToGameResult(string? result) => result switch
+    {
+        "1-0" => GameResult.WhiteWin,
+        "0-1" => GameResult.BlackWin,
+        "1/2-1/2" => GameResult.Draw,
+        _ => GameResult.Unknown
+    };
 
     private static BoardState CloneState(BoardState source)
     {

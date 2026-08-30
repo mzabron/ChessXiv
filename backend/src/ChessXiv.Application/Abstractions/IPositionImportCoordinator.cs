@@ -1,8 +1,11 @@
-using ChessXiv.Domain.Entities;
+using ChessXiv.Application.Contracts;
 
 namespace ChessXiv.Application.Abstractions;
 
 public interface IPositionImportCoordinator
 {
-    Task PopulateAsync(IReadOnlyCollection<Game> games, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Replays each parsed game and fills its <see cref="Domain.Entities.Game.Positions"/>.
+    /// </summary>
+    Task PopulateAsync(IReadOnlyCollection<ParsedGame> games, CancellationToken cancellationToken = default);
 }

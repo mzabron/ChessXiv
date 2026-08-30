@@ -1,4 +1,6 @@
 using ChessXiv.Application.Abstractions;
+using ChessXiv.Application.Contracts;
+using ChessXiv.Domain.Engine.Models;
 using ChessXiv.Domain.Entities;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -24,9 +26,9 @@ public class PgnService : IPgnParser
         "*"
     ];
 
-    public IReadOnlyCollection<Game> ParsePgn(string pgn)
+    public IReadOnlyCollection<ParsedGame> ParsePgn(string pgn)
     {
-        var games = new List<Game>();
+        var games = new List<ParsedGame>();
 
         if (string.IsNullOrWhiteSpace(pgn))
         {
@@ -47,7 +49,7 @@ public class PgnService : IPgnParser
         return games;
     }
 
-    public async IAsyncEnumerable<Game> ParsePgnAsync(TextReader reader, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<ParsedGame> ParsePgnAsync(TextReader reader, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(reader);
 
@@ -117,7 +119,7 @@ public class PgnService : IPgnParser
         }
     }
 
-    private static Game ParseSingleGame(string gameBlock)
+    private static ParsedGame ParseSingleGame(string gameBlock)
     {
         var game = new Game
         {
@@ -142,15 +144,19 @@ public class PgnService : IPgnParser
             movesPart = RemoveTrailingResultToken(movesPart, game.Result);
         }
 
-        game.Moves = ParseMoves(movesPart, game.Id);
-        game.MoveCount = game.Moves.Count;
+        var moves = ParseMoves(movesPart);
+        game.MoveCount = moves.Count;
 
         if (game.Result == "*" && TryGetTrailingResult(movesPart, out var inferredResult))
         {
             game.Result = inferredResult;
         }
 
-        return game;
+        return new ParsedGame
+        {
+            Game = game,
+            Moves = moves
+        };
     }
 
     private static Dictionary<string, string> ParseTags(string tagsPart)
@@ -223,9 +229,9 @@ public class PgnService : IPgnParser
         return tags.TryGetValue(tagName, out var value) ? value : null;
     }
 
-    private static ICollection<Move> ParseMoves(string movesText, Guid gameId)
+    private static List<ParsedMove> ParseMoves(string movesText)
     {
-        var moves = new List<Move>();
+        var moves = new List<ParsedMove>();
         if (string.IsNullOrWhiteSpace(movesText))
         {
             return moves;
@@ -234,7 +240,7 @@ public class PgnService : IPgnParser
         var tokens = TokenizeMoves(movesText);
         var currentMoveNumber = 0;
         var expectingWhiteMove = true;
-        Move? lastMove = null;
+        ParsedMove? lastMove = null;
         Side? lastSide = null;
         var variationDepth = 0;
 
@@ -316,10 +322,8 @@ public class PgnService : IPgnParser
 
             if (expectingWhiteMove)
             {
-                var move = new Move
+                var move = new ParsedMove
                 {
-                    Id = Guid.NewGuid(),
-                    GameId = gameId,
                     MoveNumber = moveNumber,
                     WhiteMove = value
                 };
@@ -333,10 +337,8 @@ public class PgnService : IPgnParser
                 var move = moves.LastOrDefault(m => m.MoveNumber == moveNumber && string.IsNullOrWhiteSpace(m.BlackMove));
                 if (move is null)
                 {
-                    move = new Move
+                    move = new ParsedMove
                     {
-                        Id = Guid.NewGuid(),
-                        GameId = gameId,
                         MoveNumber = moveNumber,
                         WhiteMove = string.Empty
                     };
@@ -452,7 +454,7 @@ public class PgnService : IPgnParser
         return end < token.Length - 1 ? token[..(end + 1)] : token;
     }
 
-    private static void ApplyMoveMetadata(Move move, Side side, string comment)
+    private static void ApplyMoveMetadata(ParsedMove move, Side side, string comment)
     {
         var clkMatch = ClockRegex.Match(comment);
         if (clkMatch.Success)
