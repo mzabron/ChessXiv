@@ -12,17 +12,35 @@
     <p class="tree-status">{{ emptyMessage }}</p>
   } @else {
     <p class="tree-caption">
-      Based on {{ moveTree?.totalGamesInPosition ?? 0 }} games.
+      Based on {{ totalGamesInPosition | number }} games.
     </p>
 
     <div class="tree-list">
-      <div class="tree-item" *ngFor="let move of moveTree?.moves; trackBy: trackByMove">
-        <button type="button" class="move" (click)="onMoveClicked(move)">{{ move.moveSan }}</button>
-        <span class="meta">{{ shareOfPosition(move) | number: '1.0-2' }}%</span>
-        <span class="meta">{{ move.games | number }} games</span>
-        <span class="meta split">W {{ move.whiteWinPct | number: '1.0-2' }}%</span>
-        <span class="meta split">D {{ move.drawPct | number: '1.0-2' }}%</span>
-        <span class="meta split">B {{ move.blackWinPct | number: '1.0-2' }}%</span>
+      <div class="tree-item" *ngFor="let row of rows; trackBy: trackByRow">
+        <button type="button" class="move" (click)="onMoveClicked(row)">{{ row.move.moveSan }}</button>
+        <span class="meta">{{ row.sharePct | number: '1.0-2' }}%</span>
+        <span class="meta">{{ row.move.games | number }} games</span>
+
+        <div class="results" [title]="row.barTitle">
+          <div class="figures" role="img" [attr.aria-label]="row.barTitle">
+            <span class="figure" *ngFor="let figure of row.figures" [class]="'figure figure-' + figure.kind">
+              <span class="figure-name">{{ figure.name }}</span>{{ figure.label }}
+            </span>
+          </div>
+
+          @if (row.segments.length) {
+            <div class="win-bar" aria-hidden="true">
+              <span
+                class="seg"
+                *ngFor="let segment of row.segments"
+                [class]="'seg seg-' + segment.kind"
+                [style.flex-grow]="segment.weight"
+              ></span>
+            </div>
+          } @else {
+            <div class="win-bar win-bar-empty" aria-hidden="true"></div>
+          }
+        </div>
       </div>
     </div>
   }

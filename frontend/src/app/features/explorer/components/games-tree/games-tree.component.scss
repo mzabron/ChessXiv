@@ -1,7 +1,7 @@
 .panel {
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: var(--panel);
+  background: var(--surface);
   box-shadow: 0 14px 28px rgb(61 42 27 / 8%);
 }
 
@@ -18,7 +18,7 @@
 
   p {
     margin: 0.28rem 0 0;
-    color: var(--muted);
+    color: var(--text-muted);
     font-size: 0.76rem;
   }
 }
@@ -32,8 +32,13 @@
 
 .tree-item {
   display: grid;
-  grid-template-columns: 1fr auto auto auto auto auto;
-  gap: 0.5rem;
+  /* Floors on the two meta columns so the figures start at the same x down the list -
+     with plain `auto` every row sized its own columns, and "8 games" against "1,204 games"
+     made the whole right-hand side of the list stagger. */
+  grid-template-columns: 1fr minmax(2.6rem, auto) minmax(4.6rem, auto) minmax(178px, 240px);
+  /* The move column is 1fr and carries its own slack, so this gap really only reads
+     between the share, the game count and the bar - which is where the row needed air. */
+  gap: 0.9rem;
   align-items: center;
   border: 1px solid #dfd2bc;
   border-radius: 8px;
@@ -58,24 +63,89 @@
 .meta {
   font-size: 0.72rem;
   color: #6f604e;
+  text-align: right;
 }
 
-.split {
-  min-width: 3.4rem;
-  text-align: right;
+/* Numbers above, graph below. They were previously printed inside the bands, which forced
+   a choice between an honest bar and a readable one: a band under ~15% could not hold its
+   own figure, so the figure was dropped and that result silently vanished from the row.
+   Splitting them lets the bar stay strictly proportional while every share stays legible. */
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  min-width: 0;
+}
+
+.figures {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.34rem;
+}
+
+.figure {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.24rem;
+  font: 600 0.64rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* The three figures sit in the same order as the bands below them, so the name carries the
+   mapping on its own - which is why it replaced the colour chip that used to sit here. */
+.figure-name {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.win-bar {
+  display: flex;
+  /* Tall enough that the white band reads as a filled band and not as empty track -
+     it is only just lighter than the row it sits on. */
+  height: 0.6rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--winbar-edge);
+  overflow: hidden;
+}
+
+.win-bar-empty {
+  background: var(--surface-sunken);
+}
+
+/* flex-grow carries the proportions (set inline from the raw result counts) and
+   flex-basis: 0 keeps them exact - the bands always fill the bar with no remainder, so no
+   sliver of the row background can show through as a phantom extra band. */
+.seg {
+  flex: 0 1 0;
+  min-width: 0;
+
+  &.seg-white {
+    background: var(--winbar-white);
+  }
+
+  &.seg-draw {
+    background: var(--winbar-draw);
+  }
+
+  &.seg-black {
+    background: var(--winbar-black);
+  }
 }
 
 .tree-caption {
   margin: 0;
   padding: 0 0.85rem 0.5rem;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.73rem;
 }
 
 .tree-status {
   margin: 0;
   padding: 0 0.85rem 0.85rem;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
@@ -84,18 +154,19 @@
 }
 
 @media (max-width: 1120px) {
+  /* Too narrow for a fourth column: the results block drops to its own line. */
   .tree-item {
     grid-template-columns: 1fr auto auto;
   }
 
-  .split {
-    min-width: auto;
+  .results {
+    grid-column: 1 / -1;
   }
 }
 
 :host-context(body.dark-theme) {
   .tree-item { border-color: var(--line); background: var(--bg); }
   .move { color: var(--text); }
-  .meta { color: var(--muted); }
-  .tree-status-error { color: #ff9e9e; }
+  .meta { color: var(--text-muted); }
+  .tree-status-error { color: var(--danger); }
 }
