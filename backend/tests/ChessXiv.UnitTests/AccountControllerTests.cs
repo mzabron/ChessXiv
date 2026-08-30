@@ -119,9 +119,8 @@ public class AccountControllerTests
         Assert.Equal("johnny", summary.Nickname);
         Assert.Equal("johnny@example.com", summary.Email);
         Assert.Equal(2, summary.SavedGamesUsed);
-        Assert.Equal(10_000, summary.SavedGamesLimit);
-        Assert.Equal(2, summary.ImportedGamesUsed);
-        Assert.Equal(200_000, summary.ImportedGamesLimit);
+        Assert.Equal(ChessXivLimits.MaxSavedGamesPerUser, summary.SavedGamesLimit);
+        Assert.Equal(ChessXivLimits.MaxUploadBytes, summary.MaxUploadBytes);
     }
 
     [Fact]
@@ -395,18 +394,6 @@ public class AccountControllerTests
         Assert.Equal("Invalid credentials.", unauthorized.Value);
     }
 
-    private sealed class StubQuotaService : IQuotaService
-    {
-        public Task<int> GetMaxDraftImportGamesAsync(string? ownerUserId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(200_000);
-        }
-
-        public Task<int> GetMaxSavedGamesAsync(string? ownerUserId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(10_000);
-        }
-    }
 
     private sealed class FakeEmailSender : IEmailSender
     {
@@ -615,7 +602,6 @@ public class AccountControllerTests
         return new AccountController(
             userManager,
             dbContext,
-            new StubQuotaService(),
             emailSender,
             Options.Create(new FrontendOptions { BaseUrl = "https://chessxiv.org" }));
     }

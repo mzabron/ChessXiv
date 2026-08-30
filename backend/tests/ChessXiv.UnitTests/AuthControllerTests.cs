@@ -248,6 +248,16 @@ public class AuthControllerTests
         {
             return new AuthTokenResponse(AccessToken, DateTime.UtcNow.AddMinutes(60));
         }
+
+        public AuthTokenResponse CreateGuestToken()
+        {
+            return new AuthTokenResponse(AccessToken, DateTime.UtcNow.AddHours(12));
+        }
+
+        public string? TryGetGuestUserId(string guestToken)
+        {
+            return null;
+        }
     }
 
     private sealed class FakeEmailSender : IEmailSender

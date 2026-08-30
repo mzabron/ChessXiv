@@ -32,10 +32,17 @@ public class BitboardBoardStateTransitionTests
         var transition = new BitboardBoardStateTransition();
         var state = factory.CreateInitial();
 
+        // 1.e4 alone leaves no en-passant target: no black pawn stands beside the e4 pawn,
+        // so nothing could capture there. Playing on until one can gives a real target.
         Assert.True(transition.TryApplySan(state, "e4"));
-        Assert.Equal(Square.From(4, 2), state.EnPassantSquare);
+        Assert.Null(state.EnPassantSquare);
 
-        Assert.True(transition.TryApplySan(state, "Nf6"));
+        Assert.True(transition.TryApplySan(state, "d5"));
+        Assert.True(transition.TryApplySan(state, "e5"));
+        Assert.True(transition.TryApplySan(state, "f5"));
+        Assert.Equal(Square.From(5, 5), state.EnPassantSquare);
+
+        Assert.True(transition.TryApplySan(state, "Nf3"));
         Assert.Null(state.EnPassantSquare);
     }
 

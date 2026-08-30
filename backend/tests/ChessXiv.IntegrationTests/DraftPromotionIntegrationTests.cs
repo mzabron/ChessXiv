@@ -17,23 +17,6 @@ namespace ChessXiv.IntegrationTests;
 public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
 {
     [Fact]
-    public async Task DraftImport_WhenQuotaExceeded_ImportsNothing_AndThrowsLimitMessage()
-    {
-        await fixture.ResetDatabaseAsync();
-
-        await using var dbContext = fixture.CreateDbContext();
-        var (ownerId, _) = await CreateOwnerAndDatabaseAsync(dbContext, "quota-user");
-        var importService = CreateDraftImportService(dbContext, quota: 10);
-
-        using var reader = new StringReader(BuildPgnGames(15));
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            importService.ImportAsync(reader, ownerId, batchSize: 5));
-
-        Assert.Contains("10", exception.Message, StringComparison.Ordinal);
-        Assert.Equal(0, await dbContext.StagingGames.CountAsync());
-    }
-
-    [Fact]
     public async Task DraftImport_NewImport_ClearsPreviousUnpromotedDraftData()
     {
         await fixture.ResetDatabaseAsync();
@@ -79,7 +62,6 @@ public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
         await promotionService.PromoteAsync(ownerId, userDatabaseId);
 
         Assert.Equal(0, await dbContext.StagingGames.CountAsync());
-        Assert.Equal(0, await dbContext.StagingMoves.CountAsync());
         Assert.Equal(0, await dbContext.StagingPositions.CountAsync());
 
         Assert.Equal(10, await dbContext.Games.CountAsync());
@@ -114,25 +96,14 @@ public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
                 Site = "Atomic Site",
                 Round = i.ToString(),
                 GameHash = $"atomic-hash-{i}",
-                Moves =
-                [
-                    new StagingMove
-                    {
-                        Id = Guid.NewGuid(),
-                        MoveNumber = 1,
-                        WhiteMove = "e4",
-                        BlackMove = "e5"
-                    }
-                ],
                 Positions =
                 [
                     new StagingPosition
                     {
-                        Id = Guid.NewGuid(),
-                        Fen = "startpos",
-                        FenHash = i,
                         PlyCount = 0,
-                        SideToMove = 'w'
+                        PosKey = BuildPositionKey(i),
+                        NextMove = "e4",
+                        Result = GameResult.Unknown
                     }
                 ]
             })
@@ -144,7 +115,7 @@ public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
         var baseRepository = new DraftPromotionRepository(dbContext);
         var failingRepository = new ThrowingDraftPromotionRepository(baseRepository);
         var unitOfWork = new EfUnitOfWork(dbContext);
-        var promotionService = new DraftPromotionService(failingRepository, unitOfWork);
+        var promotionService = new DraftPromotionService(failingRepository, new NoOpDraftSessionTracker(), unitOfWork);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             promotionService.PromoteAsync(ownerId, userDatabaseId));
@@ -178,25 +149,14 @@ public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
                 Site = "Batch Site",
                 Round = i.ToString(),
                 GameHash = $"hash-{i}",
-                Moves =
-                [
-                    new StagingMove
-                    {
-                        Id = Guid.NewGuid(),
-                        MoveNumber = 1,
-                        WhiteMove = "e4",
-                        BlackMove = "e5"
-                    }
-                ],
                 Positions =
                 [
                     new StagingPosition
                     {
-                        Id = Guid.NewGuid(),
-                        Fen = "startpos",
-                        FenHash = i,
                         PlyCount = 0,
-                        SideToMove = 'w'
+                        PosKey = BuildPositionKey(i),
+                        NextMove = "e4",
+                        Result = GameResult.Unknown
                     }
                 ]
             })
@@ -217,25 +177,31 @@ public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
         Assert.Equal(1001, await dbContext.UserDatabaseGames.CountAsync());
     }
 
-    private static DraftImportService CreateDraftImportService(ChessXivDbContext dbContext, int quota = 200_000)
+    /// <summary>Distinct 16-byte key per fixture row; the value itself is irrelevant here.</summary>
+    private static byte[] BuildPositionKey(int seed)
+    {
+        var key = new byte[16];
+        BitConverter.TryWriteBytes(key, seed);
+        return key;
+    }
+
+    private static DraftImportService CreateDraftImportService(ChessXivDbContext dbContext)
     {
         var parser = new PgnService();
         var serializer = new FenBoardStateSerializer();
         var factory = new BoardStateFactory(serializer);
         var transition = new BitboardBoardStateTransition();
-        var hasher = new ZobristPositionHasher();
-        var positionCoordinator = new PositionImportCoordinator(factory, serializer, transition, hasher);
+        var positionCoordinator = new PositionImportCoordinator(factory, transition, new ZobristPositionKeyCalculator());
         var repo = new DraftImportRepository(dbContext);
-        var quotaService = new StubQuotaService(quota);
         var uow = new EfUnitOfWork(dbContext);
 
-        return new DraftImportService(parser, positionCoordinator, repo, quotaService, uow);
+        return new DraftImportService(parser, positionCoordinator, repo, new NoOpDraftSessionTracker(), uow);
     }
 
     private static DraftPromotionService CreateDraftPromotionService(ChessXivDbContext dbContext, IUnitOfWork unitOfWork)
     {
         var promotionRepo = new DraftPromotionRepository(dbContext);
-        return new DraftPromotionService(promotionRepo, unitOfWork);
+        return new DraftPromotionService(promotionRepo, new NoOpDraftSessionTracker(), unitOfWork);
     }
 
     private static async Task<(string OwnerId, Guid UserDatabaseId)> CreateOwnerAndDatabaseAsync(ChessXivDbContext dbContext, string ownerId)
@@ -335,18 +301,31 @@ public class DraftPromotionIntegrationTests(PostgresTestFixture fixture)
             throw new InvalidOperationException("Simulated failure during promotion.");
         }
 
-    }
 
-    private sealed class StubQuotaService(int maxDraftImportGames) : IQuotaService
-    {
-        public Task<int> GetMaxDraftImportGamesAsync(string? ownerUserId, CancellationToken cancellationToken = default)
+        public Task<int> PromoteSelectionAsync(
+            string ownerUserId,
+            Guid userDatabaseId,
+            IReadOnlyCollection<Guid> stagingGameIds,
+            DateTime addedAtUtc,
+            CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(maxDraftImportGames);
+            return Task.FromResult(stagingGameIds.Count);
         }
 
-        public Task<int> GetMaxSavedGamesAsync(string? ownerUserId, CancellationToken cancellationToken = default)
+        public Task<int> CountSavedGamesAsync(string ownerUserId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(10_000);
+            return Task.FromResult(0);
+        }
+
+        public Task<int> CountStagingGamesAsync(string ownerUserId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(0);
+        }
+
+        public Task SyncGameCountAsync(Guid userDatabaseId, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
+
 }

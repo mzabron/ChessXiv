@@ -18,7 +18,7 @@ public class DraftPromotionServiceTests
 
         var repo = new FakeDraftPromotionRepository(stagingGame, userDatabaseId, "user-1");
         var unitOfWork = new FakeUnitOfWork();
-        var service = new DraftPromotionService(repo, unitOfWork);
+        var service = new DraftPromotionService(repo, new NoOpDraftSessionTracker(), unitOfWork);
 
         var result = await service.PromoteAsync("user-1", userDatabaseId);
 
@@ -36,7 +36,7 @@ public class DraftPromotionServiceTests
 
         var repo = new FakeDraftPromotionRepository(games, userDatabaseId, "user-1");
         var unitOfWork = new FakeUnitOfWork();
-        var service = new DraftPromotionService(repo, unitOfWork);
+        var service = new DraftPromotionService(repo, new NoOpDraftSessionTracker(), unitOfWork);
 
         var result = await service.PromoteAsync("user-1", userDatabaseId);
 
@@ -60,25 +60,14 @@ public class DraftPromotionServiceTests
             Event = @event,
             Site = site,
             Round = "3",
-            Moves =
-            [
-                new StagingMove
-                {
-                    Id = Guid.NewGuid(),
-                    MoveNumber = 1,
-                    WhiteMove = "e4",
-                    BlackMove = "e5"
-                }
-            ],
             Positions =
             [
                 new StagingPosition
                 {
-                    Id = Guid.NewGuid(),
                     PlyCount = 0,
-                    Fen = "startpos",
-                    FenHash = 123,
-                    SideToMove = 'w'
+                    PosKey = [1, 2, 3],
+                    NextMove = "e4",
+                    Result = GameResult.Unknown
                 }
             ]
         };
@@ -140,6 +129,31 @@ public class DraftPromotionServiceTests
             return Task.FromResult(promoted);
         }
 
+
+        public Task<int> PromoteSelectionAsync(
+            string ownerUserId,
+            Guid userDatabaseId,
+            IReadOnlyCollection<Guid> stagingGameIds,
+            DateTime addedAtUtc,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(stagingGameIds.Count);
+        }
+
+        public Task<int> CountSavedGamesAsync(string ownerUserId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(0);
+        }
+
+        public Task<int> CountStagingGamesAsync(string ownerUserId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_stagingGames.Count);
+        }
+
+        public Task SyncGameCountAsync(Guid userDatabaseId, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeUnitOfWork : IUnitOfWork

@@ -35,12 +35,27 @@ public class FenBoardStateSerializerTests
     [Fact]
     public void ToFen_RoundTripsComplexPosition()
     {
-        const string fen = "r1bqkbnr/pppp1ppp/2n5/4p3/1bBPP3/5N2/PPP2PPP/RNBQK2R b KQkq d3 2 4";
+        // Black pawn on e4 sits beside the white d4 pawn, so the d3 en-passant target is real
+        // and survives the round trip.
+        const string fen = "r1bqkbnr/pppp1ppp/2n5/8/1bBPp3/5N2/PPP2PPP/RNBQK2R b KQkq d3 0 4";
 
         var state = _serializer.FromFen(fen);
         var serialized = _serializer.ToFen(state);
 
         Assert.Equal(fen, serialized);
+    }
+
+    [Fact]
+    public void FromFen_DropsAnEnPassantTargetThatNoPawnCanCaptureOn()
+    {
+        // Same placement without the black e4 pawn: nothing can take on d3, so the target is
+        // not part of the position and must not survive into the key or the round trip.
+        const string fen = "r1bqkbnr/pppp1ppp/2n5/4p3/1bBPP3/5N2/PPP2PPP/RNBQK2R b KQkq d3 0 4";
+
+        var state = _serializer.FromFen(fen);
+
+        Assert.Null(state.EnPassantSquare);
+        Assert.Equal(fen.Replace(" d3 ", " - "), _serializer.ToFen(state));
     }
 
     [Fact]

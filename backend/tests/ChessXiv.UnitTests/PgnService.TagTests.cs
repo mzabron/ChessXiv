@@ -11,7 +11,7 @@ public class PgnServiceTagTests
     {
         var pgn = PgnServiceTestData.LoadGamesSamplePgn();
 
-        var games = _service.ParsePgn(pgn).ToList();
+        var games = _service.ParsePgn(pgn).Select(parsed => parsed.Game).ToList();
         var first = games.First();
 
         Assert.NotEmpty(games);
@@ -35,7 +35,7 @@ public class PgnServiceTagTests
     {
         var pgn = PgnServiceTestData.LoadGamesSamplePgn();
 
-        var games = _service.ParsePgn(pgn).ToList();
+        var games = _service.ParsePgn(pgn).Select(parsed => parsed.Game).ToList();
 
         Assert.True(games.Count >= 4);
         Assert.Contains(games, game => game.Result == "1/2-1/2");
@@ -69,7 +69,7 @@ public class PgnServiceTagTests
             1. d3 Nf6 2. e4 Nc6 3. f4 e5 4. fxe5 Nxe5 0-1
             """;
 
-        var games = _service.ParsePgn(pgn).ToList();
+        var games = _service.ParsePgn(pgn).Select(parsed => parsed.Game).ToList();
 
         Assert.Equal(2, games.Count);
         Assert.Equal("Berlin", games[0].Event);
@@ -82,7 +82,7 @@ public class PgnServiceTagTests
         var pgn = PgnServiceTestData.LoadGamesSamplePgn();
         var withoutUtcDate = pgn.Replace("[UTCDate \"2026.01.04\"]\n", string.Empty, StringComparison.Ordinal);
 
-        var game = _service.ParsePgn(withoutUtcDate).First();
+        var game = _service.ParsePgn(withoutUtcDate).First().Game;
 
         Assert.Equal(new DateTime(2026, 1, 4), game.Date);
     }
@@ -101,7 +101,7 @@ public class PgnServiceTagTests
             1. e4 e5 1-0
             """;
 
-        var game = _service.ParsePgn(pgn).Single();
+        var game = _service.ParsePgn(pgn).Single().Game;
 
         Assert.Null(game.Date);
         Assert.Equal(2023, game.Year);
@@ -122,7 +122,7 @@ public class PgnServiceTagTests
             1. e4 e5 1-0
             """;
 
-        var game = _service.ParsePgn(pgn).Single();
+        var game = _service.ParsePgn(pgn).Single().Game;
 
         Assert.Equal(new DateTime(1992, 10, 3), game.Date);
         Assert.Equal(1992, game.Year);

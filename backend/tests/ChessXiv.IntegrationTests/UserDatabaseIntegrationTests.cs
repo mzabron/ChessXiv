@@ -313,18 +313,7 @@ public class UserDatabaseIntegrationTests(PostgresTestFixture fixture)
             BlackNormalizedFullName = blackNormalized,
             Result = "*",
             Pgn = "1. e4 e5 *",
-            MoveCount = 1,
-            Moves =
-            [
-                new Move
-                {
-                    Id = Guid.NewGuid(),
-                    GameId = gameId,
-                    MoveNumber = 1,
-                    WhiteMove = "e4",
-                    BlackMove = "e5"
-                }
-            ]
+            MoveCount = 1
         };
     }
 }
