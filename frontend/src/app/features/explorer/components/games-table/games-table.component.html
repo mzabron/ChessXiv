@@ -2,6 +2,12 @@
   <table class="games-table">
     <thead>
       <tr>
+        @if (selectionEnabled) {
+        <th class="select-cell">
+          <input type="checkbox" [checked]="allOnPageChecked" (change)="togglePageChecked()"
+            aria-label="Select all games on this page" />
+        </th>
+        }
         <th class="sortable" (click)="toggleSort('year')">Year{{ sortIndicator('year') }}</th>
         <th class="sortable" (click)="toggleSort('white')">White{{ sortIndicator('white') }}</th>
         <th class="sortable" (click)="toggleSort('whiteElo')">WhiteElo{{ sortIndicator('whiteElo') }}</th>
@@ -14,11 +20,31 @@
       </tr>
     </thead>
     <tbody>
+      @if (isLoading) {
+      <!-- Skeleton rows keep the table's height and column rhythm while a page loads, so
+           the surrounding layout does not jump when the real rows arrive. -->
+      @for (row of skeletonRows; track row) {
+      <tr class="skeleton-row" aria-hidden="true">
+        @if (selectionEnabled) {
+        <td class="select-cell"><span class="skeleton-bar"></span></td>
+        }
+        @for (cell of skeletonCells; track cell) {
+        <td><span class="skeleton-bar"></span></td>
+        }
+      </tr>
+      }
+      } @else {
+      @for (game of games; track game.id) {
       <tr
-        *ngFor="let game of games"
         class="game-row"
         [class.selected]="selectedGameId === game.id"
         (click)="selectGame(game)">
+        @if (selectionEnabled) {
+        <td class="select-cell" (click)="$event.stopPropagation()">
+          <input type="checkbox" [checked]="isChecked(game.id)" (change)="toggleGameChecked(game.id)"
+            [attr.aria-label]="'Select game ' + game.white + ' vs ' + game.black" />
+        </td>
+        }
         <td>{{ game.year || '-' }}</td>
         <td>{{ game.white }}</td>
         <td>{{ game.whiteElo || '-' }}</td>
@@ -29,6 +55,8 @@
         <td class="event-cell" [title]="game.event || ''">{{ game.event || '-' }}</td>
         <td>{{ game.moveCount }}</td>
       </tr>
+      }
+      }
     </tbody>
   </table>
 

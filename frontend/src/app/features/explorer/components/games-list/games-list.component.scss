@@ -1,7 +1,7 @@
 .panel {
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: var(--panel);
+  background: var(--surface);
   box-shadow: 0 14px 28px rgb(61 42 27 / 8%);
 }
 
@@ -9,14 +9,14 @@
   display: flex;
   padding: 0.35rem 0.35rem 0;
   gap: 0.35rem;
-  border-bottom: 1px solid #e1d6c5;
-  background: #f4ede0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-raised);
 }
 
 .tab-btn {
   border: 1px solid transparent;
   background: transparent;
-  color: #6a5b49;
+  color: var(--text-muted);
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
   padding: 0.56rem 0.85rem;
@@ -25,10 +25,10 @@
 }
 
 .tab-btn.active {
-  background: var(--panel);
-  color: #33261a;
-  border-color: #e1d6c5;
-  border-bottom-color: var(--panel);
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+  border-bottom-color: var(--surface);
 }
 
 .panel-header {
@@ -44,7 +44,7 @@
 
   p {
     margin: 0.35rem 0 0;
-    color: var(--muted);
+    color: var(--text-muted);
     font-size: 0.9rem;
   }
 }
@@ -73,17 +73,17 @@
 .summary-btn {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #eee3cf;
-  color: #4a3828;
+  background: var(--surface-raised);
+  color: var(--text);
   padding: 0.4rem 0.62rem;
   font: 600 0.78rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
   cursor: pointer;
 }
 
 .summary-btn.primary {
-  background: #d9c39e;
-  border-color: #bea073;
-  color: #3f2f23;
+  background: var(--accent-soft);
+  border-color: var(--line-strong);
+  color: var(--text);
 }
 
 .modal-overlay {
@@ -100,7 +100,7 @@
   width: min(420px, calc(100% - 2rem));
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: var(--panel);
+  background: var(--surface);
   padding: 0.9rem;
   box-shadow: 0 14px 32px rgb(0 0 0 / 24%);
   display: flex;
@@ -123,7 +123,7 @@
 .close-btn {
   border: 0;
   background: transparent;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
@@ -138,21 +138,21 @@
   flex: 1;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #f0e8d9;
-  color: #4a3828;
+  background: var(--surface-raised);
+  color: var(--text);
   padding: 0.45rem 0.55rem;
   font: 600 0.76rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
   cursor: pointer;
 }
 
 .mode-btn.active {
-  background: #e1cfb1;
-  border-color: #ba9a6b;
+  background: var(--accent-soft);
+  border-color: var(--line-strong);
 }
 
 .field-label {
   margin: 0.1rem 0 0;
-  color: var(--muted);
+  color: var(--text-muted);
   font: 600 0.72rem/1.2 'IBM Plex Sans', 'Segoe UI', sans-serif;
 }
 
@@ -168,7 +168,7 @@
 
 .modal-error {
   margin: 0;
-  color: #b91c1c;
+  color: var(--danger);
   font: 600 0.72rem/1.2 'IBM Plex Sans', 'Segoe UI', sans-serif;
 }
 
@@ -209,24 +209,24 @@
   }
 
   .tab-btn {
-    color: var(--muted);
+    color: var(--text-muted);
   }
 
   .tab-btn.active {
-    background: var(--panel);
+    background: var(--surface);
     color: var(--text);
     border-color: var(--line);
-    border-bottom-color: var(--panel);
+    border-bottom-color: var(--surface);
   }
   .summary-btn {
-    background: #27272a;
+    background: var(--surface-raised);
     color: var(--text);
     border-color: var(--line);
   }
 
   .summary-btn.primary {
-    background: #3f3f46;
-    border-color: #52525b;
+    background: var(--line);
+    border-color: var(--text-muted);
   }
 
   .modal-overlay {
@@ -234,17 +234,48 @@
   }
 
   .mode-btn {
-    background: #27272a;
+    background: var(--surface-raised);
     color: var(--text);
     border-color: var(--line);
   }
 
   .mode-btn.active {
-    background: #3f3f46;
-    border-color: #52525b;
+    background: var(--line);
+    border-color: var(--text-muted);
   }
 
   .modal-error {
-    color: #fca5a5;
+    color: var(--danger);
+  }
+}
+
+/* Marks the Filters tab while applied filters are narrowing the list - easy to forget after
+   switching databases, and the cause of "why is this database empty?" confusion. */
+.filter-marker {
+  margin-left: 0.15rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Tabs can be dragged to reorder. The cursor and the drop indicator are the only
+   affordances - a grab handle would crowd a control this small. */
+.tab-btn {
+  cursor: grab;
+  /* The strip scrolls horizontally on touch; claiming pan-y lets the browser keep vertical
+     scrolling while this directive owns horizontal movement. */
+  touch-action: pan-y;
+
+  &.is-dragging {
+    /* Lifted above its neighbours and following the pointer directly - any transition here
+       would make it lag behind the cursor. */
+    position: relative;
+    z-index: 2;
+    transition: none;
+    cursor: grabbing;
+    box-shadow: var(--shadow-md);
+  }
+
+  &.is-drop-target {
+    box-shadow: inset 2px 0 0 var(--accent);
   }
 }

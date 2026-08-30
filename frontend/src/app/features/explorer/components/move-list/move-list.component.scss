@@ -7,7 +7,7 @@
 .panel {
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: var(--panel);
+  background: var(--surface);
   box-shadow: 0 14px 28px rgb(61 42 27 / 8%);
 }
 
@@ -33,7 +33,7 @@
 .empty-note {
   margin: 0;
   padding: 0.8rem 0.7rem;
-  color: var(--muted);
+  color: var(--text-muted);
   font: 600 0.75rem/1.3 'IBM Plex Sans', 'Segoe UI', sans-serif;
 }
 
@@ -45,7 +45,7 @@
 }
 
 .ply-number {
-  color: var(--muted);
+  color: var(--text-muted);
   font-weight: 600;
   font-size: 0.68rem;
 }
@@ -53,7 +53,7 @@
 .move-btn {
   border: 0;
   background: transparent;
-  color: #4f3d2d;
+  color: var(--text);
   border-radius: 6px;
   padding: 0.15rem 0.2rem;
   font: 600 0.72rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
@@ -62,7 +62,7 @@
 }
 
 .move-btn.active {
-  background: #eadab8;
+  background: var(--surface-sunken);
 }
 
 .move-placeholder {
@@ -71,7 +71,7 @@
 }
 
 .move-placeholder.text {
-  color: var(--muted);
+  color: var(--text-muted);
   font: 600 0.72rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
   padding: 0.15rem 0.2rem;
 }
@@ -102,5 +102,5 @@
 
 :host-context(body.dark-theme) {
   .move-btn { color: var(--text); }
-  .move-btn.active { background: #3f3f46; }
+  .move-btn.active { background: var(--line); }
 }

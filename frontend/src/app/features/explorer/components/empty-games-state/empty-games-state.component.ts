@@ -8,13 +8,13 @@ import { Component, EventEmitter, Output } from '@angular/core';
 })
 export class EmptyGamesStateComponent {
   @Output() importDatabase = new EventEmitter<void>();
-  @Output() searchCommunityDatabase = new EventEmitter<void>();
+  @Output() browseDatabases = new EventEmitter<void>();
 
   protected onImportClick(): void {
     this.importDatabase.emit();
   }
 
-  protected onSearchClick(): void {
-    this.searchCommunityDatabase.emit();
+  protected onBrowseClick(): void {
+    this.browseDatabases.emit();
   }
 }

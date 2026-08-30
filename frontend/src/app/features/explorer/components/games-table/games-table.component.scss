@@ -21,8 +21,8 @@
   th {
     position: sticky;
     top: 0;
-    background: var(--panel);
-    color: var(--muted);
+    background: var(--surface);
+    color: var(--text-muted);
     font-weight: 600;
     font-size: 0.75rem;
     text-transform: uppercase;
@@ -48,7 +48,7 @@
     }
 
     &.selected {
-      background: #eadab8;
+      background: var(--surface-sunken);
     }
   }
 
@@ -65,7 +65,7 @@
 
 .table-empty-state {
   padding: 1rem 0.85rem;
-  color: var(--muted);
+  color: var(--text-muted);
   font: 600 0.85rem/1.2 'Space Grotesk', 'Segoe UI', sans-serif;
 }
 
@@ -76,7 +76,7 @@
   gap: 0.45rem;
   padding: 0.6rem 0.75rem;
   border-top: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--surface);
 
   button {
     border: 1px solid var(--line);
@@ -94,12 +94,12 @@
   }
 
   span {
-    color: var(--muted);
+    color: var(--text-muted);
     font-size: 0.8rem;
   }
 
   .page-size {
-    color: var(--muted);
+    color: var(--text-muted);
     font-size: 0.8rem;
     margin-right: 0.2rem;
   }
@@ -118,7 +118,7 @@
 :host-context(body.dark-theme) {
   .games-table {
     th {
-      background: var(--panel);
+      background: var(--surface);
     }
   }
 
@@ -127,6 +127,44 @@
   }
 
   .game-row.selected {
-    background: #3f3f46;
+    background: var(--line);
+  }
+}
+
+.select-cell {
+  width: 2rem;
+  text-align: center;
+  cursor: default;
+}
+
+/* Loading placeholders. Deliberately non-interactive and hidden from assistive tech - they
+   convey "still working", which a screen reader gets from the live region instead. */
+.skeleton-row {
+  cursor: default;
+}
+
+.skeleton-bar {
+  display: block;
+  height: 0.7rem;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    90deg,
+    var(--surface-sunken) 0%,
+    var(--surface-raised) 50%,
+    var(--surface-sunken) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-bar {
+    animation: none;
+    background: var(--surface-sunken);
   }
 }

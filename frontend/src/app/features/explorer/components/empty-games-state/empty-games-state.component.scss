@@ -19,7 +19,7 @@
 .empty-copy {
   margin: 0;
   max-width: 34ch;
-  color: var(--muted);
+  color: var(--text-muted);
   line-height: 1.4;
 }
 
@@ -57,11 +57,11 @@
 .action-button.ghost {
   color: var(--accent-strong);
   background: #f0ecdf;
-  border-color: #d3c6ae;
+  border-color: var(--line);
 }
 
 :host-context(body.dark-theme) {
-  .action-button.primary { color: #fff; background: var(--accent); }
+  .action-button.primary { color: var(--text-on-accent); background: var(--accent); }
   .action-button.primary:hover { background: var(--accent-strong); }
-  .action-button.ghost { color: var(--accent-strong); background: var(--panel); border-color: var(--line); }
+  .action-button.ghost { color: var(--accent-strong); background: var(--surface); border-color: var(--line); }
 }
