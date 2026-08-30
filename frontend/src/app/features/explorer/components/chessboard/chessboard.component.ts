@@ -201,6 +201,11 @@ export class ChessboardComponent implements OnChanges {
   }
 
   protected onSquareClick(fileIndex: number, rankIndex: number): void {
+    // A left click anywhere on the board clears drawn arrows, same as every other chess
+    // site - covers clicks that land on an empty square. Clicks on a piece are handled in
+    // onPiecePointerDown below, since pieces sit in their own layer and never bubble here.
+    this.clearArrows();
+
     if (this.suppressNextSquareClick) {
       this.suppressNextSquareClick = false;
       return;
@@ -217,7 +222,16 @@ export class ChessboardComponent implements OnChanges {
   }
 
   protected onPiecePointerDown(piece: ChessPiece, event: PointerEvent): void {
+    if (event.button === 2) {
+      // Let a right-button press on an occupied square bubble up to the board's own
+      // pointerdown handler, which is what starts arrow drawing. Stopping propagation
+      // unconditionally here - as this used to - meant an arrow could never start from a
+      // square that had a piece on it, only from an empty one.
+      return;
+    }
+
     event.stopPropagation();
+    this.clearArrows();
 
     if (this.pendingPromotionMove) {
       return;
