@@ -1,7 +1,7 @@
 .panel {
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: var(--panel);
+  background: var(--surface);
   box-shadow: 0 14px 28px rgb(61 42 27 / 8%);
 }
 
@@ -53,12 +53,12 @@
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 0.2rem;
   padding: 0.45rem 0.55rem;
-  border-bottom: 1px solid #dbcdb6;
-  background: #f4efe3;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-raised);
 }
 
 .setup-strip.bottom {
-  border-top: 1px solid #dbcdb6;
+  border-top: 1px solid var(--line);
   border-bottom: 0;
 }
 
@@ -68,9 +68,11 @@
   align-items: center;
   justify-content: center;
   min-height: 2rem;
-  border: 1px solid #d5c6ad;
-  border-radius: 8px;
-  background: #efe7d8;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  /* A light, warm tile in both themes: the black piece sprites are dark artwork and would
+     otherwise disappear into a dark tray. */
+  background: var(--piece-tray);
   cursor: pointer;
   padding: 0.12rem;
 }
@@ -81,7 +83,8 @@
 }
 
 .setup-tool {
-  color: #4c3827;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .setup-tool .material-symbols-outlined {
@@ -92,9 +95,9 @@
 
 .setup-piece.active,
 .setup-tool.active {
-  border-color: #9f7f55;
+  border-color: var(--accent);
   box-shadow: inset 0 0 0 2px #c5a571;
-  background: #e8dcc7;
+  background: var(--surface-sunken);
 }
 
 .board-toolbar {
@@ -106,23 +109,48 @@
   padding: 0.55rem 0.65rem 0.5rem;
 }
 
+/* One neutral button; only the confirming action is accented. Previously these carried
+   three different backgrounds (default, "primary", "clear") plus accent-coloured text,
+   which made a row of five buttons read as five unrelated controls. */
 .tool-btn,
 .icon-btn {
-  border: 1px solid #d3c6ae;
-  border-radius: 9px;
-  background: #f0ecdf;
-  color: var(--accent-strong);
-  font: 600 0.84rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: 600 var(--text-sm) / 1 var(--font-display);
   cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+
+  &:hover:not(:disabled) {
+    background: var(--surface-raised);
+    border-color: var(--line-strong);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-ring);
+    border-color: var(--accent);
+  }
 }
 
 .tool-btn {
-  padding: 0.4rem 0.62rem;
+  padding: 0 var(--space-3);
+  height: var(--control-height-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tool-btn.primary {
-  background: #d9c39e;
-  border-color: #bea073;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+
+  &:hover:not(:disabled) {
+    background: var(--accent-strong);
+    border-color: var(--accent-strong);
+  }
 }
 
 .move-controls {
@@ -147,23 +175,13 @@
   font-size: 1rem;
 }
 
-.icon-single,
-.icon-double {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* Navigation now uses Material Symbols rather than Unicode triangles. The glyphs' own
+   metrics never sat on the button's optical centre, which is why they looked misaligned;
+   an icon font designed on a square grid centres cleanly. */
+.icon-btn .material-symbols-outlined {
+  font-size: 1.1rem;
   line-height: 1;
-  color: #3d2f23;
-  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
-}
-
-.icon-single {
-  font-size: 0.7rem;
-}
-
-.icon-double {
-  gap: 0.04rem;
-  font-size: 0.58rem;
+  color: inherit;
 }
 
 .board {
@@ -191,10 +209,10 @@
 }
 
 .promotion-option {
-  border: 1px solid #cfbfa5;
+  border: 1px solid var(--line);
   border-radius: 9px;
   background: #efe4cf;
-  color: #3f2f23;
+  color: var(--text);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -215,6 +233,9 @@
 }
 
 .board-grid {
+  /* Amber reads clearly on both light and dark squares, in either theme. */
+  --annotation-color: #f0a020;
+
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -264,13 +285,18 @@
 
 .move-status {
   margin: 0 0.7rem 0.1rem;
-  font: 600 0.7rem/1.2 'IBM Plex Sans', 'Segoe UI', sans-serif;
-  color: #8b2f2f;
+  font: 600 var(--text-xs) / 1.2 var(--font-sans);
+  color: var(--danger);
 }
 
+/* "Clear" wipes the board, so it reads as destructive rather than as a third neutral. */
 .tool-btn.clear {
-  background: #e9dfce;
-  color: #5e4b39;
+  color: var(--danger);
+
+  &:hover:not(:disabled) {
+    background: var(--danger-soft);
+    border-color: var(--danger);
+  }
 }
 
 .setup-controls {
@@ -302,15 +328,15 @@
 }
 
 .meta-label {
-  color: #6a5541;
-  font: 700 0.66rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  color: var(--text-muted);
+  font: 700 var(--text-xs) / 1 var(--font-sans);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .turn-group {
   display: inline-flex;
-  gap: 0.2rem;
+  gap: var(--space-2);
   margin-right: 0.08rem;
 }
 
@@ -327,12 +353,12 @@
 .castle-side {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: var(--space-2);
 }
 
 .castle-label {
-  color: #6a5541;
-  font: 700 0.65rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  color: var(--text-muted);
+  font: 700 var(--text-xs) / 1 var(--font-sans);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -340,11 +366,13 @@
 .meta-chip {
   min-width: 1.7rem;
   height: 1.7rem;
-  border: 1px solid #cfbfa5;
+  padding: 0 0.4rem;
+  border: 1px solid var(--line);
   border-radius: 7px;
   background: #eee5d6;
-  color: #4a3828;
+  color: var(--text);
   font: 700 0.76rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -367,12 +395,12 @@
 .ep-label select {
   width: 4.2rem;
   height: 1.7rem;
-  border: 1px solid #cfbfa5;
+  border: 1px solid var(--line);
   border-radius: 7px;
   background: #f4ecde;
   text-align: center;
   font: 700 0.75rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
-  color: #3f2f23;
+  color: var(--text);
   padding: 0 0.25rem;
 }
 
@@ -430,58 +458,51 @@
   }
 }
 
+/*
+ * Only what genuinely needs a different value in the dark theme. Everything else resolves
+ * from the global tokens. The previous block re-declared the tool buttons with three
+ * separate backgrounds, which is how Set Position ended up looking like three unrelated
+ * button styles side by side.
+ */
 :host-context(body.dark-theme) {
-  .player-strip { color: var(--text); }
-  .player-rating { color: var(--muted); }
-  .player-clock { color: #a1a1aa; }
-  .setup-strip {
-    background: #1f2937;
-    border-color: #374151;
-  }
-  .setup-piece,
-  .setup-tool {
-    border-color: #4b5563;
-    background: #111827;
-  }
-  .setup-piece.active,
-  .setup-tool.active {
-    border-color: #ca8a04;
-    box-shadow: inset 0 0 0 2px #a16207;
-    background: #2f2a1a;
-  }
-  .setup-tool { color: #e5e7eb; }
-  .meta-block { background: transparent; }
-  .meta-label { color: #a1a1aa; }
-  .tool-btn,
-  .icon-btn { border-color: var(--line); background: var(--panel); color: var(--accent-strong); }
-  .tool-btn.primary { background: #3f3f46; border-color: #52525b; }
-  .icon-single,
-  .icon-double { color: var(--text); }
-  .tool-btn.clear { background: var(--line); color: var(--text); }
-  .meta-chip,
-  .ep-label select {
-    border-color: #52525b;
-    background: #18181b;
-    color: #e4e4e7;
-  }
-  .castle-label { color: #a1a1aa; }
-  .meta-chip.active {
-    background: #3f3f46;
-    border-color: #a16207;
-  }
-  .ep-label { color: #cbd5e1; }
+  /* Board coordinates sit on top of the squares, not on a themed surface. */
   .file-label,
-  .rank-label { color: rgba(255, 255, 255, 0.45); }
-  .square.selected { box-shadow: inset 0 0 0 3px #facc15; }
-  .move-status { color: #fca5a5; }
-  .promotion-picker {
-    border-color: #52525b;
-    background: #18181b;
-    box-shadow: 0 12px 28px rgb(0 0 0 / 45%);
+  .rank-label {
+    color: rgb(255 255 255 / 45%);
   }
-  .promotion-option {
-    border-color: #52525b;
-    background: #27272a;
-    color: #e4e4e7;
+
+  .square.selected {
+    box-shadow: inset 0 0 0 3px var(--accent);
   }
+}
+
+/* Annotation layer sits above the squares but below the pieces, and never takes pointer
+   events so it cannot interfere with dragging. */
+.annotation-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  color: var(--annotation-color);
+  overflow: visible;
+}
+
+.annotation-arrow {
+  stroke: var(--annotation-color);
+  stroke-width: 0.16;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.annotation-arrow.is-pending {
+  opacity: 0.55;
+}
+
+.annotation-circle {
+  fill: none;
+  stroke: var(--annotation-color);
+  stroke-width: 0.1;
+  opacity: 0.85;
 }

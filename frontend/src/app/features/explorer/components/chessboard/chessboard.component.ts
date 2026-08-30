@@ -75,6 +75,11 @@ export class ChessboardComponent implements OnChanges {
   @Output() readonly moveRowsChanged = new EventEmitter<MoveRow[]>();
   @Output() readonly currentPlyChanged = new EventEmitter<number>();
   @Output() readonly currentFenChanged = new EventEmitter<string>();
+  /**
+   * Raised when the user plays a move that leaves the loaded game's line. The page uses it
+   * to stop showing that game's result alongside a position it no longer describes.
+   */
+  @Output() readonly recordedGameAbandoned = new EventEmitter<void>();
 
   pieces: ChessPiece[] = [];
   protected selectedSquare: string | null = null;
@@ -104,6 +109,9 @@ export class ChessboardComponent implements OnChanges {
   protected bottomPlayerName = 'White';
   protected bottomPlayerRating: number | null = null;
   private isFlipped = false;
+  /** User-drawn board annotations. View-only: never saved, cleared when the position moves. */
+  protected arrows: Array<{ id: string; from: string; to: string }> = [];
+  protected pendingArrow: { from: string; to: string } | null = null;
   private setupSnapshot: SetupSnapshot | null = null;
   private activeDrag: {
     pieceId: string;
@@ -760,9 +768,17 @@ export class ChessboardComponent implements OnChanges {
       return;
     }
 
-    if (this.currentPly < this.sanHistory.length) {
+    // Playing a move that is not the game's own continuation forks off into a line that is
+    // no longer that game, so the players, result and clocks stop applying to what is on the
+    // board and are cleared.
+    const divergedFromRecordedGame = this.currentPly < this.sanHistory.length;
+    if (divergedFromRecordedGame) {
       this.sanHistory = this.sanHistory.slice(0, this.currentPly);
       this.fenHistory = this.fenHistory.slice(0, this.currentPly + 1);
+    }
+
+    if (divergedFromRecordedGame || this.hasRecordedGameMetadata) {
+      this.clearRecordedGameMetadata();
     }
 
     this.sanHistory = [...this.sanHistory, san];
@@ -770,8 +786,27 @@ export class ChessboardComponent implements OnChanges {
     this.currentPly = this.sanHistory.length;
     this.currentFen = nextFen;
     this.pieces = this.parseFenToPieces(this.currentFen, this.pieces);
+    this.clearArrows();
     this.emitMoveRows();
     this.emitNavigationState();
+  }
+
+  /** True while the board still represents the loaded game rather than a user's own line. */
+  private get hasRecordedGameMetadata(): boolean {
+    return this.topPlayerRating !== null
+      || this.bottomPlayerRating !== null
+      || this.clocksByPly.size > 0
+      || this.topPlayerName !== 'Black'
+      || this.bottomPlayerName !== 'White';
+  }
+
+  private clearRecordedGameMetadata(): void {
+    this.topPlayerName = 'Black';
+    this.topPlayerRating = null;
+    this.bottomPlayerName = 'White';
+    this.bottomPlayerRating = null;
+    this.clocksByPly.clear();
+    this.recordedGameAbandoned.emit();
   }
 
   private navigateToPly(targetPly: number): void {
@@ -787,6 +822,7 @@ export class ChessboardComponent implements OnChanges {
     this.currentPly = clamped;
     this.currentFen = this.fenHistory[this.currentPly] ?? START_FEN;
     this.pieces = this.parseFenToPieces(this.currentFen, this.pieces);
+    this.clearArrows();
     this.selectedSquare = null;
     this.pendingPromotionMove = null;
     this.statusMessage = null;
@@ -1144,6 +1180,86 @@ export class ChessboardComponent implements OnChanges {
     }
 
     return null;
+  }
+
+  /**
+   * Right-drag draws an arrow between two squares; a right-click on one square rings it.
+   * Drawing the same annotation twice removes it, which is the convention every other chess
+   * site uses and means no separate erase mode is needed. Arrows are view-only annotations:
+   * they are never persisted and are cleared whenever the position changes.
+   */
+  protected onBoardPointerDown(event: PointerEvent): void {
+    if (event.button !== 2 || this.isSetupMode) {
+      return;
+    }
+
+    const from = this.getSquareFromClientPoint(event.clientX, event.clientY);
+    if (!from) {
+      return;
+    }
+
+    event.preventDefault();
+    this.pendingArrow = { from, to: from };
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const to = this.getSquareFromClientPoint(moveEvent.clientX, moveEvent.clientY);
+      if (to && this.pendingArrow) {
+        this.pendingArrow = { from: this.pendingArrow.from, to };
+      }
+    };
+
+    const onUp = (upEvent: PointerEvent) => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+
+      const pending = this.pendingArrow;
+      this.pendingArrow = null;
+
+      if (!pending) {
+        return;
+      }
+
+      const to = this.getSquareFromClientPoint(upEvent.clientX, upEvent.clientY) ?? pending.to;
+      this.commitArrow(pending.from, to);
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
+  /** Suppresses the browser menu so right-drag is usable on the board. */
+  protected onBoardContextMenu(event: MouseEvent): void {
+    if (!this.isSetupMode) {
+      event.preventDefault();
+    }
+  }
+
+  private commitArrow(from: string, to: string): void {
+    const id = `${from}${to}`;
+    const existing = this.arrows.findIndex(arrow => arrow.id === id);
+
+    this.arrows = existing >= 0
+      ? this.arrows.filter((_, index) => index !== existing)
+      : [...this.arrows, { id, from, to }];
+  }
+
+  protected clearArrows(): void {
+    if (this.arrows.length > 0 || this.pendingArrow) {
+      this.arrows = [];
+      this.pendingArrow = null;
+    }
+  }
+
+  /** Centre of a square in the SVG's 8x8 user space, honouring board flip. */
+  protected arrowX(square: string): number {
+    const file = this.files.indexOf(square[0]);
+    return (this.isFlipped ? 7 - file : file) + 0.5;
+  }
+
+  protected arrowY(square: string): number {
+    const rank = Number(square[1]);
+    const displayY = this.isFlipped ? rank - 1 : 8 - rank;
+    return displayY + 0.5;
   }
 
   private displayCoordsToSquare(displayX: number, displayY: number): string {

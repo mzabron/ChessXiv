@@ -25,7 +25,8 @@
   }
 
   <div class="board" role="img" aria-label="Interactive chessboard">
-    <div class="board-grid" #boardGrid>
+    <div class="board-grid" #boardGrid (contextmenu)="onBoardContextMenu($event)"
+      (pointerdown)="onBoardPointerDown($event)">
       @for (rank of ranks; track rank; let rankIndex = $index) {
         @for (file of files; track file; let fileIndex = $index) {
           <div
@@ -42,6 +43,32 @@
             }
           </div>
         }
+      }
+
+      <!-- Annotation layer: user-drawn arrows and square highlights, right-drag to add.
+           Sits under the pieces so it never intercepts a drag. -->
+      @if (arrows.length > 0 || pendingArrow) {
+      <svg class="annotation-layer" viewBox="0 0 8 8" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <marker id="arrowhead" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4"
+            orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+          </marker>
+        </defs>
+        @for (arrow of arrows; track arrow.id) {
+        @if (arrow.from === arrow.to) {
+        <circle class="annotation-circle" [attr.cx]="arrowX(arrow.from)" [attr.cy]="arrowY(arrow.from)" r="0.45" />
+        } @else {
+        <line class="annotation-arrow" [attr.x1]="arrowX(arrow.from)" [attr.y1]="arrowY(arrow.from)"
+          [attr.x2]="arrowX(arrow.to)" [attr.y2]="arrowY(arrow.to)" marker-end="url(#arrowhead)" />
+        }
+        }
+        @if (pendingArrow && pendingArrow.from !== pendingArrow.to) {
+        <line class="annotation-arrow is-pending" [attr.x1]="arrowX(pendingArrow.from)"
+          [attr.y1]="arrowY(pendingArrow.from)" [attr.x2]="arrowX(pendingArrow.to)"
+          [attr.y2]="arrowY(pendingArrow.to)" marker-end="url(#arrowhead)" />
+        }
+      </svg>
       }
 
       <!-- Absolute Pieces Layer -->
@@ -111,16 +138,16 @@
       <button type="button" class="tool-btn" (click)="setPosition()">Set position</button>
       <div class="move-controls" aria-label="Move navigation controls">
         <button type="button" class="icon-btn" (click)="goToGameStart()" aria-label="Go to game start">
-          <span class="icon-double" aria-hidden="true"><span>&#9664;</span><span>&#9664;</span></span>
+          <span class="material-symbols-outlined" aria-hidden="true">first_page</span>
         </button>
         <button type="button" class="icon-btn" (click)="goPreviousMove()" aria-label="Previous move">
-          <span class="icon-single" aria-hidden="true">&#9664;</span>
+          <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
         </button>
         <button type="button" class="icon-btn" (click)="goNextMove()" aria-label="Next move">
-          <span class="icon-single" aria-hidden="true">&#9654;</span>
+          <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
         </button>
         <button type="button" class="icon-btn" (click)="goToGameEnd()" aria-label="Go to game end">
-          <span class="icon-double" aria-hidden="true"><span>&#9654;</span><span>&#9654;</span></span>
+          <span class="material-symbols-outlined" aria-hidden="true">last_page</span>
         </button>
         <button type="button" class="tool-btn clear" (click)="clearPosition()">Clear</button>
       </div>
@@ -129,9 +156,17 @@
         <div class="setup-meta">
           <div class="meta-block">
             <span class="meta-label">Turn</span>
-            <div class="turn-group" role="group" aria-label="Side to move">
-              <button type="button" class="meta-chip turn" [class.active]="setupSideToMove === 'w'" (click)="setSetupSideToMove('w')">White</button>
-              <button type="button" class="meta-chip turn" [class.active]="setupSideToMove === 'b'" (click)="setSetupSideToMove('b')">Black</button>
+            <div class="turn-group" role="radiogroup" aria-label="Side to move">
+              <label class="ui-check">
+                <input type="radio" name="setup-side-to-move" [checked]="setupSideToMove === 'w'"
+                  (change)="setSetupSideToMove('w')" />
+                <span>White</span>
+              </label>
+              <label class="ui-check">
+                <input type="radio" name="setup-side-to-move" [checked]="setupSideToMove === 'b'"
+                  (change)="setSetupSideToMove('b')" />
+                <span>Black</span>
+              </label>
             </div>
           </div>
           <div class="meta-block">
@@ -139,13 +174,29 @@
             <div class="castling-group" role="group" aria-label="Castling rights">
               <div class="castle-side">
                 <span class="castle-label">White</span>
-                <button type="button" class="meta-chip" [class.active]="setupCastling.whiteKingSide" [disabled]="!canSetupCastle('whiteKingSide')" (click)="toggleCastlingRight('whiteKingSide')">K</button>
-                <button type="button" class="meta-chip" [class.active]="setupCastling.whiteQueenSide" [disabled]="!canSetupCastle('whiteQueenSide')" (click)="toggleCastlingRight('whiteQueenSide')">Q</button>
+                <label class="ui-check" title="White kingside castling">
+                  <input type="checkbox" [checked]="setupCastling.whiteKingSide"
+                    [disabled]="!canSetupCastle('whiteKingSide')" (change)="toggleCastlingRight('whiteKingSide')" />
+                  <span>0-0</span>
+                </label>
+                <label class="ui-check" title="White queenside castling">
+                  <input type="checkbox" [checked]="setupCastling.whiteQueenSide"
+                    [disabled]="!canSetupCastle('whiteQueenSide')" (change)="toggleCastlingRight('whiteQueenSide')" />
+                  <span>0-0-0</span>
+                </label>
               </div>
               <div class="castle-side">
                 <span class="castle-label">Black</span>
-                <button type="button" class="meta-chip" [class.active]="setupCastling.blackKingSide" [disabled]="!canSetupCastle('blackKingSide')" (click)="toggleCastlingRight('blackKingSide')">k</button>
-                <button type="button" class="meta-chip" [class.active]="setupCastling.blackQueenSide" [disabled]="!canSetupCastle('blackQueenSide')" (click)="toggleCastlingRight('blackQueenSide')">q</button>
+                <label class="ui-check" title="Black kingside castling">
+                  <input type="checkbox" [checked]="setupCastling.blackKingSide"
+                    [disabled]="!canSetupCastle('blackKingSide')" (change)="toggleCastlingRight('blackKingSide')" />
+                  <span>0-0</span>
+                </label>
+                <label class="ui-check" title="Black queenside castling">
+                  <input type="checkbox" [checked]="setupCastling.blackQueenSide"
+                    [disabled]="!canSetupCastle('blackQueenSide')" (change)="toggleCastlingRight('blackQueenSide')" />
+                  <span>0-0-0</span>
+                </label>
               </div>
             </div>
           </div>
