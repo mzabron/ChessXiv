@@ -82,3 +82,8 @@ yarn-error.log*
 docker-compose.override.yml
 *.pgsql
 *.sql.backup
+
+# Build output written with Windows-style separators, which "bin/" does not match.
+*bin\Debug/
+*obj\Debug/
+preprocessed.xml
