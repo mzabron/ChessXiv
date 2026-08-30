@@ -22,6 +22,10 @@ export class AuthApiService {
     return this.http.post<AuthRegisterResponse>(`${this.baseUrl}/auth/register`, request);
   }
 
+  createGuestSession(): Observable<AuthTokenResponse> {
+    return this.http.post<AuthTokenResponse>(`${this.baseUrl}/auth/guest-session`, {});
+  }
+
   login(request: AuthLoginRequest): Observable<AuthTokenResponse> {
     return this.http.post<AuthTokenResponse>(`${this.baseUrl}/auth/login`, request);
   }
@@ -54,14 +58,15 @@ export class AuthApiService {
     return this.http.post<AuthTokenResponse>(`${this.baseUrl}/auth/confirm-email`, request);
   }
 
-  private resolveBaseUrl(): string {
-    const host = window.location.hostname;
-    const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
-
-    if (isLocalHost) {
-      return `http://${host}:5027/api`;
-    }
-
-    return '/api';
+  /**
+   * Reassigns a guest's staging games onto the account they just signed into. The route
+   * lives under /api/pgn (that's where the staging rows live), but the operation itself is
+   * part of the auth transition, so it's called from here rather than a drafts-feature
+   * service.
+   */
+  claimGuestDraft(guestToken: string): Observable<{ claimed: boolean; gameCount: number }> {
+    return this.http.post<{ claimed: boolean; gameCount: number }>(`${this.baseUrl}/pgn/drafts/claim`, {
+      guestToken
+    });
   }
 }

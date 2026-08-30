@@ -42,14 +42,4 @@ export class AccountApiService {
     });
   }
 
-  private resolveBaseUrl(): string {
-    const host = window.location.hostname;
-    const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
-
-    if (isLocalHost) {
-      return `http://${host}:5027/api`;
-    }
-
-    return '/api';
-  }
 }

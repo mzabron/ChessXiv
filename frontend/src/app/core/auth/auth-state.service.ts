@@ -1,6 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { jwtDecode } from 'jwt-decode';
-import { Observable, map } from 'rxjs';
+import { Observable, firstValueFrom, from, map, switchMap } from 'rxjs';
 import { AuthApiService } from './auth-api.service';
 import {
   AuthLoginRequest,
@@ -39,9 +39,29 @@ export class AuthStateService {
     this.restoreSession();
   }
 
+  /**
+   * Guests need a bearer token too: uploading and exploring a PGN happens against the
+   * same staging endpoints a signed-in user hits, keyed by the token's subject. The token
+   * is refused by every endpoint that writes durable data, so a guest can browse their
+   * import but not save it.
+   */
+  async ensureGuestSession(): Promise<void> {
+    if (this.isAuthenticated() || this.sessionService.hasValidGuestSession()) {
+      return;
+    }
+
+    try {
+      const response = await firstValueFrom(this.authApi.createGuestSession());
+      this.sessionService.setGuestSession(response.accessToken, response.expiresAtUtc);
+    } catch {
+      // Without a guest token the explorer still works read-only against public data.
+      this.sessionService.clearGuestSession();
+    }
+  }
+
   login(request: AuthLoginRequest): Observable<AuthUser> {
     return this.authApi.login(request).pipe(
-      map(response => this.applyTokenResponse(response))
+      switchMap(response => from(this.applyTokenResponse(response)))
     );
   }
 
@@ -67,12 +87,14 @@ export class AuthStateService {
 
   confirmEmail(request: ConfirmEmailRequest): Observable<AuthUser> {
     return this.authApi.confirmEmail(request).pipe(
-      map(response => this.applyTokenResponse(response))
+      switchMap(response => from(this.applyTokenResponse(response)))
     );
   }
 
   logout(): void {
     this.sessionService.clearSession();
+    // A signed-in user's draft belongs to their account, not to the guest that follows.
+    this.sessionService.clearGuestSession();
     this.currentUserSignal.set(null);
   }
 
@@ -103,7 +125,22 @@ export class AuthStateService {
     this.currentUserSignal.set(user);
   }
 
-  private applyTokenResponse(response: AuthTokenResponse): AuthUser {
+  /**
+   * Applies a freshly issued user token and, when the caller arrived as a guest, rescues
+   * their in-progress draft before the guest identity becomes unreachable.
+   *
+   * A guest's staging games are keyed by their throwaway token's subject; once that token
+   * is gone, nobody can ever present it again, so the rows become permanently invisible to
+   * everyone while still occupying storage. Discarding the guest token here used to happen
+   * immediately, before the caller could possibly do anything with it - this is the one
+   * point in the app where it is still usable, so the claim call happens here, in this
+   * order: the new session is set first (the claim endpoint requires it), the claim is
+   * awaited so the migrated rows exist before anything reloads the draft list, and only
+   * then does isAuthenticated() flip - which is what triggers that reload.
+   */
+  private async applyTokenResponse(response: AuthTokenResponse): Promise<AuthUser> {
+    const guestToken = this.sessionService.getGuestToken();
+
     this.sessionService.setSession(response.accessToken, response.expiresAtUtc);
 
     const user = this.decodeUser(response.accessToken);
@@ -112,6 +149,16 @@ export class AuthStateService {
       throw new Error('Invalid access token payload.');
     }
 
+    if (guestToken) {
+      try {
+        await firstValueFrom(this.authApi.claimGuestDraft(guestToken));
+      } catch {
+        // Best effort: an unclaimed guest draft is not lost, it just ages out via the
+        // normal idle-based staging cleanup like any other abandoned draft.
+      }
+    }
+
+    this.sessionService.clearGuestSession();
     this.currentUserSignal.set(user);
     return user;
   }

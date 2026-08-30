@@ -3,8 +3,7 @@ export interface AccountSummary {
   email: string;
   savedGamesUsed: number;
   savedGamesLimit: number;
-  importedGamesUsed: number;
-  importedGamesLimit: number;
+  maxUploadBytes: number;
 }
 
 export interface ChangeAccountEmailRequest {

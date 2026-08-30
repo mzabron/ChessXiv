@@ -5,8 +5,43 @@ export class AuthSessionService {
   private readonly tokenStorageKey = 'chessxiv.auth.token';
   private readonly expiresStorageKey = 'chessxiv.auth.expiresAtUtc';
 
+  /**
+   * Guest tokens live in sessionStorage rather than localStorage: closing the tab drops
+   * the token, which makes the guest's uploaded draft unreachable straight away. The
+   * backend then sweeps the orphaned staging rows once they go idle.
+   */
+  private readonly guestTokenStorageKey = 'chessxiv.guest.token';
+  private readonly guestExpiresStorageKey = 'chessxiv.guest.expiresAtUtc';
+
+  /** The signed-in user's token when there is one, otherwise the anonymous guest token. */
   getAccessToken(): string | null {
+    return localStorage.getItem(this.tokenStorageKey) ?? this.getGuestToken();
+  }
+
+  getUserAccessToken(): string | null {
     return localStorage.getItem(this.tokenStorageKey);
+  }
+
+  getGuestToken(): string | null {
+    return sessionStorage.getItem(this.guestTokenStorageKey);
+  }
+
+  setGuestSession(accessToken: string, expiresAtUtc: string): void {
+    sessionStorage.setItem(this.guestTokenStorageKey, accessToken);
+    sessionStorage.setItem(this.guestExpiresStorageKey, expiresAtUtc);
+  }
+
+  clearGuestSession(): void {
+    sessionStorage.removeItem(this.guestTokenStorageKey);
+    sessionStorage.removeItem(this.guestExpiresStorageKey);
+  }
+
+  hasValidGuestSession(now: Date = new Date()): boolean {
+    return AuthSessionService.isUnexpired(
+      this.getGuestToken(),
+      sessionStorage.getItem(this.guestExpiresStorageKey),
+      now
+    );
   }
 
   getExpiresAtUtc(): string | null {
@@ -24,9 +59,10 @@ export class AuthSessionService {
   }
 
   hasValidSession(now: Date = new Date()): boolean {
-    const token = this.getAccessToken();
-    const expiresAtUtc = this.getExpiresAtUtc();
+    return AuthSessionService.isUnexpired(this.getUserAccessToken(), this.getExpiresAtUtc(), now);
+  }
 
+  private static isUnexpired(token: string | null, expiresAtUtc: string | null, now: Date): boolean {
     if (!token || !expiresAtUtc) {
       return false;
     }
