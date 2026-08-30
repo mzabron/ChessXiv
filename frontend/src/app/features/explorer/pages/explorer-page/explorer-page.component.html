@@ -13,16 +13,17 @@
     <div class="board-moves-row" #boardMovesRow *ngIf="!isFocusMode">
       <app-chessboard #mainChessboard [navigationRequest]="navigationRequest" [sanMoveRequest]="boardSanMoveRequest()"
         [replayData]="selectedGameReplay()" (moveRowsChanged)="onMoveRowsChanged($event)"
-        (currentPlyChanged)="onCurrentPlyChanged($event)" (currentFenChanged)="onBoardFenChanged($event)" />
+        (currentPlyChanged)="onCurrentPlyChanged($event)" (currentFenChanged)="onBoardFenChanged($event)"
+        (recordedGameAbandoned)="onRecordedGameAbandoned()" />
       <app-move-list #mainMoveList [moveRows]="moveRows" [currentPly]="currentPly"
-        [gameResult]="selectedGameReplay()?.result ?? null" (plySelected)="onPlySelected($event)" />
+        [gameResult]="activeGameResult()" (plySelected)="onPlySelected($event)" />
     </div>
 
     <!-- Focus Mode Board -->
     <app-chessboard *ngIf="isFocusMode" class="full-size-board" [navigationRequest]="navigationRequest"
       [sanMoveRequest]="boardSanMoveRequest()" [replayData]="selectedGameReplay()"
       (moveRowsChanged)="onMoveRowsChanged($event)" (currentPlyChanged)="onCurrentPlyChanged($event)"
-      (currentFenChanged)="onBoardFenChanged($event)" />
+      (currentFenChanged)="onBoardFenChanged($event)" (recordedGameAbandoned)="onRecordedGameAbandoned()" />
 
     <!-- Default Mode Tree -->
     <app-games-tree *ngIf="!isFocusMode" [sourceType]="currentGamesSource"
@@ -41,13 +42,20 @@
       [sortDirection]="draftGamesSortDirection()" [selectedGameId]="selectedGameId()"
       [databaseName]="currentDatabaseName" [sourceType]="currentGamesSource" [activeDatabaseId]="activeUserDatabaseId()"
       [myDatabases]="myDatabases()" [panelDatabases]="panelDatabases()" [currentUserName]="currentUserName() ?? ''"
-      [boardFen]="boardFen()" [filters]="gamesFilters()" (importDatabase)="importDatabase()"
-      (searchCommunityDatabase)="searchCommunityDatabase()" (saveDatabase)="saveCurrentDatabase()"
+      [isRegisteredUser]="isRegisteredUser()" [savedGamesUsed]="savedGamesUsed()"
+      [savedGamesLimit]="savedGamesLimit()" [selectedGameIds]="selectedGameIds()"
+      [isLoadingGames]="isLoadingGames()"
+      [boardFen]="boardFen()" [filters]="gamesFilters()" [appliedFilters]="appliedGamesFilters()"
+      (importDatabase)="importDatabase()"
+      (signInRequested)="signInRequested.emit()"
+      (selectedGameIdsChange)="onSelectedGameIdsChanged($event)"
       (openDatabase)="onDatabaseSelected($event)" (deleteDatabase)="onDatabaseDeleteRequested($event)"
       (refreshDatabases)="onDatabasesRefreshRequested()"
-      (updateDatabase)="onDatabaseUpdateRequested($event)"
+      (updateDatabase)="onDatabaseUpdateRequested($event)" (createDatabase)="onCreateDatabaseRequested($event)"
+      (toggleBookmark)="toggleDatabaseBookmark($event)"
+      (removeSelectedGames)="onRemoveSelectedGamesRequested()"
       (closeDatabase)="closeCurrentDatabase()" (saveDatabaseRequest)="onSaveDatabaseRequest($event)"
-      (addBookmark)="addCurrentDatabaseBookmark()"
+      (addBookmark)="toggleCurrentDatabaseBookmark()"
       (gamesResultSortModeChange)="onDraftGamesResultSortModeChanged($event)"
       (gamesSortChange)="onDraftGamesSortChanged($event)" (gamesPageSizeChange)="onDraftGamesPageSizeChanged($event)"
       (gamesPageChange)="onDraftGamesPageChanged($event)" (gameSelected)="onGameSelected($event)"
@@ -59,17 +67,22 @@
       <div class="tabs-shell">
         <button type="button" class="tabs-nav tabs-nav-left" aria-label="Scroll tabs left"
           (click)="scrollFocusTabs('left')">&#9664;</button>
-        <div class="tabs" #focusTabs>
-          <button class="tab-btn" [class.active]="focusRightTab === 'tree'"
-            (click)="focusRightTab = 'tree'">Tree</button>
-          <button class="tab-btn" [class.active]="focusRightTab === 'moves'"
-            (click)="focusRightTab = 'moves'">Moves</button>
-          <button class="tab-btn" [class.active]="focusRightTab === 'games'"
-            (click)="focusRightTab = 'games'">Games</button>
-          <button class="tab-btn" [class.active]="focusRightTab === 'filters'"
-            (click)="focusRightTab = 'filters'">Filters</button>
-          <button class="tab-btn" [class.active]="focusRightTab === 'databases'"
-            (click)="focusRightTab = 'databases'">Databases</button>
+        <div class="tabs" #focusTabs appReorderableTabs #focusTabOrder="reorderableTabs"
+          [storageKey]="focusTabOrderStorageKey" [defaultOrder]="defaultFocusTabOrder"
+          (click)="focusTabOrder.onClickCapture($event)">
+          @for (tab of focusTabOrder.order; track tab) {
+          <button type="button" class="tab-btn" [class.active]="focusRightTab === tab"
+            [class.is-dragging]="focusTabOrder.draggedTab === tab"
+            [class.is-drop-target]="focusTabOrder.dragOverTab === tab && focusTabOrder.draggedTab !== tab"
+            [style.transform]="focusTabOrder.draggedTab === tab ? 'translateX(' + focusTabOrder.dragOffsetX + 'px)' : null"
+            (pointerdown)="focusTabOrder.onPointerDown(tab, $event)" (click)="focusRightTab = tab">
+            {{ focusTabLabels[tab] }}
+            @if (tab === 'filters' && hasActiveAppliedFilters()) {
+            <span class="filter-marker" aria-hidden="true">*</span>
+            <span class="visually-hidden">(filters active)</span>
+            }
+          </button>
+          }
         </div>
         <button type="button" class="tabs-nav tabs-nav-right" aria-label="Scroll tabs right"
           (click)="scrollFocusTabs('right')">&#9654;</button>
@@ -77,16 +90,20 @@
       <div class="tab-body fade-in">
         <div *ngIf="focusRightTab === 'databases'" class="full-height-child">
           <app-databases-panel [databases]="panelDatabases()" [currentUser]="currentUserName() ?? ''"
-            [activeDatabaseId]="activeUserDatabaseId()" (openDatabase)="onDatabaseSelected($event)"
+            [activeDatabaseId]="activeUserDatabaseId()" [isRegisteredUser]="isRegisteredUser()"
+            (openDatabase)="onDatabaseSelected($event)"
             (deleteDatabase)="onDatabaseDeleteRequested($event)"
             (refreshDatabases)="onDatabasesRefreshRequested()"
-            (updateDatabase)="onDatabaseUpdateRequested($event)" />
+            (updateDatabase)="onDatabaseUpdateRequested($event)"
+            (createDatabase)="onCreateDatabaseRequested($event)"
+            (toggleBookmark)="toggleDatabaseBookmark($event)"
+            (signInRequested)="signInRequested.emit()" />
         </div>
         <app-games-tree *ngIf="focusRightTab === 'tree'" class="full-height-child" [sourceType]="currentGamesSource"
           [gamesLoaded]="gamesLoaded || currentGamesSource === 'userDatabase'" [loading]="moveTreeLoading()"
           [error]="moveTreeError()" [moveTree]="moveTreeData()" (moveSelected)="onTreeMoveSelected($event)" />
         <app-move-list *ngIf="focusRightTab === 'moves'" class="full-height-child" [moveRows]="moveRows"
-          [currentPly]="currentPly" [gameResult]="selectedGameReplay()?.result ?? null"
+          [currentPly]="currentPly" [gameResult]="activeGameResult()"
           (plySelected)="onPlySelected($event)" />
 
         <div *ngIf="focusRightTab === 'games'" class="full-height-child" style="display: flex; flex-direction: column;">
@@ -100,12 +117,14 @@
 
           @if (!gamesLoaded) {
           <app-empty-games-state (importDatabase)="importDatabase()"
-            (searchCommunityDatabase)="focusRightTab = 'databases'; searchCommunityDatabase()" />
+            (browseDatabases)="focusRightTab = 'databases'" />
           } @else {
           <app-games-table [games]="draftGames()" [totalCount]="draftGamesTotalCount()" [page]="draftGamesPage()"
             [pageSize]="draftGamesPageSize()" [selectedGameId]="selectedGameId()"
             [resultSortMode]="draftGamesResultSortMode()" [sortBy]="draftGamesSortBy()"
-            [sortDirection]="draftGamesSortDirection()"
+            [sortDirection]="draftGamesSortDirection()" [selectedGameIds]="selectedGameIds()"
+            [selectionEnabled]="isRegisteredUser()" [isLoading]="isLoadingGames()"
+            (selectedGameIdsChange)="onSelectedGameIdsChanged($event)"
             (resultSortModeChange)="onDraftGamesResultSortModeChanged($event)"
             (sortChange)="onDraftGamesSortChanged($event)" (pageSizeChange)="onDraftGamesPageSizeChanged($event)"
             (pageChange)="onDraftGamesPageChanged($event)" (gameSelected)="onGameSelected($event)" />
@@ -163,10 +182,16 @@
 <div class="import-progress-overlay" role="dialog" aria-modal="true" aria-label="Delete confirmation">
   <div class="delete-confirm-card">
     @if (deleteConfirmationKind() === 'draft') {
-    <h3>Delete Imported Draft?</h3>
+    <h3>Delete imported draft?</h3>
     <p>This will remove all currently imported draft games.</p>
+    } @else if (deleteConfirmationKind() === 'games') {
+    <h3>Remove {{ selectedGameIds().length }} {{ selectedGameIds().length === 1 ? 'game' : 'games' }}?</h3>
+    <p>
+      They will be removed from <strong>{{ currentDatabaseName }}</strong>. Any game that is
+      not saved in another database will be deleted permanently.
+    </p>
     } @else {
-    <h3>Delete Database?</h3>
+    <h3>Delete database?</h3>
     <p>
       This will permanently delete
       <strong>{{ deleteConfirmationDatabaseName() }}</strong>
@@ -176,7 +201,9 @@
 
     <div class="delete-confirm-actions">
       <button type="button" class="confirm-btn" (click)="cancelDeleteConfirmation()">Cancel</button>
-      <button type="button" class="confirm-btn danger" (click)="confirmDeleteConfirmation()">Delete</button>
+      <button type="button" class="confirm-btn danger" (click)="confirmDeleteConfirmation()">
+        {{ deleteConfirmationKind() === 'games' ? 'Remove' : 'Delete' }}
+      </button>
     </div>
   </div>
 </div>

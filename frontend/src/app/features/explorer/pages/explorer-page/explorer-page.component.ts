@@ -1,6 +1,6 @@
-import { Component, ElementRef, HostListener, ViewChild, Input, effect, inject, signal, OnDestroy, AfterViewInit } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild, Input, Output, EventEmitter, computed, effect, inject, signal, OnDestroy, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { firstValueFrom, forkJoin, Subscription } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChessboardComponent } from '../../components/chessboard/chessboard.component';
 import { GamesListComponent } from '../../components/games-list/games-list.component';
@@ -12,8 +12,12 @@ import { DatabasesPanelComponent } from '../../components/databases-panel/databa
 import { GamesTableComponent } from '../../components/games-table/games-table.component';
 import { MoveRow } from '../../components/move-list/move-list.component';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
-import { UserDatabasesApiService } from '../../services/user-databases-api.service';
+import { AccountApiService } from '../../../../core/auth/account-api.service';
+import { UserDatabaseListItemDto, UserDatabasesApiService } from '../../services/user-databases-api.service';
 import { Database } from '../../components/databases-panel/databases-panel.component';
+
+/** Tabs in the focus-mode side panel. */
+type FocusPanelTab = 'tree' | 'moves' | 'games' | 'filters' | 'databases';
 import {
   DraftGameListItem,
   DraftGamesResultSortMode,
@@ -29,6 +33,7 @@ import {
   toExplorerGamesFiltersQuery,
   toExplorerMoveTreeFiltersPayload
 } from '../../services/games-filters.models';
+import { ReorderableTabsDirective } from '../../../../shared/directives/reorderable-tabs.directive';
 import {
   ExplorerBoardApiService,
   ExplorerMoveTreeRequest,
@@ -38,25 +43,36 @@ import {
 @Component({
   selector: 'app-explorer-page',
   standalone: true,
-  imports: [CommonModule, ChessboardComponent, GamesTreeComponent, GamesListComponent, MoveListComponent, EmptyGamesStateComponent, FiltersPanelComponent, DatabasesPanelComponent, GamesTableComponent],
+  imports: [CommonModule, ChessboardComponent, GamesTreeComponent, GamesListComponent, MoveListComponent, EmptyGamesStateComponent, FiltersPanelComponent, DatabasesPanelComponent, GamesTableComponent, ReorderableTabsDirective],
   templateUrl: './explorer-page.component.html',
   styleUrl: './explorer-page.component.scss'
 })
 export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   private static readonly initialBoardFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+  /**
+   * Matches the server limit. Checked client-side too, because Cloudflare rejects a larger
+   * body before it reaches the origin, which would surface as an opaque network failure.
+   */
+  private static readonly maxUploadBytes = 100 * 1024 * 1024;
   private readonly authState = inject(AuthStateService);
   private readonly userDatabasesApi = inject(UserDatabasesApiService);
   private readonly draftImportApi = inject(DraftImportApiService);
   private readonly draftImportProgress = inject(DraftImportProgressService);
   private readonly explorerBoardApi = inject(ExplorerBoardApiService);
+  private readonly accountApi = inject(AccountApiService);
 
   private readonly loadedForCurrentSession = signal(false);
   protected readonly activeUserDatabaseId = signal<string | null>(null);
   private static readonly activeDatabaseStorageKey = 'chessxiv.explorer.active-user-database';
-  private static readonly deletedDatabaseStorageKey = 'chessxiv.explorer.deleted-user-databases';
   private progressSubscription: Subscription | null = null;
 
   @Input() isFocusMode = false;
+
+  /** Raised when a guest tries to do something that needs an account. */
+  @Output() readonly signInRequested = new EventEmitter<void>();
+
+  protected readonly isRegisteredUser = computed(() => this.authState.isAuthenticated());
 
   @ViewChild('layoutRoot', { static: true })
   private readonly layoutRoot!: ElementRef<HTMLElement>;
@@ -84,7 +100,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   protected readonly importError = signal<string | null>(null);
   protected readonly importErrorVisible = signal(false);
   protected readonly deleteConfirmationVisible = signal(false);
-  protected readonly deleteConfirmationKind = signal<'draft' | 'database' | null>(null);
+  protected readonly deleteConfirmationKind = signal<'draft' | 'database' | 'games' | null>(null);
   protected readonly deleteConfirmationDatabaseName = signal('');
   protected readonly draftGames = signal<DraftGameListItem[]>([]);
   protected readonly draftGamesTotalCount = signal(0);
@@ -94,17 +110,34 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   protected readonly draftGamesSortBy = signal<DraftGamesSortBy>('createdAt');
   protected readonly draftGamesSortDirection = signal<DraftGamesSortDirection>('desc');
   protected readonly gamesFilters = signal<ExplorerGamesFilterState>(createDefaultExplorerGamesFilterState());
+  /**
+   * The filters the currently displayed list was loaded with. Kept apart from the live form
+   * state so the "filters active" marker reflects the list, not what is being typed.
+   */
+  protected readonly appliedGamesFilters = signal<ExplorerGamesFilterState>(createDefaultExplorerGamesFilterState());
   protected readonly boardFen = signal('');
   protected readonly moveTreeData = signal<ExplorerMoveTreeResponse | null>(null);
   protected readonly moveTreeLoading = signal(false);
   protected readonly moveTreeError = signal<string | null>(null);
   protected currentDatabaseName = 'Games';
-  protected currentGamesSource: 'imported' | 'external' | 'userDatabase' = 'imported';
+  protected currentGamesSource: 'imported' | 'userDatabase' = 'imported';
   protected readonly selectedGameId = signal<string | null>(null);
   protected readonly selectedGameReplay = signal<GameReplayResponse | null>(null);
+  /**
+   * Cleared once the user plays a move of their own: the loaded game's result no longer
+   * describes the position on the board, so continuing to show it would be a lie.
+   */
+  protected readonly hasAbandonedRecordedGame = signal(false);
+  protected readonly activeGameResult = computed(() =>
+    this.hasAbandonedRecordedGame() ? null : this.selectedGameReplay()?.result ?? null
+  );
   protected readonly boardSanMoveRequest = signal<{ san: string; version: number } | null>(null);
   protected readonly myDatabases = signal<Array<{ id: string; name: string }>>([]);
   protected readonly panelDatabases = signal<Database[]>([]);
+  protected readonly savedGamesUsed = signal(0);
+  protected readonly savedGamesLimit = signal(0);
+  protected readonly selectedGameIds = signal<string[]>([]);
+  protected readonly isLoadingGames = signal(false);
   protected readonly currentUserName = this.authState.userName;
   protected moveRows: MoveRow[] = [];
   protected currentPly = 0;
@@ -116,45 +149,45 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   private importErrorClearTimerId: number | null = null;
   private pendingDeleteDatabase: Database | null = null;
   private boardMovesResizeObserver: ResizeObserver | null = null;
-  protected mockGames: any[] = [
-    {
-      year: 2023,
-      white: 'Carlsen, M.',
-      whiteElo: 2853,
-      result: '1-0',
-      black: 'Nakamura, H.',
-      blackElo: 2789,
-      eco: 'C65',
-      event: 'Norway Chess',
-      moveCount: 42
-    },
-    {
-      year: 2023,
-      white: 'Caruana, F.',
-      whiteElo: 2782,
-      result: '1/2-1/2',
-      black: 'Ding, L.',
-      blackElo: 2788,
-      eco: 'D37',
-      event: 'World Championship',
-      moveCount: 68
-    },
-    {
-      year: 2024,
-      white: 'Fiorito, F.',
-      whiteElo: 2470,
-      result: '0-1',
-      black: 'Carlsen, M.',
-      blackElo: 2832,
-      eco: 'D31',
-      event: 'World Blitz',
-      moveCount: 38
-    }
-  ];
   protected isResizing = false;
   protected leftPaneWidth = 620;
 
-  protected focusRightTab: 'databases' | 'tree' | 'moves' | 'games' | 'filters' = 'tree';
+  protected focusRightTab: FocusPanelTab = 'tree';
+
+  /** Order is owned by ReorderableTabsDirective, which also persists it. */
+  protected readonly focusTabOrderStorageKey = 'chessxiv.explorer.focus-tab-order';
+  protected readonly defaultFocusTabOrder: FocusPanelTab[] = [
+    'tree', 'moves', 'games', 'filters', 'databases'
+  ];
+
+  protected readonly focusTabLabels: Record<FocusPanelTab, string> = {
+    tree: 'Tree',
+    moves: 'Moves',
+    games: 'Games',
+    filters: 'Filters',
+    databases: 'Databases'
+  };
+
+  /**
+   * Mirrors the games panel's marker so the focus-mode strip flags applied filters too.
+   * Reads the applied state, not the live form - typing is not yet filtering.
+   */
+  protected readonly hasActiveAppliedFilters = computed(() => {
+    const f = this.appliedGamesFilters();
+
+    return Boolean(
+      f.whiteFirstName.trim() ||
+      f.whiteLastName.trim() ||
+      f.blackFirstName.trim() ||
+      f.blackLastName.trim() ||
+      f.ecoCode.trim() ||
+      f.result.trim() ||
+      f.eloEnabled ||
+      f.yearEnabled ||
+      f.moveEnabled ||
+      f.searchByPosition
+    );
+  });
 
   private static readonly minBoardWidth = 320;
   private static readonly minMoveListWidth = 145;
@@ -163,27 +196,35 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   private static readonly handleWidth = 8;
   constructor() {
     effect(() => {
-      if (!this.authState.isAuthenticated()) {
-        this.loadedForCurrentSession.set(false);
-        this.myDatabases.set([]);
-        this.panelDatabases.set([]);
-        this.activeUserDatabaseId.set(null);
-        this.detachProgressSubscription();
-        void this.draftImportProgress.disconnect();
-        this.loadPublicDatabases();
-        return;
-      }
+      const isAuthenticated = this.authState.isAuthenticated();
 
-      void this.draftImportProgress.connect();
-      this.attachGlobalProgressSubscription();
-      this.checkAndHydrateGhostImport();
-
-      if (this.loadedForCurrentSession()) {
-        return;
-      }
-
-      this.loadUserDatabases();
+      // Signing in or out changes which games the caller may see, so every piece of
+      // loaded state has to go - otherwise the previous session's database header, game
+      // list and move tree stay on screen while the data behind them is no longer there.
+      void this.onSessionChanged(isAuthenticated);
     });
+  }
+
+  private async onSessionChanged(isAuthenticated: boolean): Promise<void> {
+    this.explorerBoardApi.invalidateMoveTreeCache();
+    this.detachProgressSubscription();
+    this.resetCurrentGamesView();
+    this.myDatabases.set([]);
+    this.panelDatabases.set([]);
+    this.loadedForCurrentSession.set(false);
+
+    if (!isAuthenticated) {
+      await this.draftImportProgress.disconnect();
+      // Guests get an anonymous token so they can upload and explore without an account.
+      await this.authState.ensureGuestSession();
+    }
+
+    await this.draftImportProgress.connect();
+    this.attachGlobalProgressSubscription();
+    this.checkAndHydrateGhostImport();
+
+    await this.loadDatabases();
+    await this.refreshAccountUsage();
   }
 
   private attachGlobalProgressSubscription(): void {
@@ -334,20 +375,6 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.pgnFileInput?.nativeElement.click();
   }
 
-  protected searchCommunityDatabase(): void {
-    // Placeholder action for searching a remote community database.
-    console.log('Search database (community database)');
-    this.activeUserDatabaseId.set(null);
-    this.clearPersistedActiveDatabase();
-    this.gamesLoaded = true;
-    this.currentDatabaseName = 'Community Database';
-    this.currentGamesSource = 'external';
-    this.selectedGameId.set(null);
-    this.selectedGameReplay.set(null);
-    this.moveRows = [];
-    this.currentPly = 0;
-    this.clearMoveTree();
-  }
 
   protected onDatabaseSelected(database: Database): void {
     if (this.isFocusMode) {
@@ -367,7 +394,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   }
 
   protected onDatabaseDeleteRequested(database: Database): void {
-    if (database.owner !== (this.currentUserName() ?? '')) {
+    if (!database.isOwner) {
       return;
     }
 
@@ -377,16 +404,32 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   }
 
   protected onDatabasesRefreshRequested(): void {
-    if (this.authState.isAuthenticated()) {
-      void this.reloadUserDatabases();
-      return;
-    }
+    void this.reloadDatabases();
+  }
 
-    this.loadPublicDatabases();
+  protected async onCreateDatabaseRequested(payload: { name: string; isPublic: boolean }): Promise<void> {
+    try {
+      await firstValueFrom(this.userDatabasesApi.create(payload));
+      await this.reloadDatabases();
+    } catch (error) {
+      if (error instanceof HttpErrorResponse) {
+        if (error.status === 409) {
+          this.showImportError('You already have a database with this name.');
+          return;
+        }
+
+        if (error.status === 401 || error.status === 403) {
+          this.showImportError('Sign in to create a database.');
+          return;
+        }
+      }
+
+      this.showImportError('Unable to create database. Please try again.');
+    }
   }
 
   protected async onDatabaseUpdateRequested(payload: { database: Database; name: string; isPublic: boolean }): Promise<void> {
-    if (payload.database.owner !== (this.currentUserName() ?? '')) {
+    if (!payload.database.isOwner) {
       return;
     }
 
@@ -433,14 +476,17 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
     if (kind === 'database' && pendingDatabase) {
       void this.deleteDatabase(pendingDatabase);
+      return;
+    }
+
+    if (kind === 'games') {
+      void this.removeSelectedGames();
     }
   }
 
-  protected saveCurrentDatabase(): void {
-    // The save modal handles whether this becomes merge or create.
-  }
 
   protected async onSaveDatabaseRequest(payload: {
+    intent: 'saveDraft' | 'addSelection';
     mode: 'merge' | 'create';
     targetDatabaseId?: string;
     newDatabaseName?: string;
@@ -454,6 +500,8 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.saveDraftCompleted.set(false);
     this.isSavingDraft.set(true);
 
+    let createdDatabaseId: string | null = null;
+
     try {
       let userDatabaseId = payload.targetDatabaseId;
 
@@ -466,6 +514,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         );
 
         userDatabaseId = created.id;
+        createdDatabaseId = created.id;
       }
 
       if (!userDatabaseId) {
@@ -473,10 +522,31 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         return;
       }
 
-      await firstValueFrom(this.draftImportApi.promoteDraft({ userDatabaseId }));
-      await this.reloadUserDatabases();
+      try {
+        // Both intents go through the same selection-aware save: "Save to database" for the
+        // imported draft used to always promote the ENTIRE draft via promoteDraft(), ignoring
+        // both the checkboxes and the active filters. That meant the modal's own summary text
+        // ("N games will be saved") was routinely a lie, and a large, unfiltered draft could
+        // trip the saved-games limit even when the visible/filtered/selected count was small.
+        // addGamesFromSelection honors filters and an explicit selection for both the draft
+        // and a user database, so "what you see is what gets saved" now actually holds.
+        await this.addCurrentSelectionToDatabase(userDatabaseId);
+      } catch (addError) {
+        if (createdDatabaseId) {
+          // A "New database" save that fails to add anything must not leave an empty,
+          // pointless database behind - the user asked to save games, not to create an
+          // empty container. Roll back what create() just did.
+          await this.rollBackCreatedDatabase(createdDatabaseId);
+        }
 
-      const selectedDatabase = this.panelDatabases().find(db => db.id === userDatabaseId)
+        throw addError;
+      }
+
+      this.explorerBoardApi.invalidateMoveTreeCache();
+      await this.reloadDatabases();
+      await this.refreshAccountUsage();
+
+      const selectedDatabase: Database = this.panelDatabases().find(db => db.id === userDatabaseId)
         ?? {
         id: userDatabaseId,
         name: payload.mode === 'create'
@@ -485,23 +555,98 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         isPublic: payload.visibility === 'public',
         owner: this.currentUserName() ?? '',
         creationDate: new Date(),
-        gamesCount: 0
+        contentUpdatedDate: new Date(),
+        gamesCount: 0,
+        isOwner: true,
+        isBookmarked: false
       };
 
       await this.openUserDatabase(selectedDatabase);
       this.saveDraftCompleted.set(true);
     } catch (error) {
-      if (error instanceof HttpErrorResponse && payload.mode === 'create') {
-        const rawMessage = this.extractErrorMessage(error);
-        if (error.status === 409 || rawMessage.toLowerCase().includes('already exists')) {
-          this.showImportError('You already have a database with this name.');
-          return;
-        }
-      }
-
-      this.showImportError('Saving imported games failed. Please try again.');
+      this.showImportError(this.resolveSaveErrorMessage(error, payload.mode));
     } finally {
       this.isSavingDraft.set(false);
+    }
+  }
+
+  /**
+   * Adds what the user is currently looking at: their explicit tick-box selection when
+   * there is one, otherwise every game matching the active filters - which is usually far
+   * more than the page on screen, so the server resolves the set rather than the client.
+   */
+  /**
+   * Deletes a database this same request just created, when adding games to it failed. Best
+   * effort: if the delete itself fails there is nothing more useful to do than leave the
+   * empty database for the user to remove manually, which is the pre-fix behaviour, not a
+   * regression - so failures here are swallowed rather than compounding the error shown for
+   * the original, more important failure.
+   */
+  private async rollBackCreatedDatabase(databaseId: string): Promise<void> {
+    try {
+      await firstValueFrom(this.userDatabasesApi.delete(databaseId));
+      await this.reloadDatabases();
+    } catch {
+      // Swallowed - see method doc.
+    }
+  }
+
+  private async addCurrentSelectionToDatabase(targetDatabaseId: string): Promise<void> {
+    const explicitIds = this.selectedGameIds();
+
+    const result = await firstValueFrom(
+      this.userDatabasesApi.addGamesFromSelection(targetDatabaseId, {
+        sourceUserDatabaseId:
+          this.currentGamesSource === 'userDatabase'
+            ? this.activeUserDatabaseId() ?? undefined
+            : undefined,
+        gameIds: explicitIds.length > 0 ? explicitIds : undefined,
+        filters: toExplorerGamesFiltersQuery(this.gamesFilters())
+      })
+    );
+
+    this.savedGamesUsed.set(result.savedGamesUsed);
+    this.savedGamesLimit.set(result.savedGamesLimit);
+    this.selectedGameIds.set([]);
+  }
+
+  private resolveSaveErrorMessage(error: unknown, mode: 'merge' | 'create'): string {
+    if (error instanceof HttpErrorResponse) {
+      const payload = error.error as { code?: string; message?: string } | string | null;
+
+      if (payload && typeof payload === 'object' && payload.code === 'SAVED_GAMES_LIMIT' && payload.message) {
+        return payload.message;
+      }
+
+      if (mode === 'create') {
+        const rawMessage = this.extractErrorMessage(error);
+        if (error.status === 409 || rawMessage.toLowerCase().includes('already exists')) {
+          return 'You already have a database with this name.';
+        }
+      }
+    }
+
+    return 'Saving games failed. Please try again.';
+  }
+
+  protected onSelectedGameIdsChanged(gameIds: string[]): void {
+    this.selectedGameIds.set(gameIds);
+  }
+
+  /** Keeps the "saved games" figure in the save dialog honest without polling. */
+  private async refreshAccountUsage(): Promise<void> {
+    if (!this.authState.isAuthenticated()) {
+      this.savedGamesUsed.set(0);
+      this.savedGamesLimit.set(0);
+      return;
+    }
+
+    try {
+      const summary = await firstValueFrom(this.accountApi.getSummary());
+      this.savedGamesUsed.set(summary.savedGamesUsed);
+      this.savedGamesLimit.set(summary.savedGamesLimit);
+    } catch {
+      // Usage display is advisory; the server is the authority when saving.
     }
   }
 
@@ -509,8 +654,78 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.saveDraftCompleted.set(false);
   }
 
-  protected addCurrentDatabaseBookmark(): void {
-    console.log('Bookmark external user database');
+  protected async toggleCurrentDatabaseBookmark(): Promise<void> {
+    const databaseId = this.activeUserDatabaseId();
+    if (!databaseId) {
+      return;
+    }
+
+    const database = this.panelDatabases().find(db => db.id === databaseId);
+    if (!database) {
+      return;
+    }
+
+    await this.toggleDatabaseBookmark(database);
+  }
+
+  protected onRemoveSelectedGamesRequested(): void {
+    if (this.selectedGameIds().length === 0) {
+      return;
+    }
+
+    this.openDeleteConfirmation('games');
+  }
+
+  private async removeSelectedGames(): Promise<void> {
+    const databaseId = this.activeUserDatabaseId();
+    const gameIds = this.selectedGameIds();
+
+    if (!databaseId || gameIds.length === 0) {
+      return;
+    }
+
+    try {
+      await firstValueFrom(this.userDatabasesApi.removeGames(databaseId, gameIds));
+
+      this.selectedGameIds.set([]);
+      this.explorerBoardApi.invalidateMoveTreeCache();
+      await this.reloadGamesAndMoveTree();
+      await this.reloadDatabases();
+      await this.refreshAccountUsage();
+    } catch {
+      this.showImportError('Unable to remove the selected games. Please try again.');
+    }
+  }
+
+  protected async toggleDatabaseBookmark(database: Database): Promise<void> {
+    if (!this.authState.isAuthenticated()) {
+      this.signInRequested.emit();
+      return;
+    }
+
+    // Optimistic: the bookmark icon is a direct, reversible toggle, so waiting on a round
+    // trip before it responds would feel broken. Reverted below if the server disagrees.
+    const previous = this.panelDatabases();
+    this.panelDatabases.set(
+      previous.map(db => (db.id === database.id ? { ...db, isBookmarked: !db.isBookmarked } : db))
+    );
+
+    try {
+      if (database.isBookmarked) {
+        await firstValueFrom(this.userDatabasesApi.removeBookmark(database.id));
+      } else {
+        await firstValueFrom(this.userDatabasesApi.addBookmark(database.id));
+      }
+
+      await this.reloadDatabases();
+    } catch {
+      this.panelDatabases.set(previous);
+      this.showImportError('Unable to update bookmark. Please try again.');
+    }
+  }
+
+  protected onRecordedGameAbandoned(): void {
+    this.hasAbandonedRecordedGame.set(true);
   }
 
   protected onMoveRowsChanged(moveRows: MoveRow[]): void {
@@ -637,6 +852,14 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       return;
     }
 
+    if (file.size > ExplorerPageComponent.maxUploadBytes) {
+      const sizeMb = Math.ceil(file.size / (1024 * 1024));
+      this.showImportError(
+        `That PGN is ${sizeMb} MB. The upload limit is 100 MB - please split it into smaller files.`
+      );
+      return;
+    }
+
     await this.runDraftImport(file);
   }
 
@@ -679,6 +902,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   }
 
   private applyImportedDraftState(result: DraftImportProgressUpdate): void {
+    this.explorerBoardApi.invalidateMoveTreeCache();
     this.gamesLoaded = result.importedCount > 0;
     this.currentDatabaseName = 'Imported Draft';
     this.currentGamesSource = 'imported';
@@ -744,6 +968,11 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   }
 
   private async loadCurrentGamesPage(): Promise<void> {
+    // Whatever the list ends up showing was loaded with these filters, so this is the one
+    // place that needs to record them - it covers apply, reset, sorting, paging and
+    // switching databases alike.
+    this.appliedGamesFilters.set({ ...this.gamesFilters() });
+
     if (this.currentGamesSource === 'userDatabase') {
       const userDatabaseId = this.activeUserDatabaseId();
       if (!userDatabaseId) {
@@ -753,12 +982,23 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
         return;
       }
 
-      await this.loadUserDatabaseGamesPage(userDatabaseId);
+      this.isLoadingGames.set(true);
+      try {
+        await this.loadUserDatabaseGamesPage(userDatabaseId);
+      } finally {
+        this.isLoadingGames.set(false);
+      }
+
       return;
     }
 
     if (this.currentGamesSource === 'imported') {
-      await this.loadDraftGamesPage();
+      this.isLoadingGames.set(true);
+      try {
+        await this.loadDraftGamesPage();
+      } finally {
+        this.isLoadingGames.set(false);
+      }
     }
   }
 
@@ -788,6 +1028,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
       this.selectedGameId.set(game.id);
       this.selectedGameReplay.set(replay);
+      this.hasAbandonedRecordedGame.set(false);
       this.navigationVersion++;
       this.navigationRequest = { ply: 0, version: this.navigationVersion };
     } catch {
@@ -838,115 +1079,66 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     return '';
   }
 
-  private loadUserDatabases(): void {
-    forkJoin({
-      mine: this.userDatabasesApi.getMine(),
-      bookmarks: this.userDatabasesApi.getBookmarks()
-    }).subscribe({
-      next: ({ mine, bookmarks }) => {
-        const deletedIds = this.readDeletedDatabaseIds();
-        this.loadedForCurrentSession.set(true);
-        this.myDatabases.set(mine.map(db => ({ id: db.id, name: db.name })));
-
-        const mineMapped: Database[] = mine.map(db => ({
-          id: db.id,
-          name: db.name,
-          isPublic: db.isPublic,
-          owner: db.ownerUserName || this.currentUserName() || db.ownerUserId,
-          creationDate: new Date(db.createdAtUtc),
-          gamesCount: db.gameCount
-        }));
-
-        const bookmarkMapped: Database[] = bookmarks
-          .filter(bookmark => !mine.some(owned => owned.id === bookmark.id))
-          .map(bookmark => ({
-            id: bookmark.id,
-            name: bookmark.name,
-            isPublic: bookmark.isPublic,
-            owner: bookmark.ownerUserName || bookmark.ownerUserId,
-            creationDate: new Date(bookmark.createdAtUtc),
-            gamesCount: bookmark.gameCount
-          }));
-
-        const allDatabases = this.filterDeletedDatabases([...mineMapped, ...bookmarkMapped], deletedIds);
-        this.persistDeletedDatabaseIds(this.pruneDeletedDatabaseIds(deletedIds, [...mineMapped, ...bookmarkMapped]));
-        this.panelDatabases.set(allDatabases);
-        void this.initializeGamesSourceForSession(allDatabases);
-      },
-      error: () => {
-        this.loadedForCurrentSession.set(false);
-      }
-    });
-  }
-
-  private loadPublicDatabases(): void {
-    this.userDatabasesApi.getPublic().subscribe({
-      next: publicDbs => {
-        const deletedIds = this.readDeletedDatabaseIds();
-        const mapped: Database[] = publicDbs.map(db => ({
-          id: db.id,
-          name: db.name,
-          isPublic: db.isPublic,
-          owner: db.ownerUserName || db.ownerUserId,
-          creationDate: new Date(db.createdAtUtc),
-          gamesCount: db.gameCount
-        }));
-
-        const filtered = this.filterDeletedDatabases(mapped, deletedIds);
-        this.persistDeletedDatabaseIds(this.pruneDeletedDatabaseIds(deletedIds, mapped));
-        this.panelDatabases.set(filtered);
-      },
-      error: () => {
-        this.panelDatabases.set([]);
-      }
-    });
-  }
-
-  private async reloadUserDatabases(): Promise<void> {
+  /**
+   * A single list for guests and signed-in users alike: every public database, plus the
+   * caller's own private ones. Signing in previously swapped this for "mine + bookmarks",
+   * which silently dropped other people's public databases from the panel.
+   */
+  private async loadDatabases(): Promise<void> {
     try {
-      const [mine, bookmarks] = await Promise.all([
-        firstValueFrom(this.userDatabasesApi.getMine()),
-        firstValueFrom(this.userDatabasesApi.getBookmarks())
-      ]);
+      const databases = await firstValueFrom(this.userDatabasesApi.getVisible());
+      const mapped = databases.map(db => this.toPanelDatabase(db));
 
-      const deletedIds = this.readDeletedDatabaseIds();
+      this.panelDatabases.set(mapped);
+      this.myDatabases.set(
+        mapped.filter(db => db.isOwner).map(db => ({ id: db.id, name: db.name }))
+      );
+      this.loadedForCurrentSession.set(true);
 
-      this.myDatabases.set(mine.map(db => ({ id: db.id, name: db.name })));
-
-      const mineMapped: Database[] = mine.map(db => ({
-        id: db.id,
-        name: db.name,
-        isPublic: db.isPublic,
-        owner: db.ownerUserName || this.currentUserName() || db.ownerUserId,
-        creationDate: new Date(db.createdAtUtc),
-        gamesCount: db.gameCount
-      }));
-
-      const bookmarkMapped: Database[] = bookmarks
-        .filter(bookmark => !mine.some(owned => owned.id === bookmark.id))
-        .map(bookmark => ({
-          id: bookmark.id,
-          name: bookmark.name,
-          isPublic: bookmark.isPublic,
-          owner: bookmark.ownerUserName || bookmark.ownerUserId,
-          creationDate: new Date(bookmark.createdAtUtc),
-          gamesCount: bookmark.gameCount
-        }));
-
-      const allDatabases = [...mineMapped, ...bookmarkMapped];
-      this.panelDatabases.set(this.filterDeletedDatabases(allDatabases, deletedIds));
-      this.persistDeletedDatabaseIds(this.pruneDeletedDatabaseIds(deletedIds, allDatabases));
+      await this.initializeGamesSourceForSession(mapped);
     } catch {
-      this.showImportError('Unable to refresh user databases after save.');
+      this.panelDatabases.set([]);
+      this.myDatabases.set([]);
+      this.loadedForCurrentSession.set(false);
     }
+  }
+
+  private async reloadDatabases(): Promise<void> {
+    try {
+      const databases = await firstValueFrom(this.userDatabasesApi.getVisible());
+      const mapped = databases.map(db => this.toPanelDatabase(db));
+
+      this.panelDatabases.set(mapped);
+      this.myDatabases.set(
+        mapped.filter(db => db.isOwner).map(db => ({ id: db.id, name: db.name }))
+      );
+    } catch {
+      this.showImportError('Unable to refresh the database list.');
+    }
+  }
+
+  private toPanelDatabase(db: UserDatabaseListItemDto): Database {
+    return {
+      id: db.id,
+      name: db.name,
+      isPublic: db.isPublic,
+      owner: db.ownerUserName || db.ownerUserId,
+      creationDate: new Date(db.createdAtUtc),
+      contentUpdatedDate: new Date(db.contentUpdatedAtUtc),
+      gamesCount: db.gameCount,
+      isOwner: db.isOwner,
+      isBookmarked: db.isBookmarked
+    };
   }
 
   private async openUserDatabase(database: Database): Promise<void> {
     this.clearImportError();
     this.selectedGameId.set(null);
     this.selectedGameReplay.set(null);
+    this.hasAbandonedRecordedGame.set(false);
     this.moveRows = [];
     this.currentPly = 0;
+    this.selectedGameIds.set([]);
     this.activeUserDatabaseId.set(database.id);
     this.currentDatabaseName = database.name;
     this.currentGamesSource = 'userDatabase';
@@ -989,6 +1181,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   private async restoreImportedDraftIfAny(): Promise<void> {
     this.selectedGameId.set(null);
     this.selectedGameReplay.set(null);
+    this.hasAbandonedRecordedGame.set(false);
     this.moveRows = [];
     this.currentPly = 0;
     this.currentGamesSource = 'imported';
@@ -1009,6 +1202,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     if (clearImportedDraft) {
       try {
         await firstValueFrom(this.draftImportApi.clearDraftGames());
+        this.explorerBoardApi.invalidateMoveTreeCache();
       } catch {
         this.showImportError('Unable to clear imported draft games.');
       }
@@ -1017,6 +1211,8 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
   private resetCurrentGamesView(): void {
     this.activeUserDatabaseId.set(null);
+    this.selectedGameIds.set([]);
+    this.appliedGamesFilters.set(createDefaultExplorerGamesFilterState());
     this.clearPersistedActiveDatabase();
     this.currentDatabaseName = 'Games';
     this.currentGamesSource = 'imported';
@@ -1027,22 +1223,13 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.gamesLoaded = false;
     this.selectedGameId.set(null);
     this.selectedGameReplay.set(null);
+    this.hasAbandonedRecordedGame.set(false);
     this.moveRows = [];
     this.currentPly = 0;
     this.clearMoveTree();
   }
 
   private async loadMoveTree(): Promise<void> {
-    if (this.currentGamesSource === 'external') {
-      this.clearMoveTree();
-      return;
-    }
-
-    if (this.currentGamesSource === 'imported' && !this.authState.isAuthenticated()) {
-      this.clearMoveTree();
-      return;
-    }
-
     const boardFen = this.boardFen().trim();
     const fen = boardFen.length > 0 ? boardFen : ExplorerPageComponent.initialBoardFen;
 
@@ -1100,8 +1287,6 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     const previousMyDatabases = this.myDatabases();
     const deletingActive = this.activeUserDatabaseId() === database.id;
 
-    this.trackDeletedDatabase(database.id);
-
     this.panelDatabases.set(previousPanelDatabases.filter(db => db.id !== database.id));
     this.myDatabases.set(previousMyDatabases.filter(db => db.id !== database.id));
 
@@ -1111,9 +1296,9 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
     try {
       await firstValueFrom(this.userDatabasesApi.delete(database.id));
-      await this.reloadUserDatabases();
+      this.explorerBoardApi.invalidateMoveTreeCache();
+      await this.reloadDatabases();
     } catch {
-      this.untrackDeletedDatabase(database.id);
       this.panelDatabases.set(previousPanelDatabases);
       this.myDatabases.set(previousMyDatabases);
 
@@ -1125,74 +1310,13 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     }
   }
 
-  private readDeletedDatabaseIds(): Set<string> {
-    const raw = localStorage.getItem(ExplorerPageComponent.deletedDatabaseStorageKey);
-    if (!raw) {
-      return new Set();
-    }
 
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (!Array.isArray(parsed)) {
-        return new Set();
-      }
 
-      return new Set(parsed.filter(id => typeof id === 'string'));
-    } catch {
-      return new Set();
-    }
-  }
 
-  private persistDeletedDatabaseIds(ids: Set<string>): void {
-    if (ids.size === 0) {
-      localStorage.removeItem(ExplorerPageComponent.deletedDatabaseStorageKey);
-      return;
-    }
 
-    localStorage.setItem(ExplorerPageComponent.deletedDatabaseStorageKey, JSON.stringify([...ids]));
-  }
 
-  private trackDeletedDatabase(databaseId: string): void {
-    const ids = this.readDeletedDatabaseIds();
-    ids.add(databaseId);
-    this.persistDeletedDatabaseIds(ids);
-  }
 
-  private untrackDeletedDatabase(databaseId: string): void {
-    const ids = this.readDeletedDatabaseIds();
-    if (!ids.delete(databaseId)) {
-      return;
-    }
-
-    this.persistDeletedDatabaseIds(ids);
-  }
-
-  private filterDeletedDatabases(databases: Database[], deletedIds: Set<string>): Database[] {
-    if (deletedIds.size === 0) {
-      return databases;
-    }
-
-    return databases.filter(db => !deletedIds.has(db.id));
-  }
-
-  private pruneDeletedDatabaseIds(deletedIds: Set<string>, databases: Database[]): Set<string> {
-    if (deletedIds.size === 0) {
-      return deletedIds;
-    }
-
-    const availableIds = new Set(databases.map(db => db.id));
-    const remaining = new Set<string>();
-
-    for (const id of deletedIds) {
-      if (availableIds.has(id)) {
-        remaining.add(id);
-      }
-    }
-
-    return remaining;
-  }
-
-  private openDeleteConfirmation(kind: 'draft' | 'database'): void {
+  private openDeleteConfirmation(kind: 'draft' | 'database' | 'games'): void {
     this.deleteConfirmationKind.set(kind);
     this.deleteConfirmationVisible.set(true);
   }
@@ -1290,6 +1414,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
     this.selectedGameId.set(null);
     this.selectedGameReplay.set(null);
+    this.hasAbandonedRecordedGame.set(false);
     this.moveRows = [];
     this.currentPly = 0;
   }

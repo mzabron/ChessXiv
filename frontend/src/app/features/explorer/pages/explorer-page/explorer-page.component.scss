@@ -1,39 +1,14 @@
 :host {
-  --bg: #f5f0e5;
-  --panel: #fffdf7;
-  --text: #2b2118;
-  --muted: #6f604e;
-  --line: #d8ccba;
-  --accent: #2e6f56;
-  --accent-strong: #215040;
-  --square-light: #e2d5bf;
-  --square-dark: #806245;
-
+  /* Palette lives in src/styles/_tokens.scss so the sidebar and modals share it too;
+     this only sets the page's own backdrop. */
   color: var(--text);
   display: block;
   min-height: 100dvh;
   background:
-    radial-gradient(circle at 10% -10%, #f0e8d8 0%, transparent 45%),
-    radial-gradient(circle at 120% 110%, #dfd2bd 0%, transparent 40%),
+    radial-gradient(circle at 10% -10%, var(--surface-raised) 0%, transparent 45%),
+    radial-gradient(circle at 120% 110%, var(--surface-sunken) 0%, transparent 40%),
     var(--bg);
   transition: background 0.3s ease, color 0.3s ease;
-}
-
-:host-context(body.dark-theme) {
-  --bg: #1e1e1e;
-  --panel: #252526;
-  --text: #d4d4d4;
-  --muted: #858585;
-  --line: #3f3f46;
-  --accent: #3b82f6;
-  --accent-strong: #2563eb;
-  --square-light: #8ca2ad;
-  --square-dark: #607382;
-
-  background:
-    radial-gradient(circle at 10% -10%, #2a2a2a 0%, transparent 45%),
-    radial-gradient(circle at 120% 110%, #1a1a1a 0%, transparent 40%),
-    var(--bg);
 }
 
 .layout {
@@ -173,7 +148,7 @@
 .panel {
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: var(--panel);
+  background: var(--surface);
   box-shadow: 0 14px 28px rgba(61, 42, 27, 0.08);
 }
 
@@ -225,7 +200,7 @@
   white-space: nowrap;
   border: 1px solid transparent;
   background: transparent;
-  color: var(--muted);
+  color: var(--text-muted);
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
   padding: 0.56rem 0.85rem;
@@ -234,10 +209,10 @@
   transition: all 0.2s;
 
   &.active {
-    background: var(--panel);
+    background: var(--surface);
     color: var(--text);
     border-color: var(--line);
-    border-bottom-color: var(--panel);
+    border-bottom-color: var(--surface);
     transform: translateY(1px); // Cover bottom border
   }
 }
@@ -262,7 +237,7 @@
 }
 
 :host-context(body.dark-theme) .resize-handle {
-  background: linear-gradient(180deg, #4b5563 0%, #374151 100%);
+  background: linear-gradient(180deg, var(--text-muted) 0%, var(--text) 100%);
 }
 
 @media (max-width: 980px) {
@@ -313,9 +288,9 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 2100;
-  background: #fff1f1;
-  border: 1px solid #f2b6b6;
-  color: #5f1e1e;
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+  color: var(--danger);
   padding: 0.6rem 0.85rem;
   border-radius: 10px;
   box-shadow: 0 8px 20px rgba(95, 30, 30, 0.14);
@@ -342,7 +317,7 @@
   width: min(440px, calc(100vw - 2rem));
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--surface);
   box-shadow: 0 24px 48px rgba(29, 24, 18, 0.24);
   padding: 1rem 1.1rem;
 }
@@ -354,7 +329,7 @@
 
 .status-line {
   margin: 0.45rem 0 0.9rem;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
@@ -373,7 +348,7 @@
 
 .import-progress-card dt {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -388,7 +363,7 @@
   width: min(280px, calc(100vw - 2rem));
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--surface);
   box-shadow: 0 24px 48px rgba(29, 24, 18, 0.24);
   padding: 1.2rem 1rem;
   display: flex;
@@ -416,8 +391,8 @@
 .save-status-close {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #eee3cf;
-  color: #4a3828;
+  background: var(--surface-raised);
+  color: var(--text);
   padding: 0.45rem 0.8rem;
   font: 600 0.78rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
   cursor: pointer;
@@ -427,7 +402,7 @@
   width: min(360px, calc(100vw - 2rem));
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--surface);
   box-shadow: 0 24px 48px rgba(29, 24, 18, 0.24);
   padding: 1rem;
 }
@@ -439,7 +414,7 @@
 
 .delete-confirm-card p {
   margin: 0.55rem 0 0;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
@@ -453,8 +428,8 @@
 .confirm-btn {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #eee3cf;
-  color: #4a3828;
+  background: var(--surface-raised);
+  color: var(--text);
   padding: 0.45rem 0.8rem;
   font: 600 0.78rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
   cursor: pointer;
@@ -473,9 +448,9 @@
 }
 
 :host-context(body.dark-theme) .import-alert {
-  background: #3a2020;
-  border-color: #6f3434;
-  color: #ffd8d8;
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 :host-context(body.dark-theme) .loading-spinner {
@@ -484,19 +459,47 @@
 }
 
 :host-context(body.dark-theme) .save-status-close {
-  background: #27272a;
+  background: var(--surface-raised);
   color: var(--text);
   border-color: var(--line);
 }
 
 :host-context(body.dark-theme) .confirm-btn {
-  background: #27272a;
+  background: var(--surface-raised);
   color: var(--text);
   border-color: var(--line);
 }
 
 :host-context(body.dark-theme) .confirm-btn.danger {
-  background: #3f2323;
-  color: #ffd0d0;
-  border-color: #7a3f3f;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Focus-mode tabs are reorderable by dragging, same as the games panel's. */
+.tabs .tab-btn {
+  cursor: grab;
+  /* The strip scrolls horizontally on touch; claiming pan-y lets the browser keep vertical
+     scrolling while this directive owns horizontal movement. */
+  touch-action: pan-y;
+
+  &.is-dragging {
+    /* Lifted above its neighbours and following the pointer directly - any transition here
+       would make it lag behind the cursor. */
+    position: relative;
+    z-index: 2;
+    transition: none;
+    cursor: grabbing;
+    box-shadow: var(--shadow-md);
+  }
+
+  &.is-drop-target {
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+}
+
+.filter-marker {
+  margin-left: 0.15rem;
+  color: var(--accent);
+  font-weight: 700;
 }
