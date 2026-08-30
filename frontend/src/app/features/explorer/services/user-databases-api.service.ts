@@ -20,8 +20,31 @@ export interface UserDatabaseDto {
   createdAtUtc: string;
 }
 
-export interface BookmarkedUserDatabaseDto extends UserDatabaseDto {
-  bookmarkedAtUtc: string;
+/**
+ * One row of the databases panel. The backend returns the same public set to signed-out
+ * and signed-in callers, so signing in only ever adds the caller's own private databases.
+ */
+export interface UserDatabaseListItemDto extends UserDatabaseDto {
+  /** When the database's games last changed - not renames or visibility edits. */
+  contentUpdatedAtUtc: string;
+  isOwner: boolean;
+  isBookmarked: boolean;
+}
+
+export interface AddGamesFromSelectionRequest {
+  /** Omit to take games from the caller's draft. */
+  sourceUserDatabaseId?: string;
+  /** An explicit tick-box selection; when omitted the whole filtered set is added. */
+  gameIds?: string[];
+  filters: ExplorerGamesFiltersQuery;
+}
+
+export interface AddGamesFromSelectionResponse {
+  addedCount: number;
+  skippedCount: number;
+  totalMatched: number;
+  savedGamesUsed: number;
+  savedGamesLimit: number;
 }
 
 export interface CreateUserDatabaseRequest {
@@ -39,16 +62,33 @@ export class UserDatabasesApiService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = '/api';
 
-  getMine(): Observable<UserDatabaseDto[]> {
-    return this.http.get<UserDatabaseDto[]>(`${this.baseUrl}/user-databases/mine`);
+  getVisible(): Observable<UserDatabaseListItemDto[]> {
+    return this.http.get<UserDatabaseListItemDto[]>(`${this.baseUrl}/user-databases`);
   }
 
-  getPublic(): Observable<UserDatabaseDto[]> {
-    return this.http.get<UserDatabaseDto[]>(`${this.baseUrl}/user-databases/public`);
+  addBookmark(userDatabaseId: string): Observable<unknown> {
+    return this.http.post(`${this.baseUrl}/user-databases/${userDatabaseId}/bookmark`, {});
   }
 
-  getBookmarks(): Observable<BookmarkedUserDatabaseDto[]> {
-    return this.http.get<BookmarkedUserDatabaseDto[]>(`${this.baseUrl}/user-databases/bookmarks`);
+  removeBookmark(userDatabaseId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/user-databases/${userDatabaseId}/bookmark`);
+  }
+
+  addGamesFromSelection(
+    userDatabaseId: string,
+    request: AddGamesFromSelectionRequest
+  ): Observable<AddGamesFromSelectionResponse> {
+    return this.http.post<AddGamesFromSelectionResponse>(
+      `${this.baseUrl}/user-databases/${userDatabaseId}/games/from-selection`,
+      request
+    );
+  }
+
+  removeGames(userDatabaseId: string, gameIds: string[]): Observable<{ removedCount: number; deletedOrphanCount: number }> {
+    return this.http.post<{ removedCount: number; deletedOrphanCount: number }>(
+      `${this.baseUrl}/user-databases/${userDatabaseId}/games/remove`,
+      { gameIds }
+    );
   }
 
   create(request: CreateUserDatabaseRequest): Observable<UserDatabaseDto> {
@@ -88,16 +128,6 @@ export class UserDatabasesApiService {
     return this.http.get<GameReplayResponse>(`${this.baseUrl}/user-databases/${userDatabaseId}/games/${gameId}`);
   }
 
-  private resolveBaseUrl(): string {
-    const host = window.location.hostname;
-    const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
-
-    if (isLocalHost) {
-      return `http://${host}:5027/api`;
-    }
-
-    return '/api';
-  }
 
   private buildFilterParams(filters?: ExplorerGamesFiltersQuery): Record<string, string | number | boolean> {
     if (!filters) {

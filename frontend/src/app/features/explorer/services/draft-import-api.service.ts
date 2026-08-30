@@ -4,15 +4,6 @@ import { Observable } from 'rxjs';
 import { GameReplayResponse } from './game-replay.models';
 import { ExplorerGamesFiltersQuery } from './games-filters.models';
 
-export interface DraftPromotionRequest {
-  userDatabaseId: string;
-}
-
-export interface DraftPromotionResult {
-  promotedCount: number;
-  skippedCount: number;
-}
-
 export interface DraftGameListItem {
   id: string;
   year: number;
@@ -47,10 +38,6 @@ export class DraftImportApiService {
     const formData = new FormData();
     formData.append('file', file);
     return this.http.post<void>(`${this.baseUrl}/drafts/import-file`, formData);
-  }
-
-  promoteDraft(request: DraftPromotionRequest): Observable<DraftPromotionResult> {
-    return this.http.post<DraftPromotionResult>(`${this.baseUrl}/drafts/promote`, request);
   }
 
   importToDatabase(file: File, userDatabaseId: string): Observable<void> {

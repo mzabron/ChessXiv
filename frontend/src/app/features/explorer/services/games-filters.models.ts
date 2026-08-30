@@ -1,7 +1,12 @@
 import { DraftGamesSortBy, DraftGamesSortDirection } from './draft-import-api.service';
 
 export type ExplorerEloMode = 'none' | 'one' | 'both' | 'avg';
-export type ExplorerPositionMode = 'exact' | 'samePosition';
+
+/**
+ * 'samePosition' finds the position however it was reached; 'exactPly' additionally requires
+ * it to occur at the same move number. Values match the backend PositionSearchMode enum.
+ */
+export type ExplorerPositionMode = 'samePosition' | 'exactPly';
 
 export interface ExplorerGamesFilterState {
   whiteFirstName: string;
@@ -72,7 +77,7 @@ const defaultState: ExplorerGamesFilterState = {
   moveCountTo: null,
   searchByPosition: false,
   fen: '',
-  positionMode: 'exact',
+  positionMode: 'samePosition',
   sortBy: 'createdAt',
   sortDirection: 'desc',
   page: 1,
@@ -116,7 +121,7 @@ export function toExplorerGamesFiltersQuery(state: ExplorerGamesFilterState): Ex
     moveCountTo: state.moveEnabled ? normalizeNumber(state.moveCountTo) : undefined,
     searchByPosition: state.searchByPosition || undefined,
     fen,
-    positionMode: mapPositionMode(state.positionMode)
+    positionMode: state.positionMode === 'exactPly' ? 1 : 0
   };
 
   if (!state.eloEnabled) {
@@ -162,13 +167,6 @@ function mapEloMode(mode: ExplorerEloMode): number {
   return mode === 'one' ? 1 : mode === 'both' ? 2 : mode === 'avg' ? 3 : 0;
 }
 
-function mapPositionMode(mode: ExplorerPositionMode): number {
-  if (mode === 'samePosition') {
-    return 2;
-  }
-
-  return 0;
-}
 
 function normalizeText(value: string): string | undefined {
   const trimmed = value.trim();

@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of, tap } from 'rxjs';
 
 export interface PositionMoveRequest {
   fen: string;
@@ -61,25 +61,64 @@ export interface ExplorerMoveTreeResponse {
 
 @Injectable({ providedIn: 'root' })
 export class ExplorerBoardApiService {
+  /**
+   * Move-tree responses are a pure function of (source, database, filters, position), so
+   * they can be memoised for as long as the underlying pool of games is unchanged. This
+   * is what stops the expensive start-position tree from being recomputed every time the
+   * user opens a game, which resets the board to ply 0.
+   */
+  private static readonly moveTreeCacheLimit = 240;
+
   private readonly http = inject(HttpClient);
   private readonly baseUrl = '/api/games/explorer';
+  private readonly moveTreeCache = new Map<string, ExplorerMoveTreeResponse>();
 
   applyMove(request: PositionMoveRequest): Observable<PositionMoveResponse> {
     return this.http.post<PositionMoveResponse>(`${this.baseUrl}/position/move`, request);
   }
 
   getMoveTree(request: ExplorerMoveTreeRequest): Observable<ExplorerMoveTreeResponse> {
-    return this.http.post<ExplorerMoveTreeResponse>(`${this.baseUrl}/move-tree`, request);
-  }
+    const cacheKey = ExplorerBoardApiService.buildMoveTreeCacheKey(request);
+    const cached = this.moveTreeCache.get(cacheKey);
 
-  private resolveBaseUrl(): string {
-    const host = window.location.hostname;
-    const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
-
-    if (isLocalHost) {
-      return `http://${host}:5027/api/games/explorer`;
+    if (cached) {
+      // Refresh recency so the entries worth keeping survive eviction.
+      this.moveTreeCache.delete(cacheKey);
+      this.moveTreeCache.set(cacheKey, cached);
+      return of(cached);
     }
 
-    return '/api/games/explorer';
+    return this.http
+      .post<ExplorerMoveTreeResponse>(`${this.baseUrl}/move-tree`, request)
+      .pipe(tap(response => this.storeMoveTree(cacheKey, response)));
+  }
+
+  /**
+   * Drops memoised trees. Must be called whenever the pool of games behind them can have
+   * changed: a new import, a save, a deletion, or a change of session.
+   */
+  invalidateMoveTreeCache(): void {
+    this.moveTreeCache.clear();
+  }
+
+  private storeMoveTree(cacheKey: string, response: ExplorerMoveTreeResponse): void {
+    if (this.moveTreeCache.size >= ExplorerBoardApiService.moveTreeCacheLimit) {
+      const oldestKey = this.moveTreeCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.moveTreeCache.delete(oldestKey);
+      }
+    }
+
+    this.moveTreeCache.set(cacheKey, response);
+  }
+
+  private static buildMoveTreeCacheKey(request: ExplorerMoveTreeRequest): string {
+    // Key on sorted entries so property order in the request cannot produce a miss for a
+    // request that is semantically identical.
+    return JSON.stringify(
+      Object.entries(request)
+        .filter(([, value]) => value !== undefined && value !== null && value !== '')
+        .sort(([left], [right]) => left.localeCompare(right))
+    );
   }
 }

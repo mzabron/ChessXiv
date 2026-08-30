@@ -22,7 +22,11 @@ export class DraftImportProgressService {
   readonly updates$: Observable<DraftImportProgressUpdate | null> = this.updatesSubject.asObservable();
 
   async connect(): Promise<void> {
-    if (!this.authState.isAuthenticated()) {
+    // Guests import too and need live progress just like registered users; isAuthenticated()
+    // is only ever true for a signed-in account, so gating on it silently skipped the guest
+    // connection entirely - the import still ran, but nothing showed until a page reload
+    // re-fetched the draft list. Any bearer token (user or guest) is enough to connect.
+    if (!this.authState.getAccessToken()) {
       return;
     }
 
