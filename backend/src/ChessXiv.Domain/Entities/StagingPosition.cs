@@ -1,14 +1,17 @@
 namespace ChessXiv.Domain.Entities;
 
+/// <summary>Staging-area twin of <see cref="Position"/>; see that type for the design notes.</summary>
 public class StagingPosition
 {
-    public Guid Id { get; set; }
     public Guid StagingGameId { get; set; }
-    public string Fen { get; set; } = null!;
-    public long FenHash { get; set; }
-    public int PlyCount { get; set; }
-    public string? LastMove { get; set; }
-    public char SideToMove { get; set; }
+
+    public short PlyCount { get; set; }
+
+    public byte[] PosKey { get; set; } = [];
+
+    public string? NextMove { get; set; }
+
+    public GameResult Result { get; set; }
 
     public StagingGame Game { get; set; } = null!;
 }

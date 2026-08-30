@@ -27,8 +27,6 @@ public class Game
     public string Pgn { get; set; } = null!;
     public int MoveCount { get; set; }
     public string GameHash { get; set; } = string.Empty;
-    public bool IsMaster { get; set; } = false;
-    public ICollection<Move> Moves { get; set; } = new List<Move>();
     public ICollection<Position> Positions { get; set; } = new List<Position>();
     public ICollection<UserDatabaseGame> UserDatabaseGames { get; set; } = new List<UserDatabaseGame>();
 }

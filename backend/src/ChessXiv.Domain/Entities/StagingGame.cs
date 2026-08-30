@@ -30,6 +30,5 @@ public class StagingGame
     public int MoveCount { get; set; }
     public string GameHash { get; set; } = string.Empty;
 
-    public ICollection<StagingMove> Moves { get; set; } = new List<StagingMove>();
     public ICollection<StagingPosition> Positions { get; set; } = new List<StagingPosition>();
 }

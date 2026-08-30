@@ -7,28 +7,51 @@ public static class ZobristTables
     public static readonly ulong[] CastlingRights = new ulong[16];
     public static readonly ulong[] EnPassantFile = new ulong[8];
 
+    /// <summary>
+    /// A second, independently seeded table set. Stored positions are identified by the
+    /// two halves together, giving a 128-bit key: at chess-database scale that makes a
+    /// collision impossible in practice, which is what lets the full FEN string be dropped
+    /// from storage without weakening exact position search.
+    /// </summary>
+    public static readonly ulong[,] PieceSquareHigh = new ulong[12, 64];
+    public static readonly ulong SideToMoveHigh;
+    public static readonly ulong[] CastlingRightsHigh = new ulong[16];
+    public static readonly ulong[] EnPassantFileHigh = new ulong[8];
+
     static ZobristTables()
     {
         ulong seed = 0x9E3779B97F4A7C15UL;
+        Fill(ref seed, PieceSquare, out SideToMove, CastlingRights, EnPassantFile);
 
+        ulong highSeed = 0xD1B54A32D192ED03UL;
+        Fill(ref highSeed, PieceSquareHigh, out SideToMoveHigh, CastlingRightsHigh, EnPassantFileHigh);
+    }
+
+    private static void Fill(
+        ref ulong seed,
+        ulong[,] pieceSquare,
+        out ulong sideToMove,
+        ulong[] castlingRights,
+        ulong[] enPassantFile)
+    {
         for (var piece = 0; piece < 12; piece++)
         {
             for (var square = 0; square < 64; square++)
             {
-                PieceSquare[piece, square] = Next(ref seed);
+                pieceSquare[piece, square] = Next(ref seed);
             }
         }
 
-        SideToMove = Next(ref seed);
+        sideToMove = Next(ref seed);
 
-        for (var i = 0; i < CastlingRights.Length; i++)
+        for (var i = 0; i < castlingRights.Length; i++)
         {
-            CastlingRights[i] = Next(ref seed);
+            castlingRights[i] = Next(ref seed);
         }
 
-        for (var i = 0; i < EnPassantFile.Length; i++)
+        for (var i = 0; i < enPassantFile.Length; i++)
         {
-            EnPassantFile[i] = Next(ref seed);
+            enPassantFile[i] = Next(ref seed);
         }
     }
 

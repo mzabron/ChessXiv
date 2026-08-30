@@ -1,5 +1,6 @@
 using ChessXiv.Domain.Engine.Abstractions;
 using ChessXiv.Domain.Engine.Models;
+using ChessXiv.Domain.Engine.Rules;
 using ChessXiv.Domain.Engine.Types;
 using System.Text;
 
@@ -33,6 +34,10 @@ public sealed class FenBoardStateSerializer : IBoardStateSerializer
 
         ParsePiecePlacement(parts[0], state);
         RecomputeOccupancy(state);
+
+        // A FEN may carry an en-passant square that nothing can capture on. Dropping it here
+        // keeps a pasted FEN and a replayed game agreeing on the same position key.
+        state.EnPassantSquare = EnPassantRules.Normalize(state, state.EnPassantSquare);
 
         return state;
     }

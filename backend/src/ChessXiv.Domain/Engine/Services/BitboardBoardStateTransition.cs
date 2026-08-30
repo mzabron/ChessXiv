@@ -1,6 +1,7 @@
 using ChessXiv.Domain.Engine.Abstractions;
 using ChessXiv.Domain.Engine.Hashing;
 using ChessXiv.Domain.Engine.Models;
+using ChessXiv.Domain.Engine.Rules;
 using ChessXiv.Domain.Engine.Types;
 using System.Numerics;
 using System.Text.RegularExpressions;
@@ -333,8 +334,7 @@ public sealed class BitboardBoardStateTransition : IBoardStateTransition
         SetEnPassantSquare(state, null);
         if (pawnMove && Math.Abs(to.Rank - from.Rank) == 2)
         {
-            var epRank = movingWhite ? from.Rank + 1 : from.Rank - 1;
-            SetEnPassantSquare(state, Square.From(to.File, epRank));
+            SetEnPassantSquare(state, EnPassantRules.ResolveAfterDoublePush(state, movingWhite, to));
         }
 
         state.HalfMoveClock = pawnMove || target != Piece.None ? 0 : state.HalfMoveClock + 1;
