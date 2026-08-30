@@ -1,6 +1,8 @@
 using ChessXiv.Application.Abstractions.Repositories;
 using ChessXiv.Domain.Entities;
 using ChessXiv.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace ChessXiv.Infrastructure.Repositories;
 
@@ -13,6 +15,17 @@ public sealed class UserDatabaseGameRepository(ChessXivDbContext dbContext) : IU
             return;
         }
 
-        await dbContext.UserDatabaseGames.AddRangeAsync(userDatabaseGames, cancellationToken);
+        if (dbContext.Database.GetDbConnection() is not NpgsqlConnection connection)
+        {
+            await dbContext.UserDatabaseGames.AddRangeAsync(userDatabaseGames, cancellationToken);
+            return;
+        }
+
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        await PostgresBulkCopy.WriteUserDatabaseGamesAsync(connection, userDatabaseGames, cancellationToken);
     }
 }

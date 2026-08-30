@@ -1,5 +1,6 @@
 using ChessXiv.Application.Abstractions.Repositories;
 using ChessXiv.Application.Contracts;
+using ChessXiv.Application.Services;
 using ChessXiv.Domain.Entities;
 using ChessXiv.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -38,85 +39,6 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
         return UserDatabaseAccessStatus.Forbidden;
     }
 
-    public async Task<PagedResult<GameExplorerItemDto>> SearchAsync(
-        GameExplorerSearchRequest request,
-        string? ownerUserId,
-        string? normalizedWhiteFirstName,
-        string? normalizedWhiteLastName,
-        string? normalizedBlackFirstName,
-        string? normalizedBlackLastName,
-        string? normalizedFen,
-        long? fenHash,
-        CancellationToken cancellationToken = default)
-    {
-        IQueryable<Game> query;
-
-        if (request.UserDatabaseId.HasValue && request.UserDatabaseId != Guid.Empty)
-        {
-            var userDatabaseId = request.UserDatabaseId.Value;
-            var accessStatus = await GetUserDatabaseAccessStatusAsync(userDatabaseId, ownerUserId, cancellationToken);
-            if (accessStatus != UserDatabaseAccessStatus.Accessible)
-            {
-                return new PagedResult<GameExplorerItemDto>();
-            }
-
-            query =
-                from link in dbContext.UserDatabaseGames.AsNoTracking()
-                join game in dbContext.Games.AsNoTracking() on link.GameId equals game.Id
-                where link.UserDatabaseId == userDatabaseId
-                select game;
-        }
-        else
-        {
-            var hasCurrentUserId = !string.IsNullOrWhiteSpace(ownerUserId);
-            query = dbContext.Games
-                .AsNoTracking()
-                .Where(game => game.UserDatabaseGames.Any(link =>
-                    link.UserDatabase.IsPublic
-                    || (hasCurrentUserId && link.UserDatabase.OwnerUserId == ownerUserId)));
-        }
-
-        query = query.ApplyPlayerFilters(
-            request.IgnoreColors,
-            normalizedWhiteFirstName,
-            normalizedWhiteLastName,
-            normalizedBlackFirstName,
-            normalizedBlackLastName);
-        query = query.ApplyScalarFilters(request);
-        query = query.ApplyPositionFilters(request.SearchByPosition, normalizedFen, fenHash, request.PositionMode);
-
-        var totalCount = await query.CountAsync(cancellationToken);
-
-        query = ApplySorting(query, request.SortBy, request.SortDirection);
-
-        var page = request.Page <= 0 ? 1 : request.Page;
-        var pageSize = request.PageSize <= 0 ? 50 : Math.Min(request.PageSize, 200);
-
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(g => new GameExplorerItemDto
-            {
-                GameId = g.Id,
-                Year = g.Year > 0 ? g.Year : null,
-                White = g.White,
-                WhiteElo = g.WhiteElo,
-                Result = g.Result,
-                Black = g.Black,
-                BlackElo = g.BlackElo,
-                Eco = g.ECO,
-                Tournament = g.Event,
-                MoveCount = g.MoveCount
-            })
-            .ToListAsync(cancellationToken);
-
-        return new PagedResult<GameExplorerItemDto>
-        {
-            TotalCount = totalCount,
-            Items = items
-        };
-    }
-
     public Task<MoveTreeResponse> GetMoveTreeAsync(
         MoveTreeRequest request,
         string? ownerUserId,
@@ -124,10 +46,8 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
         string? normalizedWhiteLastName,
         string? normalizedBlackFirstName,
         string? normalizedBlackLastName,
-        string normalizedFen,
-        long fenHash,
-        string? normalizedFilterFen,
-        long? filterFenHash,
+        byte[] posKey,
+        PositionSearchTarget? filterTarget,
         CancellationToken cancellationToken = default)
     {
         return request.Source switch
@@ -139,10 +59,8 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
                 normalizedWhiteLastName,
                 normalizedBlackFirstName,
                 normalizedBlackLastName,
-                normalizedFen,
-                fenHash,
-                normalizedFilterFen,
-                filterFenHash,
+                posKey,
+                filterTarget,
                 cancellationToken),
             MoveTreeSource.StagingSession => GetStagingMoveTreeAsync(
                 request,
@@ -151,10 +69,8 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
                 normalizedWhiteLastName,
                 normalizedBlackFirstName,
                 normalizedBlackLastName,
-                normalizedFen,
-                fenHash,
-                normalizedFilterFen,
-                filterFenHash,
+                posKey,
+                filterTarget,
                 cancellationToken),
             _ => Task.FromResult(new MoveTreeResponse())
         };
@@ -167,10 +83,8 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
         string? normalizedWhiteLastName,
         string? normalizedBlackFirstName,
         string? normalizedBlackLastName,
-        string normalizedFen,
-        long fenHash,
-        string? normalizedFilterFen,
-        long? filterFenHash,
+        byte[] posKey,
+        PositionSearchTarget? filterTarget,
         CancellationToken cancellationToken)
     {
         if (!request.UserDatabaseId.HasValue || request.UserDatabaseId == Guid.Empty)
@@ -185,79 +99,48 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
             return new MoveTreeResponse();
         }
 
-        var filteredGames = dbContext.UserDatabaseGames
+        // Every position row carries the move played from it and the game's result, so the
+        // continuations of a position are one index range - no self-join to ply + 1, and no
+        // DISTINCT pass over (game, move, result) before grouping.
+        var links = dbContext.UserDatabaseGames
             .AsNoTracking()
-            .Where(link => link.UserDatabaseId == userDatabaseId)
-            .ApplyPlayerFilters(
-                request.IgnoreColors,
-                normalizedWhiteFirstName,
-                normalizedWhiteLastName,
-                normalizedBlackFirstName,
-                normalizedBlackLastName)
-            .ApplyScalarFilters(
-                request.EloEnabled,
-                request.EloFrom,
-                request.EloTo,
-                request.EloMode,
-                request.YearEnabled,
-                request.YearFrom,
-                request.YearTo,
-                request.EcoCode,
-                request.Result,
-                request.MoveCountFrom,
-                request.MoveCountTo)
-            .ApplyPositionFilters(request.SearchByPosition, normalizedFilterFen, filterFenHash, request.PositionMode);
+            .Where(link => link.UserDatabaseId == userDatabaseId);
 
-        var parentPositions =
-            from link in filteredGames
-            join parent in dbContext.Positions.AsNoTracking() on link.GameId equals parent.GameId
-            where parent.FenHash == fenHash && parent.Fen == normalizedFen
-            select new
-            {
-                parent.GameId,
-                parent.PlyCount,
-                link.Game.Result
-            };
+        if (HasFilters(request, normalizedWhiteFirstName, normalizedWhiteLastName, normalizedBlackFirstName, normalizedBlackLastName, filterTarget))
+        {
+            links = dbContext.UserDatabaseGames
+                .AsNoTracking()
+                .Where(link => link.UserDatabaseId == userDatabaseId)
+                .ApplyPlayerFilters(
+                    request.IgnoreColors,
+                    normalizedWhiteFirstName,
+                    normalizedWhiteLastName,
+                    normalizedBlackFirstName,
+                    normalizedBlackLastName)
+                .ApplyScalarFilters(
+                    request.EloEnabled,
+                    request.EloFrom,
+                    request.EloTo,
+                    request.EloMode,
+                    request.YearEnabled,
+                    request.YearFrom,
+                    request.YearTo,
+                    request.EcoCode,
+                    request.Result,
+                    request.MoveCountFrom,
+                    request.MoveCountTo)
+                .ApplyPositionFilters(request.SearchByPosition, filterTarget?.PosKey, request.PositionMode, filterTarget?.PlyCount);
+        }
 
-        var totalGamesInPosition = await parentPositions
-            .Select(p => p.GameId)
-            .Distinct()
-            .CountAsync(cancellationToken);
-
-        var aggregates = await (
-            from parent in parentPositions
-            join child in dbContext.Positions.AsNoTracking()
-                on new { parent.GameId, NextPly = parent.PlyCount + 1 }
-                equals new { child.GameId, NextPly = child.PlyCount }
-            where child.LastMove != null && child.LastMove != string.Empty
-            select new
-            {
-                parent.GameId,
-                MoveSan = child.LastMove!,
-                parent.Result
-            })
-            .Distinct()
-            .GroupBy(x => x.MoveSan)
-            .Select(g => new MoveTreeAggregate
-            {
-                MoveSan = g.Key,
-                Games = g.Count(),
-                WhiteWins = g.Count(x => x.Result == "1-0"),
-                Draws = g.Count(x => x.Result == "1/2-1/2"),
-                BlackWins = g.Count(x => x.Result == "0-1")
-            })
-            .OrderByDescending(x => x.Games)
-            .ThenBy(x => x.MoveSan)
-            .Take(request.MaxMoves)
+        var rows = await (
+            from position in dbContext.Positions.AsNoTracking()
+            join link in links on position.GameId equals link.GameId
+            where position.PosKey == posKey
+            group position by new { position.NextMove, position.Result } into grouped
+            select new { grouped.Key.NextMove, grouped.Key.Result, Count = grouped.Count() })
             .ToListAsync(cancellationToken);
 
-        return new MoveTreeResponse
-        {
-            TotalGamesInPosition = totalGamesInPosition,
-            Moves = aggregates
-                .Select(ToMoveDto)
-                .ToArray()
-        };
+        return BuildResponse(rows.Select(r => ((string?)r.NextMove, r.Result, r.Count)), request.MaxMoves);
     }
 
     private async Task<MoveTreeResponse> GetStagingMoveTreeAsync(
@@ -267,10 +150,8 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
         string? normalizedWhiteLastName,
         string? normalizedBlackFirstName,
         string? normalizedBlackLastName,
-        string normalizedFen,
-        long fenHash,
-        string? normalizedFilterFen,
-        long? filterFenHash,
+        byte[] posKey,
+        PositionSearchTarget? filterTarget,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(ownerUserId))
@@ -278,7 +159,7 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
             return new MoveTreeResponse();
         }
 
-        var filteredGames = dbContext.StagingGames
+        var games = dbContext.StagingGames
             .AsNoTracking()
             .Where(game => game.OwnerUserId == ownerUserId)
             .ApplyPlayerFilters(
@@ -299,59 +180,93 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
                 request.Result,
                 request.MoveCountFrom,
                 request.MoveCountTo)
-            .ApplyPositionFilters(request.SearchByPosition, normalizedFilterFen, filterFenHash, request.PositionMode);
+            .ApplyPositionFilters(request.SearchByPosition, filterTarget?.PosKey, request.PositionMode, filterTarget?.PlyCount);
 
-        var parentPositions =
-            from game in filteredGames
-            join parent in dbContext.StagingPositions.AsNoTracking() on game.Id equals parent.StagingGameId
-            where parent.FenHash == fenHash
-                  && parent.Fen == normalizedFen
-            select new
-            {
-                parent.StagingGameId,
-                parent.PlyCount,
-                game.Result
-            };
-
-        var totalGamesInPosition = await parentPositions
-            .Select(p => p.StagingGameId)
-            .Distinct()
-            .CountAsync(cancellationToken);
-
-        var aggregates = await (
-            from parent in parentPositions
-            join child in dbContext.StagingPositions.AsNoTracking()
-                on new { StagingGameId = parent.StagingGameId, NextPly = parent.PlyCount + 1 }
-                equals new { child.StagingGameId, NextPly = child.PlyCount }
-            where child.LastMove != null && child.LastMove != string.Empty
-            select new
-            {
-                parent.StagingGameId,
-                MoveSan = child.LastMove!,
-                parent.Result
-            })
-            .Distinct()
-            .GroupBy(x => x.MoveSan)
-            .Select(g => new MoveTreeAggregate
-            {
-                MoveSan = g.Key,
-                Games = g.Count(),
-                WhiteWins = g.Count(x => x.Result == "1-0"),
-                Draws = g.Count(x => x.Result == "1/2-1/2"),
-                BlackWins = g.Count(x => x.Result == "0-1")
-            })
-            .OrderByDescending(x => x.Games)
-            .ThenBy(x => x.MoveSan)
-            .Take(request.MaxMoves)
+        var rows = await (
+            from position in dbContext.StagingPositions.AsNoTracking()
+            join game in games on position.StagingGameId equals game.Id
+            where position.PosKey == posKey
+            group position by new { position.NextMove, position.Result } into grouped
+            select new { grouped.Key.NextMove, grouped.Key.Result, Count = grouped.Count() })
             .ToListAsync(cancellationToken);
+
+        return BuildResponse(rows.Select(r => ((string?)r.NextMove, r.Result, r.Count)), request.MaxMoves);
+    }
+
+    /// <summary>
+    /// Turns per-(move, result) counts into the response. The total number of games in the
+    /// position falls out of the same rows, including the games that ended there (NextMove
+    /// null), so it no longer needs its own DISTINCT count query.
+    /// </summary>
+    private static MoveTreeResponse BuildResponse(
+        IEnumerable<(string? NextMove, GameResult Result, int Count)> rows,
+        int maxMoves)
+    {
+        var totalGamesInPosition = 0;
+        var byMove = new Dictionary<string, MoveTreeAggregate>(StringComparer.Ordinal);
+
+        foreach (var (nextMove, result, count) in rows)
+        {
+            totalGamesInPosition += count;
+
+            if (string.IsNullOrEmpty(nextMove))
+            {
+                continue;
+            }
+
+            if (!byMove.TryGetValue(nextMove, out var aggregate))
+            {
+                aggregate = new MoveTreeAggregate { MoveSan = nextMove };
+                byMove[nextMove] = aggregate;
+            }
+
+            aggregate.Games += count;
+
+            switch (result)
+            {
+                case GameResult.WhiteWin:
+                    aggregate.WhiteWins += count;
+                    break;
+                case GameResult.Draw:
+                    aggregate.Draws += count;
+                    break;
+                case GameResult.BlackWin:
+                    aggregate.BlackWins += count;
+                    break;
+            }
+        }
 
         return new MoveTreeResponse
         {
             TotalGamesInPosition = totalGamesInPosition,
-            Moves = aggregates
+            Moves = byMove.Values
+                .OrderByDescending(x => x.Games)
+                .ThenBy(x => x.MoveSan, StringComparer.Ordinal)
+                .Take(maxMoves)
                 .Select(ToMoveDto)
                 .ToArray()
         };
+    }
+
+    private static bool HasFilters(
+        MoveTreeRequest request,
+        string? normalizedWhiteFirstName,
+        string? normalizedWhiteLastName,
+        string? normalizedBlackFirstName,
+        string? normalizedBlackLastName,
+        PositionSearchTarget? filterTarget)
+    {
+        return normalizedWhiteFirstName is not null
+            || normalizedWhiteLastName is not null
+            || normalizedBlackFirstName is not null
+            || normalizedBlackLastName is not null
+            || request.EloEnabled
+            || request.YearEnabled
+            || !string.IsNullOrWhiteSpace(request.EcoCode)
+            || !string.IsNullOrWhiteSpace(request.Result)
+            || request.MoveCountFrom.HasValue
+            || request.MoveCountTo.HasValue
+            || (request.SearchByPosition && filterTarget is not null);
     }
 
     private static MoveTreeMoveDto ToMoveDto(MoveTreeAggregate aggregate)
@@ -366,42 +281,6 @@ public class GameExplorerRepository(ChessXivDbContext dbContext) : IGameExplorer
         };
     }
 
-    private static IQueryable<Game> ApplySorting(IQueryable<Game> query, GameExplorerSortBy sortBy, SortDirection sortDirection)
-    {
-        var desc = sortDirection == SortDirection.Desc;
-
-        return (sortBy, desc) switch
-        {
-            (GameExplorerSortBy.Year, true) => query.OrderByDescending(g => g.Year).ThenBy(g => g.Id),
-            (GameExplorerSortBy.Year, false) => query.OrderBy(g => g.Year).ThenBy(g => g.Id),
-
-            (GameExplorerSortBy.White, true) => query.OrderByDescending(g => g.White).ThenBy(g => g.Id),
-            (GameExplorerSortBy.White, false) => query.OrderBy(g => g.White).ThenBy(g => g.Id),
-
-            (GameExplorerSortBy.WhiteElo, true) => query.OrderByDescending(g => g.WhiteElo).ThenBy(g => g.Id),
-            (GameExplorerSortBy.WhiteElo, false) => query.OrderBy(g => g.WhiteElo).ThenBy(g => g.Id),
-
-            (GameExplorerSortBy.Result, true) => query.OrderByDescending(g => g.Result).ThenBy(g => g.Id),
-            (GameExplorerSortBy.Result, false) => query.OrderBy(g => g.Result).ThenBy(g => g.Id),
-
-            (GameExplorerSortBy.Black, true) => query.OrderByDescending(g => g.Black).ThenBy(g => g.Id),
-            (GameExplorerSortBy.Black, false) => query.OrderBy(g => g.Black).ThenBy(g => g.Id),
-
-            (GameExplorerSortBy.BlackElo, true) => query.OrderByDescending(g => g.BlackElo).ThenBy(g => g.Id),
-            (GameExplorerSortBy.BlackElo, false) => query.OrderBy(g => g.BlackElo).ThenBy(g => g.Id),
-
-            (GameExplorerSortBy.Eco, true) => query.OrderByDescending(g => g.ECO).ThenBy(g => g.Id),
-            (GameExplorerSortBy.Eco, false) => query.OrderBy(g => g.ECO).ThenBy(g => g.Id),
-
-            (GameExplorerSortBy.Event, true) => query.OrderByDescending(g => g.Event).ThenBy(g => g.Id),
-            (GameExplorerSortBy.Event, false) => query.OrderBy(g => g.Event).ThenBy(g => g.Id),
-
-            (GameExplorerSortBy.MoveCount, true) => query.OrderByDescending(g => g.MoveCount).ThenBy(g => g.Id),
-            (GameExplorerSortBy.MoveCount, false) => query.OrderBy(g => g.MoveCount).ThenBy(g => g.Id),
-
-            _ => query.OrderByDescending(g => g.Year).ThenBy(g => g.Id)
-        };
-    }
 
     private sealed class MoveTreeAggregate
     {

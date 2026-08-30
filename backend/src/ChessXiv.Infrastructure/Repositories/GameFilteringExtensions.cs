@@ -5,22 +5,6 @@ namespace ChessXiv.Infrastructure.Repositories;
 
 public static class GameFilteringExtensions
 {
-    public static IQueryable<Game> ApplyScalarFilters(this IQueryable<Game> query, GameExplorerSearchRequest request)
-    {
-        return query.ApplyScalarFilters(
-            request.EloEnabled,
-            request.EloFrom,
-            request.EloTo,
-            request.EloMode,
-            request.YearEnabled,
-            request.YearFrom,
-            request.YearTo,
-            request.EcoCode,
-            request.Result,
-            request.MoveCountFrom,
-            request.MoveCountTo);
-    }
-
     public static IQueryable<Game> ApplyScalarFilters(
         this IQueryable<Game> query,
         bool eloEnabled,
@@ -471,109 +455,76 @@ public static class GameFilteringExtensions
             ));
     }
 
+    /// <summary>
+    /// Filters games down to those that reached a given position.
+    /// </summary>
+    /// <remarks>
+    /// Matching is on the 128-bit position key, which covers piece placement, side to move,
+    /// castling rights and the en-passant square - everything that defines a position, and
+    /// nothing that merely records how it was reached. <see cref="PositionSearchMode.ExactPly"/>
+    /// additionally pins the ply, for callers who want the position at a specific point in
+    /// the game rather than wherever it occurred.
+    /// </remarks>
     public static IQueryable<Game> ApplyPositionFilters(
         this IQueryable<Game> query,
         bool searchByPosition,
-        string? normalizedFen,
-        long? fenHash,
-        PositionSearchMode positionMode)
+        byte[]? posKey,
+        PositionSearchMode positionMode = PositionSearchMode.SamePosition,
+        int? plyCount = null)
     {
-        if (!searchByPosition)
+        if (!searchByPosition || posKey is null)
         {
             return query;
         }
 
-        if (positionMode == PositionSearchMode.Exact)
+        if (positionMode == PositionSearchMode.ExactPly && plyCount.HasValue)
         {
-            if (fenHash.HasValue)
-            {
-                var hash = fenHash.Value;
-                if (!string.IsNullOrWhiteSpace(normalizedFen))
-                {
-                    query = query.Where(g => g.Positions.Any(p => p.FenHash == hash && p.Fen == normalizedFen));
-                }
-                else
-                {
-                    query = query.Where(g => g.Positions.Any(p => p.FenHash == hash));
-                }
-            }
-
-            return query;
+            var ply = (short)plyCount.Value;
+            return query.Where(g => g.Positions.Any(p => p.PosKey == posKey && p.PlyCount == ply));
         }
 
-        if (positionMode == PositionSearchMode.SamePosition)
-        {
-            if (!fenHash.HasValue)
-            {
-                return query;
-            }
-
-            var hash = fenHash.Value;
-            return query.Where(g => g.Positions.Any(p => p.FenHash == hash));
-        }
-
-        return query;
+        return query.Where(g => g.Positions.Any(p => p.PosKey == posKey));
     }
 
     public static IQueryable<StagingGame> ApplyPositionFilters(
         this IQueryable<StagingGame> query,
         bool searchByPosition,
-        string? normalizedFen,
-        long? fenHash,
-        PositionSearchMode positionMode)
+        byte[]? posKey,
+        PositionSearchMode positionMode = PositionSearchMode.SamePosition,
+        int? plyCount = null)
     {
-        if (!searchByPosition || string.IsNullOrWhiteSpace(normalizedFen))
+        if (!searchByPosition || posKey is null)
         {
             return query;
         }
 
-        if (positionMode == PositionSearchMode.Exact)
+        if (positionMode == PositionSearchMode.ExactPly && plyCount.HasValue)
         {
-            return query.Where(g => g.Positions.Any(p => p.Fen == normalizedFen));
+            var ply = (short)plyCount.Value;
+            return query.Where(g => g.Positions.Any(p => p.PosKey == posKey && p.PlyCount == ply));
         }
 
-        if (positionMode == PositionSearchMode.SamePosition)
-        {
-            if (!fenHash.HasValue)
-            {
-                return query;
-            }
-
-            var hash = fenHash.Value;
-            return query.Where(g => g.Positions.Any(p => p.FenHash == hash));
-        }
-
-        return query;
+        return query.Where(g => g.Positions.Any(p => p.PosKey == posKey));
     }
 
     public static IQueryable<UserDatabaseGame> ApplyPositionFilters(
         this IQueryable<UserDatabaseGame> query,
         bool searchByPosition,
-        string? normalizedFen,
-        long? fenHash,
-        PositionSearchMode positionMode)
+        byte[]? posKey,
+        PositionSearchMode positionMode = PositionSearchMode.SamePosition,
+        int? plyCount = null)
     {
-        if (!searchByPosition || string.IsNullOrWhiteSpace(normalizedFen))
+        if (!searchByPosition || posKey is null)
         {
             return query;
         }
 
-        if (positionMode == PositionSearchMode.Exact)
+        if (positionMode == PositionSearchMode.ExactPly && plyCount.HasValue)
         {
-            return query.Where(g => g.Game.Positions.Any(p => p.Fen == normalizedFen));
+            var ply = (short)plyCount.Value;
+            return query.Where(link => link.Game.Positions.Any(p => p.PosKey == posKey && p.PlyCount == ply));
         }
 
-        if (positionMode == PositionSearchMode.SamePosition)
-        {
-            if (!fenHash.HasValue)
-            {
-                return query;
-            }
-
-            var hash = fenHash.Value;
-            return query.Where(g => g.Game.Positions.Any(p => p.FenHash == hash));
-        }
-
-        return query;
+        return query.Where(link => link.Game.Positions.Any(p => p.PosKey == posKey));
     }
 }

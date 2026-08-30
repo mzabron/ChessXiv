@@ -12,14 +12,13 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
     }
 
     public DbSet<Game> Games { get; set; }
-    public DbSet<Move> Moves { get; set; }
     public DbSet<Position> Positions { get; set; }
     public DbSet<UserDatabase> UserDatabases { get; set; }
     public DbSet<UserDatabaseGame> UserDatabaseGames { get; set; }
     public DbSet<UserDatabaseBookmark> UserDatabaseBookmarks { get; set; }
     public DbSet<StagingGame> StagingGames { get; set; }
-    public DbSet<StagingMove> StagingMoves { get; set; }
     public DbSet<StagingPosition> StagingPositions { get; set; }
+    public DbSet<StagingDraftSession> StagingDraftSessions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,7 +28,6 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
         {
             entity.HasIndex(u => u.Email).IsUnique();
             entity.Property(u => u.CreatedAtUtc).IsRequired();
-            entity.Property(u => u.UserTier).HasMaxLength(32).IsRequired();
         });
 
         modelBuilder.Entity<Game>(entity =>
@@ -48,25 +46,24 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(g => new { g.BlackNormalizedFirstName, g.BlackNormalizedLastName });
         });
 
-        modelBuilder.Entity<Move>(entity =>
-        {
-            entity
-                .HasOne(m => m.Game)
-                .WithMany(g => g.Moves)
-                .HasForeignKey(m => m.GameId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
         modelBuilder.Entity<Position>(entity =>
         {
-            entity.HasIndex(p => p.FenHash);
-            entity.HasIndex(p => p.Fen);
-            entity.HasIndex(p => new {p.GameId, p.PlyCount });
+            // Clustering by game keeps a game's positions together, which is what cascade
+            // deletes and replay reads touch, and removes the surrogate uuid key entirely.
+            entity.HasKey(p => new { p.GameId, p.PlyCount });
+            entity.Property(p => p.PosKey).HasColumnType("bytea").IsRequired();
+            entity.Property(p => p.Result).HasConversion<byte>().IsRequired();
+
+            // Covering index: position search and the opening tree are both answered from
+            // the index alone, without visiting the heap.
+            entity.HasIndex(p => p.PosKey)
+                .IncludeProperties(p => new { p.NextMove, p.Result });
+
             entity
                 .HasOne(p => p.Game)
                 .WithMany(g => g.Positions)
                 .HasForeignKey(p => p.GameId)
                 .OnDelete(DeleteBehavior.Cascade);
-
         });
 
         modelBuilder.Entity<UserDatabase>(entity =>
@@ -74,6 +71,8 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(d => d.Name).HasMaxLength(200).IsRequired();
             entity.Property(d => d.OwnerUserId).IsRequired();
             entity.Property(d => d.CreatedAtUtc).IsRequired();
+            entity.Property(d => d.GameCount).IsRequired().HasDefaultValue(0);
+            entity.Property(d => d.ContentUpdatedAtUtc).IsRequired();
 
             entity.HasIndex(d => new { d.OwnerUserId, d.Name }).IsUnique();
             entity.HasIndex(d => d.IsPublic);
@@ -152,22 +151,23 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(x => new { x.OwnerUserId, x.BlackNormalizedFirstName, x.BlackNormalizedLastName });
         });
 
-        modelBuilder.Entity<StagingMove>(entity =>
+        modelBuilder.Entity<StagingDraftSession>(entity =>
         {
-            entity.HasKey(x => x.Id);
-
-            entity
-                .HasOne(x => x.Game)
-                .WithMany(x => x.Moves)
-                .HasForeignKey(x => x.StagingGameId)
-                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasKey(x => x.OwnerUserId);
+            entity.Property(x => x.OwnerUserId).HasMaxLength(128);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.LastAccessedAtUtc).IsRequired();
+            entity.HasIndex(x => x.LastAccessedAtUtc);
         });
 
         modelBuilder.Entity<StagingPosition>(entity =>
         {
-            entity.HasKey(x => x.Id);
-            entity.HasIndex(x => x.FenHash);
-            entity.HasIndex(x => new { x.StagingGameId, x.PlyCount });
+            entity.HasKey(x => new { x.StagingGameId, x.PlyCount });
+            entity.Property(x => x.PosKey).HasColumnType("bytea").IsRequired();
+            entity.Property(x => x.Result).HasConversion<byte>().IsRequired();
+
+            entity.HasIndex(x => x.PosKey)
+                .IncludeProperties(x => new { x.NextMove, x.Result });
 
             entity
                 .HasOne(x => x.Game)

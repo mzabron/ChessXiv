@@ -3,6 +3,7 @@ using System;
 using ChessXiv.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ChessXiv.Infrastructure.Migrations
 {
     [DbContext(typeof(ChessXivDbContext))]
-    partial class ChessXivDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260829124838_RemoveUserTiersAddGameCountAndDraftSessions")]
+    partial class RemoveUserTiersAddGameCountAndDraftSessions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -64,6 +67,9 @@ namespace ChessXiv.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("IsMaster")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("MoveCount")
                         .HasColumnType("integer");
@@ -129,29 +135,70 @@ namespace ChessXiv.Infrastructure.Migrations
                     b.ToTable("Games");
                 });
 
-            modelBuilder.Entity("ChessXiv.Domain.Entities.Position", b =>
+            modelBuilder.Entity("ChessXiv.Domain.Entities.Move", b =>
                 {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BlackClk")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BlackMove")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("GameId")
                         .HasColumnType("uuid");
 
-                    b.Property<short>("PlyCount")
-                        .HasColumnType("smallint");
+                    b.Property<int>("MoveNumber")
+                        .HasColumnType("integer");
 
-                    b.Property<string>("NextMove")
+                    b.Property<string>("WhiteClk")
                         .HasColumnType("text");
 
-                    b.Property<byte[]>("PosKey")
+                    b.Property<string>("WhiteMove")
                         .IsRequired()
-                        .HasColumnType("bytea");
+                        .HasColumnType("text");
 
-                    b.Property<byte>("Result")
-                        .HasColumnType("smallint");
+                    b.HasKey("Id");
 
-                    b.HasKey("GameId", "PlyCount");
+                    b.HasIndex("GameId");
 
-                    b.HasIndex("PosKey");
+                    b.ToTable("Moves");
+                });
 
-                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("PosKey"), new[] { "NextMove", "Result" });
+            modelBuilder.Entity("ChessXiv.Domain.Entities.Position", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Fen")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("FenHash")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("GameId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LastMove")
+                        .HasColumnType("text");
+
+                    b.Property<int>("PlyCount")
+                        .HasColumnType("integer");
+
+                    b.Property<char>("SideToMove")
+                        .HasColumnType("character(1)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Fen");
+
+                    b.HasIndex("FenHash");
+
+                    b.HasIndex("GameId", "PlyCount");
 
                     b.ToTable("Positions");
                 });
@@ -291,29 +338,68 @@ namespace ChessXiv.Infrastructure.Migrations
                     b.ToTable("StagingGames");
                 });
 
-            modelBuilder.Entity("ChessXiv.Domain.Entities.StagingPosition", b =>
+            modelBuilder.Entity("ChessXiv.Domain.Entities.StagingMove", b =>
                 {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BlackClk")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BlackMove")
+                        .HasColumnType("text");
+
+                    b.Property<int>("MoveNumber")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("StagingGameId")
                         .HasColumnType("uuid");
 
-                    b.Property<short>("PlyCount")
-                        .HasColumnType("smallint");
-
-                    b.Property<string>("NextMove")
+                    b.Property<string>("WhiteClk")
                         .HasColumnType("text");
 
-                    b.Property<byte[]>("PosKey")
+                    b.Property<string>("WhiteMove")
                         .IsRequired()
-                        .HasColumnType("bytea");
+                        .HasColumnType("text");
 
-                    b.Property<byte>("Result")
-                        .HasColumnType("smallint");
+                    b.HasKey("Id");
 
-                    b.HasKey("StagingGameId", "PlyCount");
+                    b.HasIndex("StagingGameId");
 
-                    b.HasIndex("PosKey");
+                    b.ToTable("StagingMoves");
+                });
 
-                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("PosKey"), new[] { "NextMove", "Result" });
+            modelBuilder.Entity("ChessXiv.Domain.Entities.StagingPosition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Fen")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("FenHash")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("LastMove")
+                        .HasColumnType("text");
+
+                    b.Property<int>("PlyCount")
+                        .HasColumnType("integer");
+
+                    b.Property<char>("SideToMove")
+                        .HasColumnType("character(1)");
+
+                    b.Property<Guid>("StagingGameId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FenHash");
+
+                    b.HasIndex("StagingGameId", "PlyCount");
 
                     b.ToTable("StagingPositions");
                 });
@@ -323,9 +409,6 @@ namespace ChessXiv.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ContentUpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -615,11 +698,33 @@ namespace ChessXiv.Infrastructure.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("ChessXiv.Domain.Entities.Move", b =>
+                {
+                    b.HasOne("ChessXiv.Domain.Entities.Game", "Game")
+                        .WithMany("Moves")
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Game");
+                });
+
             modelBuilder.Entity("ChessXiv.Domain.Entities.Position", b =>
                 {
                     b.HasOne("ChessXiv.Domain.Entities.Game", "Game")
                         .WithMany("Positions")
                         .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("ChessXiv.Domain.Entities.StagingMove", b =>
+                {
+                    b.HasOne("ChessXiv.Domain.Entities.StagingGame", "Game")
+                        .WithMany("Moves")
+                        .HasForeignKey("StagingGameId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -735,6 +840,8 @@ namespace ChessXiv.Infrastructure.Migrations
 
             modelBuilder.Entity("ChessXiv.Domain.Entities.Game", b =>
                 {
+                    b.Navigation("Moves");
+
                     b.Navigation("Positions");
 
                     b.Navigation("UserDatabaseGames");
@@ -742,6 +849,8 @@ namespace ChessXiv.Infrastructure.Migrations
 
             modelBuilder.Entity("ChessXiv.Domain.Entities.StagingGame", b =>
                 {
+                    b.Navigation("Moves");
+
                     b.Navigation("Positions");
                 });
 
