@@ -1,5 +1,9 @@
+using ChessXiv.Api.Authentication;
+using ChessXiv.Api.Authentication;
 using ChessXiv.Application.Abstractions;
 using ChessXiv.Application.Contracts;
+using ChessXiv.Application.Services;
+using ChessXiv.Application.Exceptions;
 using ChessXiv.Domain.Engine.Abstractions;
 using ChessXiv.Infrastructure.Data;
 using ChessXiv.Infrastructure.Repositories;
@@ -14,33 +18,33 @@ namespace ChessXiv.Api.Controllers;
 [ApiController]
 [Route("api/pgn")]
 public class PgnImportController(
-    IPgnImportService pgnImportService,
     IDraftPromotionService draftPromotionService,
     ChessXivDbContext dbContext,
     IBoardStateSerializer boardStateSerializer,
-    IPositionHasher positionHasher,
+    IPositionKeyCalculator positionKeyCalculator,
     DraftImportProgressCache progressCache,
+    IDraftSessionTracker draftSessionTracker,
+    IGameReplayBuilder gameReplayBuilder,
+    IDraftClaimService draftClaimService,
     BackgroundImportQueue backgroundQueue) : ControllerBase
 {
-    private const string DefaultStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
-    [HttpPost("import")]
-    public async Task<IActionResult> Import([FromBody] PgnImportRequest request, CancellationToken cancellationToken)
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
+    [HttpPost("drafts/claim")]
+    public async Task<IActionResult> ClaimGuestDraft([FromBody] ClaimGuestDraftRequest request, CancellationToken cancellationToken)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.Pgn))
+        var userId = GetCurrentUserId();
+        if (userId is null)
         {
-            return BadRequest("PGN content is required.");
+            return Unauthorized();
         }
 
-        using var reader = new StringReader(request.Pgn);
-        var result = await pgnImportService.ImportAsync(reader, cancellationToken: cancellationToken);
+        var result = await draftClaimService.ClaimAsync(request?.GuestToken ?? string.Empty, userId, cancellationToken);
         return Ok(result);
     }
 
-    [Authorize]
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
     [HttpPost("import-to-database-file")]
-    [RequestSizeLimit(200_000_000)]
-    [DisableRequestSizeLimit]
+    [RequestSizeLimit(ChessXivLimits.MaxUploadBytes)]
     public async Task<IActionResult> ImportToDatabaseFile([FromForm] IFormFile file, [FromForm] Guid userDatabaseId, CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
@@ -78,8 +82,7 @@ public class PgnImportController(
 
     [Authorize]
     [HttpPost("drafts/import-file")]
-    [RequestSizeLimit(200_000_000)]
-    [DisableRequestSizeLimit]
+    [RequestSizeLimit(ChessXivLimits.MaxUploadBytes)]
     public async Task<IActionResult> ImportDraftFile(IFormFile file, CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
@@ -109,7 +112,7 @@ public class PgnImportController(
         return Accepted();
     }
 
-    [Authorize]
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
     [HttpPost("drafts/promote")]
     public async Task<IActionResult> PromoteDraft(
         [FromBody] DraftPromotionRequest request,
@@ -126,12 +129,32 @@ public class PgnImportController(
             return Unauthorized();
         }
 
-        var result = await draftPromotionService.PromoteAsync(
-            userId,
-            request.UserDatabaseId,
-            cancellationToken);
+        try
+        {
+            var result = await draftPromotionService.PromoteAsync(
+                userId,
+                request.UserDatabaseId,
+                cancellationToken);
 
-        return Ok(result);
+            return Ok(result);
+        }
+        catch (SavedGamesLimitExceededException ex)
+        {
+            return Conflict(new
+            {
+                code = "SAVED_GAMES_LIMIT",
+                message = $"You can save up to {ex.Limit:N0} games. You already have {ex.CurrentlySaved:N0}, "
+                          + $"so there is room for {ex.Remaining:N0} more, but this import has {ex.Requested:N0}.",
+                ex.CurrentlySaved,
+                ex.Requested,
+                ex.Limit,
+                ex.Remaining
+            });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
     }
 
     [Authorize]
@@ -179,7 +202,7 @@ public class PgnImportController(
         [FromQuery] int? moveCountTo = null,
         [FromQuery] bool searchByPosition = false,
         [FromQuery] string? fen = null,
-        [FromQuery] PositionSearchMode positionMode = PositionSearchMode.Exact,
+        [FromQuery] PositionSearchMode positionMode = PositionSearchMode.SamePosition,
         CancellationToken cancellationToken = default)
     {
         if (page <= 0)
@@ -203,6 +226,8 @@ public class PgnImportController(
             return Unauthorized();
         }
 
+        await draftSessionTracker.TouchAsync(userId, cancellationToken);
+
         var normalizedSortBy = (sortBy ?? "createdAt").Trim().ToLowerInvariant();
         var normalizedSortDirection = (sortDirection ?? "desc").Trim().ToLowerInvariant();
         var normalizedResultSortMode = (resultSortMode ?? "default").Trim().ToLowerInvariant();
@@ -216,8 +241,7 @@ public class PgnImportController(
         var normalizedWhiteLastName = NormalizeNameToken(whiteLastName);
         var normalizedBlackFirstName = NormalizeNameToken(blackFirstName);
         var normalizedBlackLastName = NormalizeNameToken(blackLastName);
-        var normalizedFen = NormalizeFenForSearch(fen);
-        var fenHash = TryComputeFenHash(searchByPosition, positionMode, normalizedFen, boardStateSerializer, positionHasher);
+        var positionTarget = PositionSearchTarget.Resolve(searchByPosition, fen, boardStateSerializer, positionKeyCalculator);
 
         query = query.ApplyPlayerFilters(
             ignoreColors,
@@ -237,7 +261,7 @@ public class PgnImportController(
             result,
             moveCountFrom,
             moveCountTo);
-        query = query.ApplyPositionFilters(searchByPosition, normalizedFen, fenHash, positionMode);
+        query = query.ApplyPositionFilters(searchByPosition, positionTarget?.PosKey, positionMode, positionTarget?.PlyCount);
 
         query = (normalizedSortBy, descending) switch
         {
@@ -333,6 +357,8 @@ public class PgnImportController(
             return Unauthorized();
         }
 
+        await draftSessionTracker.TouchAsync(userId, cancellationToken);
+
         var game = await dbContext.StagingGames
             .AsNoTracking()
             .Where(g => g.Id == gameId && g.OwnerUserId == userId)
@@ -355,29 +381,7 @@ public class PgnImportController(
             return NotFound();
         }
 
-        var moves = await dbContext.StagingMoves
-            .AsNoTracking()
-            .Where(m => m.StagingGameId == gameId)
-            .OrderBy(m => m.MoveNumber)
-            .Select(m => new GameReplayMoveDto(
-                m.MoveNumber,
-                m.WhiteMove,
-                m.BlackMove,
-                string.IsNullOrWhiteSpace(m.WhiteClk) ? null : m.WhiteClk,
-                string.IsNullOrWhiteSpace(m.BlackClk) ? null : m.BlackClk))
-            .ToListAsync(cancellationToken);
-
-        var fenHistory = await dbContext.StagingPositions
-            .AsNoTracking()
-            .Where(p => p.StagingGameId == gameId)
-            .OrderBy(p => p.PlyCount)
-            .Select(p => p.Fen)
-            .ToListAsync(cancellationToken);
-
-        if (fenHistory.Count == 0)
-        {
-            fenHistory.Add(ResolveStartFen(game.Pgn));
-        }
+        var replay = gameReplayBuilder.Build(game.Pgn);
 
         return Ok(new GameReplayResponse(
             game.Id,
@@ -388,8 +392,8 @@ public class PgnImportController(
             game.Result,
             game.Event,
             game.Year,
-            fenHistory,
-            moves));
+            replay.FenHistory,
+            replay.Moves));
     }
 
     [Authorize]
@@ -406,6 +410,8 @@ public class PgnImportController(
             .Where(g => g.OwnerUserId == userId)
             .ExecuteDeleteAsync(cancellationToken);
 
+        await draftSessionTracker.ClearAsync(userId, cancellationToken);
+
         return Ok(new { deletedCount });
     }
 
@@ -415,28 +421,6 @@ public class PgnImportController(
             ?? User.FindFirstValue("sub");
     }
 
-    private static string ResolveStartFen(string? pgn)
-    {
-        if (!string.IsNullOrWhiteSpace(pgn))
-        {
-            foreach (var line in pgn.Split('\n'))
-            {
-                var trimmed = line.Trim();
-                if (!trimmed.StartsWith("[FEN \"", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith("\"]", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var fen = trimmed[6..^2].Trim();
-                if (!string.IsNullOrWhiteSpace(fen))
-                {
-                    return fen;
-                }
-            }
-        }
-
-        return DefaultStartFen;
-    }
 
     private static string? NormalizeNameToken(string? value)
     {
@@ -448,52 +432,4 @@ public class PgnImportController(
         return value.Trim().ToLowerInvariant();
     }
 
-    private static string? NormalizeFenForSearch(string? fen)
-    {
-        if (string.IsNullOrWhiteSpace(fen))
-        {
-            return null;
-        }
-
-        var parts = fen.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 6)
-        {
-            return null;
-        }
-
-        return string.Join(' ', parts);
-    }
-
-    private static long? TryComputeFenHash(
-        bool searchByPosition,
-        PositionSearchMode positionMode,
-        string? normalizedFen,
-        IBoardStateSerializer boardStateSerializer,
-        IPositionHasher positionHasher)
-    {
-        if (!searchByPosition)
-        {
-            return null;
-        }
-
-        if (positionMode != PositionSearchMode.Exact && positionMode != PositionSearchMode.SamePosition)
-        {
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(normalizedFen))
-        {
-            return null;
-        }
-
-        try
-        {
-            var state = boardStateSerializer.FromFen(normalizedFen);
-            return unchecked((long)positionHasher.Compute(state));
-        }
-        catch (FormatException)
-        {
-            return null;
-        }
-    }
 }

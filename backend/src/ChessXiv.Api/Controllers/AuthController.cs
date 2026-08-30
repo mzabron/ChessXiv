@@ -53,6 +53,18 @@ public class AuthController(
             Message: "Registration created. Please confirm your email to sign in."));
     }
 
+    /// <summary>
+    /// Issues an anonymous session so a visitor can upload a PGN and use the explorer
+    /// without registering. The token is rejected by every endpoint that writes durable
+    /// data, so a guest can browse their import but not save it.
+    /// </summary>
+    [EnableRateLimiting("GuestSession")]
+    [HttpPost("guest-session")]
+    public IActionResult CreateGuestSession()
+    {
+        return Ok(jwtTokenService.CreateGuestToken());
+    }
+
     [HttpPost("login")]
     [EnableRateLimiting("AuthLogin")]
     public async Task<IActionResult> Login([FromBody] AuthLoginRequest request)

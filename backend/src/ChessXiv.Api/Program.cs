@@ -64,6 +64,17 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment = true
             }));
 
+    options.AddPolicy("GuestSession", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(10),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
     options.AddPolicy("AuthForgotPassword", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -134,7 +145,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Guests authenticate with a throwaway token so they can upload and explore a PGN.
+    // Anything that writes durable data requires a real account.
+    options.AddPolicy(ChessXivClaims.RegisteredUserPolicy, policy =>
+        policy.RequireAuthenticatedUser()
+            .RequireAssertion(context => !context.User.HasClaim(ChessXivClaims.Guest, "true")));
+});
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<Microsoft.AspNetCore.SignalR.IUserIdProvider, SubOrNameIdentifierUserIdProvider>();
 
@@ -148,15 +166,17 @@ builder.Services.AddScoped<IPositionImportCoordinator, PositionImportCoordinator
 builder.Services.AddScoped<IBoardStateSerializer, FenBoardStateSerializer>();
 builder.Services.AddScoped<IBoardStateFactory, BoardStateFactory>();
 builder.Services.AddScoped<IBoardStateTransition, BitboardBoardStateTransition>();
-builder.Services.AddScoped<IPositionHasher, ZobristPositionHasher>();
+builder.Services.AddScoped<IPositionKeyCalculator, ZobristPositionKeyCalculator>();
+builder.Services.AddScoped<IGameReplayBuilder, GameReplayBuilder>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-builder.Services.AddScoped<IPgnImportService, PgnImportService>();
+builder.Services.AddScoped<IDraftSessionTracker, DraftSessionTracker>();
+builder.Services.AddScoped<IDraftClaimService, DraftClaimService>();
 builder.Services.AddScoped<IDraftImportService, DraftImportService>();
 builder.Services.AddScoped<IDirectDatabaseImportService, DirectDatabaseImportService>();
+builder.Services.AddScoped<IImportStatisticsRefresher, PostgresImportStatisticsRefresher>();
 builder.Services.AddScoped<IDraftPromotionService, DraftPromotionService>();
 builder.Services.AddScoped<IGameExplorerService, GameExplorerService>();
 builder.Services.AddScoped<IPositionPlayService, PositionPlayService>();
-builder.Services.AddScoped<IQuotaService, UserQuotaService>();
 builder.Services.AddSingleton<DraftImportProgressCache>();
 builder.Services.AddSingleton<ImportProgressConnectionRegistry>();
 builder.Services.AddScoped<IDraftImportProgressPublisher, SignalRDraftImportProgressPublisher>();

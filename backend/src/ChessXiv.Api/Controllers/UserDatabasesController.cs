@@ -1,5 +1,9 @@
 using System.Security.Claims;
+using ChessXiv.Api.Authentication;
+using ChessXiv.Application.Abstractions;
+using ChessXiv.Application.Abstractions.Repositories;
 using ChessXiv.Application.Contracts;
+using ChessXiv.Application.Services;
 using ChessXiv.Domain.Engine.Abstractions;
 using ChessXiv.Domain.Entities;
 using ChessXiv.Infrastructure.Data;
@@ -14,95 +18,69 @@ namespace ChessXiv.Api.Controllers;
 [Route("api/user-databases")]
 public class UserDatabasesController(
     ChessXivDbContext dbContext,
+    IDraftPromotionRepository draftPromotionRepository,
+    IGameReplayBuilder gameReplayBuilder,
     IBoardStateSerializer boardStateSerializer,
-    IPositionHasher positionHasher) : ControllerBase
+    IPositionKeyCalculator positionKeyCalculator) : ControllerBase
 {
-    private const string DefaultStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
-    [Authorize]
-    [HttpGet("mine")]
-    public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
+    /// <summary>
+    /// Lists every database the caller may open: all public ones plus, when signed in,
+    /// the caller's own private ones. Anonymous and authenticated callers see the same
+    /// public set - signing in only ever adds rows, never removes them.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet]
+    public async Task<IActionResult> GetVisible(CancellationToken cancellationToken)
     {
         var userId = GetCurrentUserId();
-        if (userId is null)
-        {
-            return Unauthorized();
-        }
+
+        var bookmarkedIds = userId is null
+            ? []
+            : await dbContext.UserDatabaseBookmarks
+                .AsNoTracking()
+                .Where(b => b.UserId == userId)
+                .Select(b => b.UserDatabaseId)
+                .ToListAsync(cancellationToken);
+
+        var bookmarkedIdSet = bookmarkedIds.ToHashSet();
 
         var items = await dbContext.UserDatabases
             .AsNoTracking()
-            .Where(d => d.OwnerUserId == userId)
+            .Where(d => d.IsPublic || (userId != null && d.OwnerUserId == userId))
             .OrderBy(d => d.Name)
-            .Select(d => new UserDatabaseDto(
+            .Select(d => new
+            {
                 d.Id,
                 d.Name,
                 d.IsPublic,
                 d.OwnerUserId,
-                dbContext.Users
+                OwnerUserName = dbContext.Users
                     .Where(u => u.Id == d.OwnerUserId)
                     .Select(u => u.UserName)
-                    .FirstOrDefault() ?? d.OwnerUserId,
-                d.UserDatabaseGames.Count,
-                d.CreatedAtUtc))
+                    .FirstOrDefault(),
+                d.GameCount,
+                d.CreatedAtUtc,
+                d.ContentUpdatedAtUtc
+            })
             .ToListAsync(cancellationToken);
 
-        return Ok(items);
-    }
-
-    [HttpGet("public")]
-    public async Task<IActionResult> GetPublic(CancellationToken cancellationToken)
-    {
-        var items = await dbContext.UserDatabases
-            .AsNoTracking()
-            .Where(d => d.IsPublic)
-            .OrderBy(d => d.Name)
-            .Select(d => new UserDatabaseDto(
+        var response = items
+            .Select(d => new UserDatabaseListItemDto(
                 d.Id,
                 d.Name,
                 d.IsPublic,
                 d.OwnerUserId,
-                dbContext.Users
-                    .Where(u => u.Id == d.OwnerUserId)
-                    .Select(u => u.UserName)
-                    .FirstOrDefault() ?? d.OwnerUserId,
-                d.UserDatabaseGames.Count,
-                d.CreatedAtUtc))
-            .ToListAsync(cancellationToken);
+                d.OwnerUserName ?? d.OwnerUserId,
+                d.GameCount,
+                d.CreatedAtUtc,
+                d.ContentUpdatedAtUtc,
+                IsOwner: userId != null && d.OwnerUserId == userId,
+                IsBookmarked: bookmarkedIdSet.Contains(d.Id)))
+            .ToList();
 
-        return Ok(items);
+        return Ok(response);
     }
 
-    [Authorize]
-    [HttpGet("bookmarks")]
-    public async Task<IActionResult> GetBookmarks(CancellationToken cancellationToken)
-    {
-        var userId = GetCurrentUserId();
-        if (userId is null)
-        {
-            return Unauthorized();
-        }
-
-        var items = await dbContext.UserDatabaseBookmarks
-            .AsNoTracking()
-            .Where(b => b.UserId == userId)
-            .Where(b => b.UserDatabase.IsPublic || b.UserDatabase.OwnerUserId == userId)
-            .OrderByDescending(b => b.CreatedAtUtc)
-            .Select(b => new BookmarkedUserDatabaseDto(
-                b.UserDatabase.Id,
-                b.UserDatabase.Name,
-                b.UserDatabase.IsPublic,
-                b.UserDatabase.OwnerUserId,
-                dbContext.Users
-                    .Where(u => u.Id == b.UserDatabase.OwnerUserId)
-                    .Select(u => u.UserName)
-                    .FirstOrDefault() ?? b.UserDatabase.OwnerUserId,
-                b.UserDatabase.UserDatabaseGames.Count,
-                b.UserDatabase.CreatedAtUtc,
-                b.CreatedAtUtc))
-            .ToListAsync(cancellationToken);
-
-        return Ok(items);
-    }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
@@ -121,7 +99,7 @@ public class UserDatabasesController(
                     .Where(u => u.Id == d.OwnerUserId)
                     .Select(u => u.UserName)
                     .FirstOrDefault() ?? d.OwnerUserId,
-                d.UserDatabaseGames.Count,
+                d.GameCount,
                 d.CreatedAtUtc))
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -164,7 +142,7 @@ public class UserDatabasesController(
         [FromQuery] int? moveCountTo = null,
         [FromQuery] bool searchByPosition = false,
         [FromQuery] string? fen = null,
-        [FromQuery] PositionSearchMode positionMode = PositionSearchMode.Exact,
+        [FromQuery] PositionSearchMode positionMode = PositionSearchMode.SamePosition,
         CancellationToken cancellationToken = default)
     {
         if (page <= 0)
@@ -218,8 +196,7 @@ public class UserDatabasesController(
         var normalizedWhiteLastName = NormalizeNameToken(whiteLastName);
         var normalizedBlackFirstName = NormalizeNameToken(blackFirstName);
         var normalizedBlackLastName = NormalizeNameToken(blackLastName);
-        var normalizedFen = NormalizeFenForSearch(fen);
-        var fenHash = TryComputeFenHash(searchByPosition, positionMode, normalizedFen, boardStateSerializer, positionHasher);
+        var positionTarget = PositionSearchTarget.Resolve(searchByPosition, fen, boardStateSerializer, positionKeyCalculator);
 
         query = query.ApplyPlayerFilters(
             ignoreColors,
@@ -239,7 +216,7 @@ public class UserDatabasesController(
             result,
             moveCountFrom,
             moveCountTo);
-        query = query.ApplyPositionFilters(searchByPosition, normalizedFen, fenHash, positionMode);
+        query = query.ApplyPositionFilters(searchByPosition, positionTarget?.PosKey, positionMode, positionTarget?.PlyCount);
 
         query = (normalizedSortBy, descending) switch
         {
@@ -381,29 +358,7 @@ public class UserDatabasesController(
             return NotFound();
         }
 
-        var moves = await dbContext.Moves
-            .AsNoTracking()
-            .Where(m => m.GameId == gameId)
-            .OrderBy(m => m.MoveNumber)
-            .Select(m => new GameReplayMoveDto(
-                m.MoveNumber,
-                m.WhiteMove,
-                m.BlackMove,
-                string.IsNullOrWhiteSpace(m.WhiteClk) ? null : m.WhiteClk,
-                string.IsNullOrWhiteSpace(m.BlackClk) ? null : m.BlackClk))
-            .ToListAsync(cancellationToken);
-
-        var fenHistory = await dbContext.Positions
-            .AsNoTracking()
-            .Where(p => p.GameId == gameId)
-            .OrderBy(p => p.PlyCount)
-            .Select(p => p.Fen)
-            .ToListAsync(cancellationToken);
-
-        if (fenHistory.Count == 0)
-        {
-            fenHistory.Add(ResolveStartFen(game.Pgn));
-        }
+        var replay = gameReplayBuilder.Build(game.Pgn);
 
         return Ok(new GameReplayResponse(
             game.Id,
@@ -414,11 +369,11 @@ public class UserDatabasesController(
             game.Result,
             game.Event,
             game.Year,
-            fenHistory,
-            moves));
+            replay.FenHistory,
+            replay.Moves));
     }
 
-    [Authorize]
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateUserDatabaseRequest request, CancellationToken cancellationToken)
     {
@@ -442,13 +397,15 @@ public class UserDatabasesController(
             return Conflict("A database with this name already exists for this user.");
         }
 
+        var createdAtUtc = DateTime.UtcNow;
         var entity = new UserDatabase
         {
             Id = Guid.NewGuid(),
             Name = normalizedName,
             IsPublic = request.IsPublic,
             OwnerUserId = userId,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = createdAtUtc,
+            ContentUpdatedAtUtc = createdAtUtc
         };
 
         dbContext.UserDatabases.Add(entity);
@@ -464,7 +421,7 @@ public class UserDatabasesController(
         return CreatedAtAction(nameof(GetById), new { id = entity.Id }, dto);
     }
 
-    [Authorize]
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserDatabaseRequest request, CancellationToken cancellationToken)
     {
@@ -506,7 +463,7 @@ public class UserDatabasesController(
         return NoContent();
     }
 
-    [Authorize]
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
@@ -583,7 +540,7 @@ public class UserDatabasesController(
         return NoContent();
     }
 
-    [Authorize]
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
     [HttpPost("{id:guid}/bookmark")]
     public async Task<IActionResult> AddBookmark(Guid id, CancellationToken cancellationToken)
     {
@@ -628,7 +585,7 @@ public class UserDatabasesController(
         return Ok(new { IsBookmarked = true, Created = true });
     }
 
-    [Authorize]
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
     [HttpDelete("{id:guid}/bookmark")]
     public async Task<IActionResult> RemoveBookmark(Guid id, CancellationToken cancellationToken)
     {
@@ -651,7 +608,7 @@ public class UserDatabasesController(
         return NoContent();
     }
 
-    [Authorize]
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
     [HttpPost("{id:guid}/games")]
     public async Task<IActionResult> AddGames(Guid id, [FromBody] AddGamesToDatabaseRequest request, CancellationToken cancellationToken)
     {
@@ -724,6 +681,8 @@ public class UserDatabasesController(
         if (toInsert.Length > 0)
         {
             dbContext.UserDatabaseGames.AddRange(toInsert);
+            dbEntity.GameCount += toInsert.Length;
+            dbEntity.ContentUpdatedAtUtc = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
@@ -734,7 +693,254 @@ public class UserDatabasesController(
         });
     }
 
-    [Authorize]
+    /// <summary>
+    /// Adds games to this database from the caller's draft or from another database they
+    /// can read. Without an explicit id list the whole filtered result set is added, not
+    /// just the visible page. Games already linked here are skipped rather than duplicated.
+    /// </summary>
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
+    [HttpPost("{id:guid}/games/from-selection")]
+    public async Task<IActionResult> AddGamesFromSelection(
+        Guid id,
+        [FromBody] AddGamesFromSelectionRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("Request body is required.");
+        }
+
+        if (!Enum.IsDefined(request.Filters.EloMode) || !Enum.IsDefined(request.Filters.PositionMode))
+        {
+            return BadRequest("Invalid filter value.");
+        }
+
+        var userId = GetCurrentUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var target = await dbContext.UserDatabases.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+        if (target is null)
+        {
+            return NotFound();
+        }
+
+        if (target.OwnerUserId != userId)
+        {
+            return Forbid();
+        }
+
+        var candidateIds = await ResolveSelectedGameIdsAsync(request, userId, cancellationToken);
+        if (candidateIds is null)
+        {
+            return Forbid();
+        }
+
+        var totalMatched = candidateIds.Count;
+
+        var alreadyLinked = await dbContext.UserDatabaseGames
+            .AsNoTracking()
+            .Where(link => link.UserDatabaseId == id && candidateIds.Contains(link.GameId))
+            .Select(link => link.GameId)
+            .ToListAsync(cancellationToken);
+
+        var alreadyLinkedSet = alreadyLinked.ToHashSet();
+        var toAdd = candidateIds.Where(gameId => !alreadyLinkedSet.Contains(gameId)).ToArray();
+
+        var savedGamesUsed = await draftPromotionRepository.CountSavedGamesAsync(userId, cancellationToken);
+        var remaining = ChessXivLimits.MaxSavedGamesPerUser - savedGamesUsed;
+
+        if (toAdd.Length > remaining)
+        {
+            return Conflict(new
+            {
+                code = "SAVED_GAMES_LIMIT",
+                message = $"You can save up to {ChessXivLimits.MaxSavedGamesPerUser:N0} games. "
+                          + $"You already have {savedGamesUsed:N0}, so there is room for {Math.Max(0, remaining):N0} more, "
+                          + $"but this selection adds {toAdd.Length:N0}.",
+                CurrentlySaved = savedGamesUsed,
+                Requested = toAdd.Length,
+                Limit = ChessXivLimits.MaxSavedGamesPerUser,
+                Remaining = Math.Max(0, remaining)
+            });
+        }
+
+        if (toAdd.Length > 0)
+        {
+            if (request.SourceUserDatabaseId.HasValue)
+            {
+                await LinkExistingGamesAsync(id, toAdd, cancellationToken);
+            }
+            else
+            {
+                // Draft games do not live in Games yet, so they are copied across first.
+                await draftPromotionRepository.PromoteSelectionAsync(
+                    userId,
+                    id,
+                    toAdd,
+                    DateTime.UtcNow,
+                    cancellationToken);
+            }
+
+            await draftPromotionRepository.SyncGameCountAsync(id, cancellationToken);
+        }
+
+        return Ok(new AddGamesFromSelectionResponse(
+            AddedCount: toAdd.Length,
+            SkippedCount: alreadyLinked.Count,
+            TotalMatched: totalMatched,
+            SavedGamesUsed: await draftPromotionRepository.CountSavedGamesAsync(userId, cancellationToken),
+            SavedGamesLimit: ChessXivLimits.MaxSavedGamesPerUser));
+    }
+
+    private async Task LinkExistingGamesAsync(Guid userDatabaseId, IReadOnlyCollection<Guid> gameIds, CancellationToken cancellationToken)
+    {
+        var addedAtUtc = DateTime.UtcNow;
+        var idArray = gameIds as Guid[] ?? gameIds.ToArray();
+
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "UserDatabaseGames" (
+                "UserDatabaseId", "GameId", "AddedAtUtc", "Date", "Year", "Event", "Round", "Site"
+            )
+            SELECT
+                {userDatabaseId}, g."Id", {addedAtUtc}, g."Date",
+                CASE WHEN g."Year" <= 0 THEN NULL ELSE g."Year" END,
+                g."Event", g."Round", g."Site"
+            FROM "Games" g
+            WHERE g."Id" = ANY({idArray})
+            ON CONFLICT ("UserDatabaseId", "GameId") DO NOTHING;
+            """, cancellationToken);
+    }
+
+    /// <summary>
+    /// Resolves the games the request refers to. Returns null when the caller may not read
+    /// the source database.
+    /// </summary>
+    private async Task<List<Guid>?> ResolveSelectedGameIdsAsync(
+        AddGamesFromSelectionRequest request,
+        string userId,
+        CancellationToken cancellationToken)
+    {
+        var explicitIds = request.GameIds?.Where(g => g != Guid.Empty).Distinct().ToList();
+        var filters = request.Filters;
+
+        var positionTarget = PositionSearchTarget.Resolve(
+            filters.SearchByPosition,
+            filters.Fen,
+            boardStateSerializer,
+            positionKeyCalculator);
+
+        if (request.SourceUserDatabaseId.HasValue)
+        {
+            var sourceId = request.SourceUserDatabaseId.Value;
+            var sourceInfo = await dbContext.UserDatabases
+                .AsNoTracking()
+                .Where(d => d.Id == sourceId)
+                .Select(d => new { d.OwnerUserId, d.IsPublic })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (sourceInfo is null || (!sourceInfo.IsPublic && sourceInfo.OwnerUserId != userId))
+            {
+                return null;
+            }
+
+            var linkQuery = dbContext.UserDatabaseGames
+                .AsNoTracking()
+                .Where(link => link.UserDatabaseId == sourceId);
+
+            if (explicitIds is { Count: > 0 })
+            {
+                return await linkQuery
+                    .Where(link => explicitIds.Contains(link.GameId))
+                    .Select(link => link.GameId)
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+            }
+
+            linkQuery = ApplySelectionFilters(linkQuery, filters, positionTarget);
+
+            return await linkQuery
+                .Select(link => link.GameId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+        }
+
+        var draftQuery = dbContext.StagingGames
+            .AsNoTracking()
+            .Where(g => g.OwnerUserId == userId);
+
+        if (explicitIds is { Count: > 0 })
+        {
+            return await draftQuery
+                .Where(g => explicitIds.Contains(g.Id))
+                .Select(g => g.Id)
+                .ToListAsync(cancellationToken);
+        }
+
+        draftQuery = ApplySelectionFilters(draftQuery, filters, positionTarget);
+
+        return await draftQuery
+            .Select(g => g.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static IQueryable<UserDatabaseGame> ApplySelectionFilters(
+        IQueryable<UserDatabaseGame> query,
+        GameSelectionFilters filters,
+        PositionSearchTarget? positionTarget)
+    {
+        return query
+            .ApplyPlayerFilters(
+                filters.IgnoreColors,
+                NormalizeNameToken(filters.WhiteFirstName),
+                NormalizeNameToken(filters.WhiteLastName),
+                NormalizeNameToken(filters.BlackFirstName),
+                NormalizeNameToken(filters.BlackLastName))
+            .ApplyScalarFilters(
+                filters.EloEnabled,
+                filters.EloFrom,
+                filters.EloTo,
+                filters.EloMode,
+                filters.YearEnabled,
+                filters.YearFrom,
+                filters.YearTo,
+                filters.EcoCode,
+                filters.Result,
+                filters.MoveCountFrom,
+                filters.MoveCountTo)
+            .ApplyPositionFilters(filters.SearchByPosition, positionTarget?.PosKey, filters.PositionMode, positionTarget?.PlyCount);
+    }
+
+    private static IQueryable<StagingGame> ApplySelectionFilters(
+        IQueryable<StagingGame> query,
+        GameSelectionFilters filters,
+        PositionSearchTarget? positionTarget)
+    {
+        return query
+            .ApplyPlayerFilters(
+                filters.IgnoreColors,
+                NormalizeNameToken(filters.WhiteFirstName),
+                NormalizeNameToken(filters.WhiteLastName),
+                NormalizeNameToken(filters.BlackFirstName),
+                NormalizeNameToken(filters.BlackLastName))
+            .ApplyScalarFilters(
+                filters.EloEnabled,
+                filters.EloFrom,
+                filters.EloTo,
+                filters.EloMode,
+                filters.YearEnabled,
+                filters.YearFrom,
+                filters.YearTo,
+                filters.EcoCode,
+                filters.Result,
+                filters.MoveCountFrom,
+                filters.MoveCountTo)
+            .ApplyPositionFilters(filters.SearchByPosition, positionTarget?.PosKey, filters.PositionMode, positionTarget?.PlyCount);
+    }
+
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
     [HttpDelete("{id:guid}/games/{gameId:guid}")]
     public async Task<IActionResult> RemoveGame(Guid id, Guid gameId, CancellationToken cancellationToken)
     {
@@ -764,8 +970,91 @@ public class UserDatabasesController(
         }
 
         dbContext.UserDatabaseGames.Remove(link);
+        dbEntity.GameCount = Math.Max(0, dbEntity.GameCount - 1);
+        dbEntity.ContentUpdatedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Unlinks a set of games from this database in one request, and deletes any game that
+    /// no longer belongs to any database at all.
+    /// </summary>
+    /// <remarks>
+    /// Removing the link alone would leave the game and its (much larger) position rows
+    /// behind with nothing referencing them - invisible to every user but still occupying
+    /// storage. Deleting the newly-orphaned games mirrors what deleting a whole database
+    /// already does, and keeps that one rule in both places.
+    /// </remarks>
+    [Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
+    [HttpPost("{id:guid}/games/remove")]
+    public async Task<IActionResult> RemoveGames(
+        Guid id,
+        [FromBody] RemoveGamesFromDatabaseRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request?.GameIds is null || request.GameIds.Count == 0)
+        {
+            return BadRequest("At least one game id is required.");
+        }
+
+        var userId = GetCurrentUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var dbEntity = await dbContext.UserDatabases.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+        if (dbEntity is null)
+        {
+            return NotFound();
+        }
+
+        if (dbEntity.OwnerUserId != userId)
+        {
+            return Forbid();
+        }
+
+        var gameIds = request.GameIds.Where(g => g != Guid.Empty).Distinct().ToArray();
+        if (gameIds.Length == 0)
+        {
+            return BadRequest("Provided game ids are invalid.");
+        }
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var removedCount = await dbContext.UserDatabaseGames
+                .Where(link => link.UserDatabaseId == id && gameIds.Contains(link.GameId))
+                .ExecuteDeleteAsync(cancellationToken);
+
+            // Only games that lost their *last* link are deleted; one still shared with
+            // another database must survive.
+            var orphanIds = await dbContext.Games
+                .AsNoTracking()
+                .Where(game => gameIds.Contains(game.Id) && !game.UserDatabaseGames.Any())
+                .Select(game => game.Id)
+                .ToArrayAsync(cancellationToken);
+
+            var deletedOrphanCount = 0;
+            if (orphanIds.Length > 0)
+            {
+                deletedOrphanCount = await dbContext.Games
+                    .Where(game => orphanIds.Contains(game.Id))
+                    .ExecuteDeleteAsync(cancellationToken);
+            }
+
+            await draftPromotionRepository.SyncGameCountAsync(id, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return Ok(new RemoveGamesFromDatabaseResponse(removedCount, deletedOrphanCount));
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     private string? GetCurrentUserId()
@@ -784,75 +1073,5 @@ public class UserDatabasesController(
         return value.Trim().ToLowerInvariant();
     }
 
-    private static string? NormalizeFenForSearch(string? fen)
-    {
-        if (string.IsNullOrWhiteSpace(fen))
-        {
-            return null;
-        }
 
-        var parts = fen.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 6)
-        {
-            return null;
-        }
-
-        return string.Join(' ', parts);
-    }
-
-    private static long? TryComputeFenHash(
-        bool searchByPosition,
-        PositionSearchMode positionMode,
-        string? normalizedFen,
-        IBoardStateSerializer boardStateSerializer,
-        IPositionHasher positionHasher)
-    {
-        if (!searchByPosition)
-        {
-            return null;
-        }
-
-        if (positionMode != PositionSearchMode.Exact && positionMode != PositionSearchMode.SamePosition)
-        {
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(normalizedFen))
-        {
-            return null;
-        }
-
-        try
-        {
-            var state = boardStateSerializer.FromFen(normalizedFen);
-            return unchecked((long)positionHasher.Compute(state));
-        }
-        catch (FormatException)
-        {
-            return null;
-        }
-    }
-
-    private static string ResolveStartFen(string? pgn)
-    {
-        if (!string.IsNullOrWhiteSpace(pgn))
-        {
-            foreach (var line in pgn.Split('\n'))
-            {
-                var trimmed = line.Trim();
-                if (!trimmed.StartsWith("[FEN \"", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith("\"]", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var fen = trimmed[6..^2].Trim();
-                if (!string.IsNullOrWhiteSpace(fen))
-                {
-                    return fen;
-                }
-            }
-        }
-
-        return DefaultStartFen;
-    }
 }

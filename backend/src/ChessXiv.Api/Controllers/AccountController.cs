@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text;
+using ChessXiv.Api.Authentication;
 using ChessXiv.Api.Email;
 using ChessXiv.Application.Abstractions;
 using ChessXiv.Application.Contracts;
@@ -15,11 +16,10 @@ namespace ChessXiv.Api.Controllers;
 
 [ApiController]
 [Route("api/account")]
-[Authorize]
+[Authorize(Policy = ChessXivClaims.RegisteredUserPolicy)]
 public class AccountController(
     UserManager<ApplicationUser> userManager,
     ChessXivDbContext dbContext,
-    IQuotaService quotaService,
     IEmailSender emailSender,
     IOptions<FrontendOptions> frontendOptions) : ControllerBase
 {
@@ -47,21 +47,12 @@ public class AccountController(
             .Distinct()
             .CountAsync(cancellationToken);
 
-        var importedGamesUsed = await dbContext.StagingGames
-            .AsNoTracking()
-            .Where(x => x.OwnerUserId == userId)
-            .CountAsync(cancellationToken);
-
-        var importedGamesLimit = await quotaService.GetMaxDraftImportGamesAsync(userId, cancellationToken);
-        var savedGamesLimit = await quotaService.GetMaxSavedGamesAsync(userId, cancellationToken);
-
         var response = new AccountSummaryResponse(
             Nickname: user.UserName ?? string.Empty,
             Email: user.Email ?? string.Empty,
             SavedGamesUsed: savedGamesUsed,
-            SavedGamesLimit: savedGamesLimit,
-            ImportedGamesUsed: importedGamesUsed,
-            ImportedGamesLimit: importedGamesLimit);
+            SavedGamesLimit: ChessXivLimits.MaxSavedGamesPerUser,
+            MaxUploadBytes: ChessXivLimits.MaxUploadBytes);
 
         return Ok(response);
     }

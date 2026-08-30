@@ -13,37 +13,6 @@ public class GameExplorerController(
     IGameExplorerService gameExplorerService,
     IPositionPlayService positionPlayService) : ControllerBase
 {
-    [AllowAnonymous]
-    [HttpPost("search")]
-    public async Task<IActionResult> Search([FromBody] GameExplorerSearchRequest request, CancellationToken cancellationToken)
-    {
-        if (request is null)
-        {
-            return BadRequest("Request body is required.");
-        }
-
-        if (!Enum.IsDefined(request.EloMode))
-        {
-            return BadRequest("Invalid eloMode value.");
-        }
-
-        var userId = GetCurrentUserId();
-
-        try
-        {
-            var result = await gameExplorerService.SearchAsync(request, userId, cancellationToken);
-            return Ok(result);
-        }
-        catch (ForbiddenException)
-        {
-            return Forbid();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound("User database was not found.");
-        }
-    }
-
     [HttpPost("position/move")]
     public IActionResult ApplyPositionMove([FromBody] PositionMoveRequest request)
     {
@@ -73,11 +42,6 @@ public class GameExplorerController(
         if (!Enum.IsDefined(request.EloMode))
         {
             return BadRequest("Invalid eloMode value.");
-        }
-
-        if (!Enum.IsDefined(request.PositionMode))
-        {
-            return BadRequest("Invalid positionMode value.");
         }
 
         if (request.Source == MoveTreeSource.UserDatabase && (!request.UserDatabaseId.HasValue || request.UserDatabaseId == Guid.Empty))

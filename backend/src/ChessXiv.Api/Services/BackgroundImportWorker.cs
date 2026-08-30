@@ -1,4 +1,5 @@
 using ChessXiv.Application.Abstractions;
+using ChessXiv.Application.Services;
 
 namespace ChessXiv.Api.Services;
 
@@ -7,9 +8,21 @@ public class BackgroundImportWorker(
     IServiceScopeFactory serviceScopeFactory,
     ILogger<BackgroundImportWorker> logger) : BackgroundService
 {
+    /// <summary>
+    /// How many imports may run at once. Each one streams a PGN of up to 100 MB and holds a
+    /// batch of parsed games plus their positions in memory, so unbounded fan-out could
+    /// exhaust RAM on a small host. Two keeps a second user from waiting behind a long
+    /// import without putting the box at risk.
+    /// </summary>
+    private const int MaxConcurrentImports = 2;
+
+    private readonly SemaphoreSlim _concurrencyLimiter = new(MaxConcurrentImports, MaxConcurrentImports);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("Background Import Worker is starting.");
+
+        var running = new List<Task>();
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -17,7 +30,22 @@ public class BackgroundImportWorker(
             {
                 var workItem = await taskQueue.DequeueAsync(stoppingToken);
 
-                _ = Task.Run(() => ProcessWorkItemAsync(workItem, stoppingToken), stoppingToken);
+                // Waiting here rather than inside the task keeps queued work queued instead
+                // of piling up as thousands of started-but-blocked tasks.
+                await _concurrencyLimiter.WaitAsync(stoppingToken);
+
+                running.RemoveAll(task => task.IsCompleted);
+                running.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        await ProcessWorkItemAsync(workItem, stoppingToken);
+                    }
+                    finally
+                    {
+                        _concurrencyLimiter.Release();
+                    }
+                }, stoppingToken));
             }
             catch (OperationCanceledException)
             {
@@ -29,7 +57,16 @@ public class BackgroundImportWorker(
             }
         }
 
+        // Let in-flight imports finish so a shutdown does not leave a half-written draft.
+        await Task.WhenAll(running.Where(task => !task.IsCompleted));
+
         logger.LogInformation("Background Import Worker is stopping.");
+    }
+
+    public override void Dispose()
+    {
+        _concurrencyLimiter.Dispose();
+        base.Dispose();
     }
 
     private async Task ProcessWorkItemAsync(BackgroundImportJob workItem, CancellationToken stoppingToken)
@@ -39,7 +76,11 @@ public class BackgroundImportWorker(
             await using var scope = serviceScopeFactory.CreateAsyncScope();
             
             using var fileStream = File.OpenRead(workItem.TempFilePath);
-            using var reader = new StreamReader(fileStream);
+            // Uploaded PGNs are frequently not UTF-8; reading them as UTF-8 regardless
+            // turned every accented player name into replacement characters.
+            using var reader = PgnEncoding.OpenReader(fileStream, forced: null, out var encoding);
+            logger.LogInformation(
+                "Reading uploaded PGN for {UserId} as {Encoding}.", workItem.UserId, encoding.WebName);
 
             if (workItem.TargetType == ImportTargetType.Draft)
             {
@@ -50,14 +91,9 @@ public class BackgroundImportWorker(
                     batchSize: 200,
                     cancellationToken: stoppingToken);
                     
-                var dbContext = scope.ServiceProvider.GetRequiredService<ChessXiv.Infrastructure.Data.ChessXivDbContext>();
-                if (dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
-                {
-                    await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(
-                        dbContext.Database, "ANALYZE \"StagingGames\";", cancellationToken: stoppingToken);
-                    await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(
-                        dbContext.Database, "ANALYZE \"StagingPositions\";", cancellationToken: stoppingToken);
-                }
+                await scope.ServiceProvider
+                    .GetRequiredService<IImportStatisticsRefresher>()
+                    .RefreshAfterDraftImportAsync(stoppingToken);
 
                 var progressPublisher = scope.ServiceProvider.GetService<ChessXiv.Application.Abstractions.IDraftImportProgressPublisher>();
                 if (progressPublisher is not null)
@@ -82,16 +118,9 @@ public class BackgroundImportWorker(
                     batchSize: 500,
                     cancellationToken: stoppingToken);
 
-                var dbContext = scope.ServiceProvider.GetRequiredService<ChessXiv.Infrastructure.Data.ChessXivDbContext>();
-                if (dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
-                {
-                    await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(
-                        dbContext.Database, "ANALYZE \"Games\";", cancellationToken: stoppingToken);
-                    await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(
-                        dbContext.Database, "ANALYZE \"Positions\";", cancellationToken: stoppingToken);
-                    await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRawAsync(
-                        dbContext.Database, "ANALYZE \"UserDatabaseGames\";", cancellationToken: stoppingToken);
-                }
+                await scope.ServiceProvider
+                    .GetRequiredService<IImportStatisticsRefresher>()
+                    .RefreshAfterDatabaseImportAsync(stoppingToken);
             }
         }
         catch (OperationCanceledException)
