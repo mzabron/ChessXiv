@@ -186,7 +186,41 @@
 
 .board {
   position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
   padding: 0.55rem 0.65rem;
+}
+
+/**
+ * Evaluation bar. Black owns the track, White fills it from the bottom up - the same way
+ * round as the board beneath it, so it inverts when the board is flipped.
+ *
+ * It reuses the win/draw/loss colours from the opening tree on purpose: both are showing
+ * "how much of this belongs to White", and they should not be two different whites.
+ */
+.eval-bar {
+  position: relative;
+  flex: none;
+  width: 0.85rem;
+  border: 1px solid var(--winbar-edge);
+  border-radius: var(--radius-sm);
+  background: var(--winbar-black);
+  overflow: hidden;
+}
+
+.eval-bar-white {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--winbar-white);
+  transition: height 0.25s ease;
+}
+
+.eval-bar.is-flipped .eval-bar-white {
+  top: 0;
+  bottom: auto;
 }
 
 .promotion-picker {
@@ -241,7 +275,10 @@
   border: 1px solid var(--line);
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  width: 100%;
+  /* Flex item: the basis of 0 lets the grid give up exactly the bar's width when it is on,
+     so the board stays square instead of overflowing the panel. */
+  flex: 1 1 0;
+  min-width: 0;
   max-width: none;
   aspect-ratio: 1;
   position: relative; /* <-- Crucial for absolute pieces layer */

@@ -23,6 +23,8 @@ Core stack:
 - RxJS 7
 - @microsoft/signalr 10
 - jwt-decode 4
+- chess.js 1.4 (client-side legality checks and SAN conversion)
+- stockfish 18 (WASM engine, served as a build asset rather than bundled)
 
 Scripts:
 
@@ -34,6 +36,15 @@ Note:
 
 - Angular signals simplify local component state compared to larger store setup for current scope.
 - SignalR package aligns with backend hub for real-time progress updates.
+- angular.json copies `node_modules/stockfish/bin/stockfish-18-lite*.{js,wasm}` to `engine/` in
+  the build output. The engine is never imported into a bundle: it is fetched at runtime, and
+  only when a user switches it on.
+- `ng serve` sends `Cross-Origin-Opener-Policy: same-origin` and
+  `Cross-Origin-Embedder-Policy: require-corp`. Those two headers are what make
+  `SharedArrayBuffer` available, and without it the engine falls back to a single-threaded
+  build. **A production host must send them too** or analysis loses multi-threading. The COEP
+  header is also why the board's piece images carry `crossorigin="anonymous"`: they come from
+  upload.wikimedia.org, which sends CORS headers but no Cross-Origin-Resource-Policy.
 
 ## 3. Application Entry and Global Providers
 
@@ -262,6 +273,69 @@ Note:
 
 - Move frequencies and outcomes require aggregation across many stored games.
 
+## 8a. Local Engine Analysis
+
+Service: stockfish-engine.service.ts | Component: engine-panel.component.ts
+
+Stockfish 18 runs in the visitor's own browser, in a Web Worker. Analysis is open-ended and
+CPU-bound, so a single backend cannot run it for every visitor at once; the trade is a ~7 MB
+engine download on first use, which is why nothing is fetched until the engine is switched on.
+
+Structure:
+
+- The service is `providedIn: 'root'` on purpose. The board component is destroyed and rebuilt
+  when the page enters focus mode, and a component-scoped engine would re-download and
+  re-initialise on every such switch.
+- The panel renders inside the board panel and takes only a FEN. It holds no analysis state.
+- The board passes `null` while in Set Position mode, which suspends analysis rather than
+  searching every half-built position.
+
+Engine builds:
+
+- Multi-threaded (`stockfish-18-lite.js`) when `crossOriginIsolated` is true.
+- Single-threaded (`stockfish-18-lite-single.js`) otherwise, with a hint in the settings
+  explaining why threads are unavailable. Measured locally: ~7.5M nodes/s against ~1.5M.
+
+Display:
+
+- The evaluation bar and the variation list are toggled separately, and either can be used
+  without the other. Both default to on and are remembered.
+- The bar renders beside the board (not in the strip) because it only means anything next to
+  the squares. It follows board flip and reuses the opening tree's win/draw/loss colours,
+  since both answer "how much of this belongs to White".
+- With the list hidden, `MultiPV` drops to 1: only the first line feeds the bar, so searching
+  for the other four is effort nothing displays. The user's chosen line count is kept and
+  restored when the list comes back.
+- Clicking a move inside a variation plays the line up to and including that move. Each move
+  goes through the same backend validation as a dragged piece, and playback stops at the first
+  move the backend rejects. The panel emits SAN and never touches the position itself.
+
+Options:
+
+- `MultiPV` is exposed as "Lines", 1 to 5, default 3.
+- `Threads` defaults to half the machine's cores and is capped at `hardwareConcurrency`.
+- `Hash` is exposed as "Memory (MB)", default 128, capped at 1024. Stockfish advertises a 32 TB
+  maximum, which is meaningless in a browser: the WASM heap tops out at 2 GB.
+- Every other option the engine declares is rendered generically from its `uci` response, by
+  type, so a future build's options appear without a code change.
+- `EvalFile` and `EvalFileSmall` are the exception and are withheld. They name an NNUE file to
+  load from disk, and a WASM build has no filesystem - the network is compiled into the .wasm.
+  Sending either, even at its own declared default, throws inside the worker and kills the
+  engine. Only options whose value differs from the engine's default are sent at all.
+
+Protocol discipline:
+
+- `position` and `setoption` are only legal while the engine is idle. A change made mid-search
+  sends `stop` and waits for the answering `bestmove` before restarting.
+- Board navigation is debounced (120 ms), so holding an arrow key starts one search, not one
+  per keypress.
+- Scores are normalised to White's perspective; the engine reports them from the side to move's,
+  which flips sign every ply.
+- `lowerbound`/`upperbound` info lines are ignored - they are provisional, not evaluations.
+
+Settings and the on/off state persist in localStorage under `chessxiv.engine-settings.v1`. A
+stored "on" only pre-selects the switch; the worker starts when a board is actually on screen.
+
 ## 9. User Databases Frontend Integration
 
 Service: user-databases-api.service.ts
@@ -337,6 +411,9 @@ Explorer feature:
 - frontend/src/app/features/explorer/services/draft-import-progress.service.ts
 - frontend/src/app/features/explorer/services/explorer-board-api.service.ts
 - frontend/src/app/features/explorer/services/user-databases-api.service.ts
+- frontend/src/app/features/explorer/services/stockfish-engine.service.ts
+- frontend/src/app/features/explorer/services/engine.models.ts
+- frontend/src/app/features/explorer/components/engine-panel/engine-panel.component.ts
 
 Shared UI:
 

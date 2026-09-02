@@ -12,12 +12,12 @@
       <button type="button" class="setup-tool" [class.active]="isSetupToolSelected('hand')" (click)="selectSetupTool('hand')" title="Hand tool" aria-label="Hand tool">
         <span class="material-symbols-outlined" aria-hidden="true">drag_pan</span>
       </button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bk')" (click)="selectSetupPiece('bk')"><img [src]="getPieceUrl('bk')" alt="Black king"></button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bq')" (click)="selectSetupPiece('bq')"><img [src]="getPieceUrl('bq')" alt="Black queen"></button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('br')" (click)="selectSetupPiece('br')"><img [src]="getPieceUrl('br')" alt="Black rook"></button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bb')" (click)="selectSetupPiece('bb')"><img [src]="getPieceUrl('bb')" alt="Black bishop"></button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bn')" (click)="selectSetupPiece('bn')"><img [src]="getPieceUrl('bn')" alt="Black knight"></button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bp')" (click)="selectSetupPiece('bp')"><img [src]="getPieceUrl('bp')" alt="Black pawn"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bk')" (click)="selectSetupPiece('bk')"><img crossorigin="anonymous" [src]="getPieceUrl('bk')" alt="Black king"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bq')" (click)="selectSetupPiece('bq')"><img crossorigin="anonymous" [src]="getPieceUrl('bq')" alt="Black queen"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('br')" (click)="selectSetupPiece('br')"><img crossorigin="anonymous" [src]="getPieceUrl('br')" alt="Black rook"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bb')" (click)="selectSetupPiece('bb')"><img crossorigin="anonymous" [src]="getPieceUrl('bb')" alt="Black bishop"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bn')" (click)="selectSetupPiece('bn')"><img crossorigin="anonymous" [src]="getPieceUrl('bn')" alt="Black knight"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('bp')" (click)="selectSetupPiece('bp')"><img crossorigin="anonymous" [src]="getPieceUrl('bp')" alt="Black pawn"></button>
       <button type="button" class="setup-tool danger" [class.active]="isSetupToolSelected('delete')" (click)="selectSetupTool('delete')" title="Delete tool" aria-label="Delete tool">
         <span class="material-symbols-outlined" aria-hidden="true">delete</span>
       </button>
@@ -25,6 +25,14 @@
   }
 
   <div class="board" role="img" aria-label="Interactive chessboard">
+    @if (isEvalBarVisible) {
+      <!-- Purely a picture of the score that is already announced, in text, in the engine
+           strip below - so it is hidden from assistive tech rather than read out twice. -->
+      <div class="eval-bar" [class.is-flipped]="isBoardFlipped" aria-hidden="true">
+        <div class="eval-bar-white" [style.height.%]="engine.evalBarWhitePercent()"></div>
+      </div>
+    }
+
     <div class="board-grid" #boardGrid (contextmenu)="onBoardContextMenu($event)"
       (pointerdown)="onBoardPointerDown($event)">
       @for (rank of ranks; track rank; let rankIndex = $index) {
@@ -75,6 +83,7 @@
       <div class="pieces-layer">
         @for (piece of pieces; track piece.id) {
           <img
+            crossorigin="anonymous"
             class="piece"
             [class.dragging]="isPieceDragging(piece)"
             [src]="getPieceUrl(piece.type)"
@@ -95,7 +104,7 @@
               [disabled]="isSubmittingMove"
               [attr.aria-label]="choice.label"
               (click)="choosePromotionPiece(choice.code)">
-              <img [src]="getPieceUrl(getPromotionPieceType(choice.code))" [alt]="choice.label">
+              <img crossorigin="anonymous" [src]="getPieceUrl(getPromotionPieceType(choice.code))" [alt]="choice.label">
             </button>
           }
         </div>
@@ -120,12 +129,12 @@
       <button type="button" class="setup-tool" [class.active]="isSetupToolSelected('hand')" (click)="selectSetupTool('hand')" title="Hand tool" aria-label="Hand tool">
         <span class="material-symbols-outlined" aria-hidden="true">drag_pan</span>
       </button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wk')" (click)="selectSetupPiece('wk')"><img [src]="getPieceUrl('wk')" alt="White king"></button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wq')" (click)="selectSetupPiece('wq')"><img [src]="getPieceUrl('wq')" alt="White queen"></button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wr')" (click)="selectSetupPiece('wr')"><img [src]="getPieceUrl('wr')" alt="White rook"></button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wb')" (click)="selectSetupPiece('wb')"><img [src]="getPieceUrl('wb')" alt="White bishop"></button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wn')" (click)="selectSetupPiece('wn')"><img [src]="getPieceUrl('wn')" alt="White knight"></button>
-      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wp')" (click)="selectSetupPiece('wp')"><img [src]="getPieceUrl('wp')" alt="White pawn"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wk')" (click)="selectSetupPiece('wk')"><img crossorigin="anonymous" [src]="getPieceUrl('wk')" alt="White king"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wq')" (click)="selectSetupPiece('wq')"><img crossorigin="anonymous" [src]="getPieceUrl('wq')" alt="White queen"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wr')" (click)="selectSetupPiece('wr')"><img crossorigin="anonymous" [src]="getPieceUrl('wr')" alt="White rook"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wb')" (click)="selectSetupPiece('wb')"><img crossorigin="anonymous" [src]="getPieceUrl('wb')" alt="White bishop"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wn')" (click)="selectSetupPiece('wn')"><img crossorigin="anonymous" [src]="getPieceUrl('wn')" alt="White knight"></button>
+      <button type="button" class="setup-piece" [class.active]="isSetupPieceSelected('wp')" (click)="selectSetupPiece('wp')"><img crossorigin="anonymous" [src]="getPieceUrl('wp')" alt="White pawn"></button>
       <button type="button" class="setup-tool danger" [class.active]="isSetupToolSelected('delete')" (click)="selectSetupTool('delete')" title="Delete tool" aria-label="Delete tool">
         <span class="material-symbols-outlined" aria-hidden="true">delete</span>
       </button>
@@ -222,4 +231,7 @@
       </div>
     }
   </div>
+
+  <!-- Local Stockfish analysis. Runs in the visitor's browser, not on the server. -->
+  <app-engine-panel [fen]="engineFen" (variationMovesSelected)="playVariationMoves($event)" />
 </article>

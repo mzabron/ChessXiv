@@ -4,6 +4,8 @@ import { firstValueFrom } from 'rxjs';
 import { Chess } from 'chess.js';
 import { ExplorerBoardApiService } from '../../services/explorer-board-api.service';
 import { GameReplayResponse } from '../../services/game-replay.models';
+import { StockfishEngineService } from '../../services/stockfish-engine.service';
+import { EnginePanelComponent } from '../engine-panel/engine-panel.component';
 import { MoveRow } from '../move-list/move-list.component';
 
 interface ChessPiece {
@@ -48,11 +50,13 @@ const PIECE_URLS: Record<string, string> = {
 @Component({
   selector: 'app-chessboard',
   standalone: true,
+  imports: [EnginePanelComponent],
   templateUrl: './chessboard.component.html',
   styleUrl: './chessboard.component.scss'
 })
 export class ChessboardComponent implements OnChanges {
   private readonly boardApi = inject(ExplorerBoardApiService);
+  protected readonly engine = inject(StockfishEngineService);
 
   @ViewChild('boardGrid', { static: true })
   private readonly boardGridRef!: ElementRef<HTMLElement>;
@@ -180,6 +184,40 @@ export class ChessboardComponent implements OnChanges {
 
   getPieceUrl(type: string): string {
     return PIECE_URLS[type];
+  }
+
+  /**
+   * Position handed to the engine. Null while the board is being edited: a half-built
+   * setup position is not a legal one, and analysing every intermediate state of it would
+   * restart the search on every piece dropped.
+   */
+  protected get engineFen(): string | null {
+    return this.isSetupMode ? null : this.currentFen;
+  }
+
+  /**
+   * The bar follows the board rather than the panel: it is only meaningful next to the
+   * squares, and it has nothing to show while the position is being edited.
+   */
+  protected get isEvalBarVisible(): boolean {
+    return this.engine.isEnabled() && this.engine.isEvalBarVisible() && !this.isSetupMode;
+  }
+
+  protected get isBoardFlipped(): boolean {
+    return this.isFlipped;
+  }
+
+  /**
+   * Plays a variation the user clicked in the engine panel, move by move, through the same
+   * backend validation a dragged piece goes through. Stops at the first move the backend
+   * rejects rather than carrying on with a position that has diverged from the line.
+   */
+  protected async playVariationMoves(sanMoves: string[]): Promise<void> {
+    for (const san of sanMoves) {
+      if (!(await this.tryApplySanMove(san))) {
+        return;
+      }
+    }
   }
 
   getPieceTransform(piece: ChessPiece): string {
@@ -695,9 +733,9 @@ export class ChessboardComponent implements OnChanges {
     }
   }
 
-  private async tryApplySanMove(san: string): Promise<void> {
+  private async tryApplySanMove(san: string): Promise<boolean> {
     if (this.isSubmittingMove || this.pendingPromotionMove || this.isSetupMode) {
-      return;
+      return false;
     }
 
     this.isSubmittingMove = true;
@@ -713,12 +751,14 @@ export class ChessboardComponent implements OnChanges {
 
       if (!response.isValid || !response.fen) {
         this.statusMessage = null;
-        return;
+        return false;
       }
 
       this.applySuccessfulMove(response.fen, response.san ?? san);
+      return true;
     } catch (error) {
       this.statusMessage = this.resolveBackendErrorMessage(error);
+      return false;
     } finally {
       this.isSubmittingMove = false;
     }
