@@ -37,9 +37,4 @@ export interface EngineLine {
   mate: number | null;
   pvUci: string[];
   pvSan: string[];
-  /**
-   * Win/draw/loss chances in per mille, from White's point of view, as reported when
-   * UCI_ShowWDL is on. Null when the option is off, which is the default.
-   */
-  wdl: { win: number; draw: number; loss: number } | null;
 }

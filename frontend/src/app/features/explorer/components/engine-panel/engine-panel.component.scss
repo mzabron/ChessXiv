@@ -129,26 +129,7 @@
   font: 500 var(--text-xs) / 1.35 var(--font-sans);
 }
 
-.engine-wdl {
-  flex: none;
-  color: var(--text-muted);
-  font: 600 var(--text-xs) / 1 var(--font-sans);
-  font-variant-numeric: tabular-nums;
-}
 
-/** Closes every settings row, so the icons line up rather than landing mid-row. */
-.option-help {
-  flex: none;
-  margin-left: auto;
-  color: var(--text-subtle);
-  font-size: 1rem;
-  line-height: 1;
-  cursor: help;
-
-  &:hover {
-    color: var(--text-muted);
-  }
-}
 
 /**
  * Bounded and scrolled rather than allowed to grow: the board panel sets the height of the
@@ -206,45 +187,11 @@
   min-width: 1.9rem;
 }
 
-.engine-advanced {
-  border-top: 1px solid var(--line);
-  padding-top: var(--space-2);
-}
-
-.advanced-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font: 600 var(--text-xs) / 1.2 var(--font-display);
-  cursor: pointer;
-
-  &:hover {
-    color: var(--text);
-  }
-
-  &:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px var(--accent-ring);
-    border-radius: var(--radius-sm);
-  }
-
-  .material-symbols-outlined {
-    font-size: 1.1rem;
-    line-height: 1;
-  }
-}
-
-.advanced-list {
+/** Sits below the settings, separated from them: these act, they do not hold a value. */
+.settings-actions {
   display: flex;
-  flex-direction: column;
   gap: var(--space-2);
+  margin-top: var(--space-1);
   padding-top: var(--space-2);
-}
-
-.engine-reset {
-  align-self: flex-start;
+  border-top: 1px solid var(--line);
 }

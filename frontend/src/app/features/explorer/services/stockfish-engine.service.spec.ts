@@ -17,6 +17,7 @@ const UCI_OPTION_LINES = [
   'option name Skill Level type spin default 20 min 0 max 20',
   'option name Move Overhead type spin default 10 min 0 max 5000',
   'option name UCI_LimitStrength type check default false',
+  'option name UCI_ShowWDL type check default false',
   'option name UCI_Elo type spin default 1320 min 1320 max 3190',
   'option name EvalFile type string default nn-c288c895ea92.nnue'
 ];
@@ -102,6 +103,7 @@ describe('StockfishEngineService', () => {
     // overrides it outright the moment UCI_LimitStrength is on.
     expect(names).not.toContain('Ponder');
     expect(names).not.toContain('Skill Level');
+    expect(names).not.toContain('UCI_ShowWDL');
     expect(names).toContain('UCI_Elo');
   });
 
@@ -123,23 +125,13 @@ describe('StockfishEngineService', () => {
     expect(sent.some(command => command.includes('UCI_Elo'))).toBe(false);
   });
 
-  it('reads win/draw/loss chances and reorients them to White', () => {
-    const white = bootEngine(AFTER_E4_E5);
-    white.emit('info depth 20 multipv 1 score cp 30 wdl 240 700 60 nodes 1 nps 1 pv g1f3');
-    expect(service.lines()[0].wdl).toEqual({ win: 240, draw: 700, loss: 60 });
+  it('separates the options that act from the options that hold a value', () => {
+    bootEngine(START_FEN);
 
-    service.disable();
-
-    // Identical output, but with Black to move those 240 are Black's wins, not White's.
-    const black = bootEngine(AFTER_E4);
-    black.emit('info depth 20 multipv 1 score cp 30 wdl 240 700 60 nodes 1 nps 1 pv e7e5');
-    expect(service.lines()[0].wdl).toEqual({ win: 60, draw: 700, loss: 240 });
-  });
-
-  it('leaves wdl unset while the engine is not reporting it', () => {
-    const worker = bootEngine(AFTER_E4_E5);
-    worker.emit('info depth 12 multipv 1 score cp 45 nodes 1 nps 1 pv g1f3');
-    expect(service.lines()[0].wdl).toBeNull();
+    // Clear Hash does something once; the rest hold a value. The panel puts them in
+    // different places, so the service is what tells them apart.
+    expect(service.actionOptions().map(option => option.name)).toEqual(['Clear Hash']);
+    expect(service.otherOptions().map(option => option.name)).toEqual(['UCI_LimitStrength', 'UCI_Elo']);
   });
 
   it('starts a search on the requested position once the engine reports ready', () => {

@@ -9,10 +9,6 @@
       <span class="engine-score" [class]="engine.lines()[0] ? scoreClass(engine.lines()[0]) : 'is-level'"
         aria-live="polite">{{ formatMainScore() }}</span>
 
-      @if (mainWdl(); as wdl) {
-        <span class="engine-wdl" title="Estimated win / draw / loss chances for White">{{ wdl }}</span>
-      }
-
       <span class="engine-meta">
         @if (engine.status() === 'loading') {
           Loading Stockfish…
@@ -77,8 +73,6 @@
                 (click)="onLineCountInput(count.toString())">{{ count }}</button>
             }
           </div>
-          <span class="option-help material-symbols-outlined" [title]="helpFor('MultiPV')"
-            [attr.aria-label]="helpFor('MultiPV')" role="img">help</span>
         </div>
 
         @for (option of engine.options(); track option.name) {
@@ -93,10 +87,45 @@
                 [min]="bounds(option).min" [max]="bounds(option).max" [value]="engine.valueOf(option.name)"
                 (change)="onSpinOptionInput(option, $any($event.target).value)" />
               <span class="setting-range">{{ bounds(option).min }}–{{ bounds(option).max }}</span>
-              <span class="option-help material-symbols-outlined" [title]="helpFor(option.name)"
-                [attr.aria-label]="helpFor(option.name)" role="img">help</span>
             </div>
           }
+        }
+
+        @for (option of engine.otherOptions(); track option.name) {
+          <div class="setting">
+            @switch (option.type) {
+              @case ('check') {
+                <label class="ui-check">
+                  <input type="checkbox" [checked]="isOptionChecked(option)"
+                    (change)="onCheckOptionChange(option, $any($event.target).checked)" />
+                  <span>{{ labelFor(option) }}</span>
+                </label>
+              }
+              @case ('spin') {
+                <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
+                <input class="ui-input setting-number" type="number" [id]="'engine-opt-' + option.name"
+                  [min]="bounds(option).min" [max]="bounds(option).max" [value]="engine.valueOf(option.name)"
+                  (change)="onSpinOptionInput(option, $any($event.target).value)" />
+                <span class="setting-range">{{ bounds(option).min }}–{{ bounds(option).max }}</span>
+              }
+              @case ('combo') {
+                <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
+                <select class="ui-select setting-select" [id]="'engine-opt-' + option.name"
+                  [value]="engine.valueOf(option.name)"
+                  (change)="onTextOptionChange(option, $any($event.target).value)">
+                  @for (choice of option.choices ?? []; track choice) {
+                    <option [value]="choice">{{ choice }}</option>
+                  }
+                </select>
+              }
+              @default {
+                <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
+                <input class="ui-input setting-text" type="text" [id]="'engine-opt-' + option.name"
+                  [value]="engine.valueOf(option.name)"
+                  (change)="onTextOptionChange(option, $any($event.target).value)" />
+              }
+            }
+          </div>
         }
 
         @if (!engine.supportsMultipleThreads) {
@@ -106,69 +135,16 @@
           </p>
         }
 
-        <div class="engine-advanced">
-          <button type="button" class="advanced-toggle" [attr.aria-expanded]="areAdvancedOptionsOpen()"
-            (click)="toggleAdvancedOptions()">
-            <span class="material-symbols-outlined" aria-hidden="true">
-              {{ areAdvancedOptionsOpen() ? 'expand_less' : 'expand_more' }}
-            </span>
-            All engine options
-          </button>
-
-          @if (areAdvancedOptionsOpen()) {
-            <div class="advanced-list">
-              @for (option of engine.advancedOptions(); track option.name) {
-                <div class="setting">
-                  @switch (option.type) {
-                    @case ('check') {
-                      <label class="ui-check">
-                        <input type="checkbox" [checked]="isOptionChecked(option)"
-                          (change)="onCheckOptionChange(option, $any($event.target).checked)" />
-                        <span>{{ labelFor(option) }}</span>
-                      </label>
-                    }
-                    @case ('button') {
-                      <button type="button" class="ui-btn ui-btn--sm" (click)="engine.triggerOption(option.name)">
-                        {{ labelFor(option) }}
-                      </button>
-                    }
-                    @case ('spin') {
-                      <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
-                      <input class="ui-input setting-number" type="number" [id]="'engine-opt-' + option.name"
-                        [min]="bounds(option).min" [max]="bounds(option).max" [value]="engine.valueOf(option.name)"
-                        (change)="onSpinOptionInput(option, $any($event.target).value)" />
-                      <span class="setting-range">{{ bounds(option).min }}–{{ bounds(option).max }}</span>
-                    }
-                    @case ('combo') {
-                      <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
-                      <select class="ui-select setting-select" [id]="'engine-opt-' + option.name"
-                        [value]="engine.valueOf(option.name)"
-                        (change)="onTextOptionChange(option, $any($event.target).value)">
-                        @for (choice of option.choices ?? []; track choice) {
-                          <option [value]="choice">{{ choice }}</option>
-                        }
-                      </select>
-                    }
-                    @default {
-                      <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
-                      <input class="ui-input setting-text" type="text" [id]="'engine-opt-' + option.name"
-                        [value]="engine.valueOf(option.name)"
-                        (change)="onTextOptionChange(option, $any($event.target).value)" />
-                    }
-                  }
-
-                  @if (helpFor(option.name); as help) {
-                    <span class="option-help material-symbols-outlined" [title]="help" [attr.aria-label]="help"
-                      role="img">help</span>
-                  }
-                </div>
-              }
-
-              <button type="button" class="ui-btn ui-btn--sm engine-reset" (click)="engine.resetOptions()">
-                Reset to defaults
-              </button>
-            </div>
+        <!-- Actions, not settings: they do something once rather than hold a value. -->
+        <div class="settings-actions">
+          @for (option of engine.actionOptions(); track option.name) {
+            <button type="button" class="ui-btn ui-btn--sm" (click)="engine.triggerOption(option.name)">
+              {{ labelFor(option) }}
+            </button>
           }
+          <button type="button" class="ui-btn ui-btn--sm" (click)="engine.resetOptions()">
+            Reset to defaults
+          </button>
         </div>
       </div>
     }

@@ -69,7 +69,10 @@ export class StockfishEngineService implements OnDestroy {
     'Move Overhead',
     'nodestime',
     'UCI_Chess960',
-    'Skill Level'
+    'Skill Level',
+    // Nothing renders win/draw/loss, so the option that produces it would be a switch that
+    // does nothing observable - exactly what the rest of this list is for.
+    'UCI_ShowWDL'
   ];
 
   readonly isEnabled = signal(false);
@@ -122,9 +125,16 @@ export class StockfishEngineService implements OnDestroy {
     return this.clamp(100 / (1 + Math.exp(-cp / 250)), 2, 98);
   });
 
-  readonly advancedOptions = computed(() =>
-    this.options().filter(option => !StockfishEngineService.primaryOptionNames.includes(option.name))
+  /** Options rendered as ordinary rows: everything but the promoted three and the buttons. */
+  readonly otherOptions = computed(() =>
+    this.options().filter(
+      option =>
+        !StockfishEngineService.primaryOptionNames.includes(option.name) && option.type !== 'button'
+    )
   );
+
+  /** Button-typed options (Clear Hash), which belong with the panel's other actions. */
+  readonly actionOptions = computed(() => this.options().filter(option => option.type === 'button'));
 
   /**
    * What MultiPV is actually set to. With the list hidden only the evaluation is on show,
@@ -580,7 +590,6 @@ export class StockfishEngineService implements OnDestroy {
     let multipv = 1;
     let cp: number | null = null;
     let mate: number | null = null;
-    let wdl: { win: number; draw: number; loss: number } | null = null;
     let pvUci: string[] | null = null;
 
     for (let i = 1; i < tokens.length; i++) {
@@ -601,14 +610,6 @@ export class StockfishEngineService implements OnDestroy {
             mate = Number(tokens[i + 2]);
           }
           i += 2;
-          break;
-        case 'wdl':
-          wdl = {
-            win: Number(tokens[i + 1]),
-            draw: Number(tokens[i + 2]),
-            loss: Number(tokens[i + 3])
-          };
-          i += 3;
           break;
         case 'pv':
           pvUci = tokens.slice(i + 1, i + 1 + StockfishEngineService.pvPlyLimit);
@@ -632,8 +633,6 @@ export class StockfishEngineService implements OnDestroy {
       depth,
       cp: cp === null ? null : cp * perspective,
       mate: mate === null ? null : mate * perspective,
-      // Win and loss are reported for the side to move, so they swap with the scores.
-      wdl: wdl && perspective === -1 ? { win: wdl.loss, draw: wdl.draw, loss: wdl.win } : wdl,
       pvUci,
       pvSan: this.toSan(pvUci)
     });

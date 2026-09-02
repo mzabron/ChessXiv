@@ -319,8 +319,6 @@ Display:
   time advances the position and re-analyses from there, which is how a line actually gets
   explored. The move goes through the same backend validation as a dragged piece - the panel
   emits SAN and never touches the position itself.
-- With UCI_ShowWDL on, the engine's win/draw/loss estimate is shown beside the evaluation,
-  reoriented to White the same way the scores are.
 
 Options:
 
@@ -329,12 +327,14 @@ Options:
 - `Hash` is exposed as "Memory (MB)", default 128, capped at 1024. Stockfish advertises a 32 TB
   maximum, which is meaningless in a browser: the WASM heap tops out at 2 GB.
 - Every other option the engine declares is rendered generically from its `uci` response, by
-  type, so a future build's options appear without a code change. Each control carries a help
-  icon explaining what it does, and the jargon names are relabelled (`UCI_Elo` reads as
-  "Target rating").
+  type, so a future build's options appear without a code change. Jargon names are relabelled
+  (`UCI_Elo` reads as "Target rating"). They all sit in one flat list; button-typed options
+  (Clear Hash) are separated out to a row of actions at the bottom, next to Reset to defaults,
+  because they do something once rather than hold a value.
 - Options with no observable effect here are withheld: `Ponder` needs a GUI that plays games,
-  `Move Overhead` and `nodestime` only shape time management on a clock, and `UCI_Chess960`
-  needs a board that understands Chess960 castling, which this one does not.
+  `Move Overhead` and `nodestime` only shape time management on a clock, `UCI_Chess960` needs
+  a board that understands Chess960 castling, and `UCI_ShowWDL` produces a win/draw/loss
+  estimate that nothing renders.
 - `Skill Level` is withheld as a duplicate. Stockfish derives its internal level from
   `UCI_Elo` whenever `UCI_LimitStrength` is on and ignores `Skill Level` entirely
   (`Skill(int skill_level, int uci_elo)`: `if (uci_elo) level = f(elo); else level =

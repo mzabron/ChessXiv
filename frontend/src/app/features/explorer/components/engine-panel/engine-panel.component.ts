@@ -36,41 +36,14 @@ export class EnginePanelComponent implements OnInit, OnChanges {
    */
   @Output() readonly lineMoveSelected = new EventEmitter<string>();
 
-  /**
-   * Plain-language names for options whose UCI names are jargon, and a sentence each on what
-   * they actually do - shown on the help icon beside every control, because "nodestime" and
-   * "MultiPV" tell a user nothing about whether they want them.
-   */
+  /** Plain-language names for the options whose UCI names are jargon. */
   private static readonly optionLabels: Record<string, string> = {
     Hash: 'Memory (MB)',
     UCI_LimitStrength: 'Limit strength',
-    UCI_Elo: 'Target rating',
-    UCI_ShowWDL: 'Win / draw / loss'
-  };
-
-  private static readonly optionHelp: Record<string, string> = {
-    MultiPV:
-      'How many different continuations the engine reports. The search effort is split ' +
-      'between them, so five lines are each analysed less deeply than one.',
-    Threads:
-      'CPU cores the engine may use. More cores means more positions searched per second. ' +
-      'Leaving one free keeps the rest of the page responsive.',
-    Hash:
-      'Memory for the engine\'s table of positions it has already evaluated. Too little and ' +
-      'it keeps recalculating the same positions.',
-    'Clear Hash':
-      'Empties that table, so the next evaluation starts with no memory of earlier analysis.',
-    UCI_LimitStrength:
-      'Makes the engine play at the target rating below instead of at full strength.',
-    UCI_Elo:
-      'The rating the engine plays at once "Limit strength" is on. It does nothing while ' +
-      'that box is unchecked.',
-    UCI_ShowWDL:
-      'Adds the engine\'s estimated win / draw / loss chances beside the evaluation.'
+    UCI_Elo: 'Target rating'
   };
 
   protected readonly isSettingsOpen = signal(false);
-  protected readonly areAdvancedOptionsOpen = signal(false);
 
   ngOnInit(): void {
     // Starting here rather than in the service's constructor means a stored "on" setting
@@ -106,10 +79,6 @@ export class EnginePanelComponent implements OnInit, OnChanges {
 
   protected toggleSettings(): void {
     this.isSettingsOpen.update(open => !open);
-  }
-
-  protected toggleAdvancedOptions(): void {
-    this.areAdvancedOptionsOpen.update(open => !open);
   }
 
   protected onLineCountInput(value: string): void {
@@ -207,16 +176,6 @@ export class EnginePanelComponent implements OnInit, OnChanges {
     return line.pvSan[0] ?? '';
   }
 
-  /** Win/draw/loss for a line, as whole percentages. Null unless UCI_ShowWDL is on. */
-  protected formatWdl(line: EngineLine): string | null {
-    if (!line.wdl) {
-      return null;
-    }
-
-    const asPercent = (perMille: number) => Math.round(perMille / 10);
-    return `${asPercent(line.wdl.win)} / ${asPercent(line.wdl.draw)} / ${asPercent(line.wdl.loss)}`;
-  }
-
   protected formatDepth(): string {
     const depth = this.engine.depth();
     return depth > 0 ? `depth ${depth}` : '';
@@ -237,18 +196,6 @@ export class EnginePanelComponent implements OnInit, OnChanges {
 
   protected labelFor(option: EngineOption): string {
     return EnginePanelComponent.optionLabels[option.name] ?? option.name;
-  }
-
-  /** Help text for a control, with the raw UCI name so it stays traceable to the protocol. */
-  protected helpFor(name: string): string | null {
-    const help = EnginePanelComponent.optionHelp[name];
-    return help ? `${name} — ${help}` : null;
-  }
-
-  /** Win/draw/loss for the engine's best line, shown in the bar when UCI_ShowWDL is on. */
-  protected mainWdl(): string | null {
-    const line = this.engine.mainLine();
-    return line ? this.formatWdl(line) : null;
   }
 
   protected bounds(option: EngineOption): { min: number; max: number } {
