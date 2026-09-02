@@ -306,9 +306,17 @@ describe('StockfishEngineService', () => {
     expect(service.evalBarWhitePercent()).toBe(0);
   });
 
+  it('starts with the list on and the bar off', () => {
+    expect(service.areLinesVisible()).toBe(true);
+    expect(service.isEvalBarVisible()).toBe(false);
+  });
+
   it('remembers the bar and list toggles independently of each other', () => {
     bootEngine(AFTER_E4_E5);
+
+    // Move both away from their defaults, in opposite directions.
     service.toggleLines();
+    service.toggleEvalBar();
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});

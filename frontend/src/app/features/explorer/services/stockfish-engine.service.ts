@@ -90,8 +90,11 @@ export class StockfishEngineService implements OnDestroy {
    * The bar and the variation list are independent of each other, so the evaluation can be
    * followed at a glance without a block of text under the board, or the lines read without
    * the bar taking width from the board.
+   *
+   * The bar starts off: it takes width away from the squares, and the same number is already
+   * spelled out in the strip below. It is opt-in for people who prefer reading it that way.
    */
-  readonly isEvalBarVisible = signal(true);
+  readonly isEvalBarVisible = signal(false);
   readonly areLinesVisible = signal(true);
   readonly status = signal<EngineStatus>('off');
   readonly errorMessage = signal<string | null>(null);
@@ -739,8 +742,8 @@ export class StockfishEngineService implements OnDestroy {
       // background of a page the user never scrolled to.
       this.isEnabled.set(parsed.enabled === true);
 
-      // Both default to on, so only an explicit `false` hides either.
-      this.isEvalBarVisible.set(parsed.evalBar !== false);
+      // The list is on unless explicitly turned off; the bar is off unless explicitly on.
+      this.isEvalBarVisible.set(parsed.evalBar === true);
       this.areLinesVisible.set(parsed.lines !== false);
     } catch {
       // A corrupt or unavailable store is not worth surfacing; defaults apply.

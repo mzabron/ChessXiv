@@ -313,7 +313,8 @@ Display:
   and a second line gives the download size and says the work happens locally. Before the
   engine has introduced itself the pinned name stands in.
 - The evaluation bar and the variation list are toggled separately, and either can be used
-  without the other. Both default to on and are remembered.
+  without the other. The list starts on; the bar starts off, since it takes width from the
+  squares to show a number the strip already spells out. Both choices are remembered.
 - The bar renders beside the board (not in the strip) because it only means anything next to
   the squares. It follows board flip and reuses the opening tree's win/draw/loss colours,
   since both answer "how much of this belongs to White".
