@@ -306,6 +306,12 @@ Engine builds:
 
 Display:
 
+- The switch is labelled with the engine's own `id name` rather than the word "Engine" -
+  which build is running is the one thing a user cannot otherwise tell, and it decides what
+  the numbers are worth. The platform words are dropped ("Stockfish 18 Lite WASM
+  Multithreaded" reads as "Stockfish 18 Lite") with the exact string kept on the hover title,
+  and a second line gives the download size and says the work happens locally. Before the
+  engine has introduced itself the pinned name stands in.
 - The evaluation bar and the variation list are toggled separately, and either can be used
   without the other. Both default to on and are remembered.
 - The bar renders beside the board (not in the strip) because it only means anything next to

@@ -187,11 +187,23 @@ export class EnginePanelComponent implements OnInit, OnChanges {
       return '';
     }
 
+    // "Mn/s" rather than "M nodes/s": the row is narrow, and the short form is what every
+    // other engine readout uses.
     if (nps >= 1_000_000) {
-      return `${(nps / 1_000_000).toFixed(1)}M nodes/s`;
+      return `${(nps / 1_000_000).toFixed(1)} Mn/s`;
     }
 
-    return `${Math.round(nps / 1000)}k nodes/s`;
+    return `${Math.round(nps / 1000)} kn/s`;
+  }
+
+  /**
+   * The engine's name with the platform words dropped: "Stockfish 18 Lite WASM Multithreaded"
+   * is accurate but spends the whole bar saying things shown elsewhere - that it runs in the
+   * browser is on the line below it, and the threading is visible in the Threads control and
+   * in the nodes/s figure. The exact string it reported stays on the hover title.
+   */
+  protected condensedEngineName(): string {
+    return this.engine.displayName().replace(/\s+(WASM|Multithreaded)\b/g, '').trim();
   }
 
   protected labelFor(option: EngineOption): string {

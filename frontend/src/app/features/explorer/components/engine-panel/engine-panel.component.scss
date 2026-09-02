@@ -15,15 +15,52 @@
   padding: 0.4rem 0.65rem;
 }
 
+/**
+ * The engine names itself rather than being labelled "Engine": which build is running is the
+ * one thing a user cannot otherwise tell, and it decides how much the numbers are worth. The
+ * exact string comes from the engine's own `uci` response.
+ */
 .engine-switch {
-  font: 600 var(--text-sm) / 1 var(--font-display);
+  min-width: 0;
+  /* Capped so that however an engine chooses to name itself, it cannot crowd out the depth
+     and speed readout to its right. */
+  max-width: 55%;
+  align-items: center;
+}
+
+.engine-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.engine-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--text-sm) / 1.1 var(--font-display);
+}
+
+/* Says where the work happens, and what turning it on costs to fetch. */
+.engine-origin {
+  color: var(--text-subtle);
+  font: 500 var(--text-xs) / 1.1 var(--font-sans);
+  white-space: nowrap;
+}
+
+.engine-readout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
 }
 
 /* Tabular figures: without them the evaluation jitters sideways on every update. */
 .engine-score {
-  font: 700 var(--text-base) / 1 var(--font-display);
+  font: 700 var(--text-base) / 1.1 var(--font-display);
   font-variant-numeric: tabular-nums;
-  min-width: 3.2rem;
 }
 
 .engine-score.is-white-better,
@@ -42,7 +79,6 @@
 }
 
 .engine-meta {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

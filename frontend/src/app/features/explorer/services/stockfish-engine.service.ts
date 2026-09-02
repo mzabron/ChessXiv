@@ -35,6 +35,16 @@ export class StockfishEngineService implements OnDestroy {
   /** Plies of each variation kept. Beyond this the line is speculative and unreadable. */
   private static readonly pvPlyLimit = 24;
 
+  /**
+   * What to call the engine before it has introduced itself. The moment it answers `uci` its
+   * own `id name` replaces this, so the panel shows the build that is actually running rather
+   * than the one this code expects. Kept in step with scripts/fetch-engine.mjs.
+   */
+  private static readonly pinnedName = 'Stockfish 18 Lite';
+
+  /** Rounded size of one engine build, for warning what switching it on costs to download. */
+  private static readonly downloadMegabytes = 7;
+
   /** Bounds on the number of displayed lines, as opposed to what the engine would allow. */
   static readonly minLines = 1;
   static readonly maxLines = 5;
@@ -86,6 +96,15 @@ export class StockfishEngineService implements OnDestroy {
   readonly status = signal<EngineStatus>('off');
   readonly errorMessage = signal<string | null>(null);
   readonly engineName = signal<string>('');
+
+  /**
+   * The engine's exact self-reported name once it has loaded - "Stockfish 18 Lite WASM
+   * Multithreaded", say, which names the version, the network size and the threading build
+   * all at once. Falls back to the pinned name while it is still starting up.
+   */
+  readonly displayName = computed(() => this.engineName() || StockfishEngineService.pinnedName);
+
+  readonly downloadSizeLabel = `${StockfishEngineService.downloadMegabytes} MB`;
 
   readonly options = signal<EngineOption[]>([]);
   readonly optionValues = signal<Record<string, string>>({});

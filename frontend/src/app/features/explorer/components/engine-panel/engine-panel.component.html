@@ -2,22 +2,28 @@
   <header class="engine-bar">
     <label class="ui-check engine-switch">
       <input type="checkbox" [checked]="engine.isEnabled()" (change)="toggleEngine()" />
-      <span>Engine</span>
+      <span class="engine-identity">
+        <span class="engine-name" [title]="engine.displayName()">{{ condensedEngineName() }}</span>
+        <span class="engine-origin">{{ engine.downloadSizeLabel }} · in your browser</span>
+      </span>
     </label>
 
     @if (engine.isEnabled()) {
-      <span class="engine-score" [class]="engine.lines()[0] ? scoreClass(engine.lines()[0]) : 'is-level'"
-        aria-live="polite">{{ formatMainScore() }}</span>
-
-      <span class="engine-meta">
-        @if (engine.status() === 'loading') {
-          Loading Stockfish…
-        } @else {
-          {{ formatDepth() }}
-          @if (formatSpeed()) {
-            <span class="engine-meta-sep" aria-hidden="true">·</span>{{ formatSpeed() }}
+      <!-- Score over its own detail line, so both columns of the bar are two lines tall and
+           the depth readout is not squeezed out by however the engine names itself. -->
+      <span class="engine-readout">
+        <span class="engine-score" [class]="engine.lines()[0] ? scoreClass(engine.lines()[0]) : 'is-level'"
+          aria-live="polite">{{ formatMainScore() }}</span>
+        <span class="engine-meta">
+          @if (engine.status() === 'loading') {
+            Loading Stockfish…
+          } @else {
+            {{ formatDepth() }}
+            @if (formatSpeed()) {
+              <span class="engine-meta-sep" aria-hidden="true">·</span>{{ formatSpeed() }}
+            }
           }
-        }
+        </span>
       </span>
 
       <button type="button" class="ui-btn ui-btn--sm ui-btn--icon engine-toggle"
