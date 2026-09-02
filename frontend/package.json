@@ -6,7 +6,9 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "engine:fetch": "node scripts/fetch-engine.mjs",
+    "postinstall": "node scripts/fetch-engine.mjs"
   },
   "private": true,
   "packageManager": "npm@10.9.2",
@@ -21,7 +23,6 @@
     "chess.js": "^1.4.0",
     "jwt-decode": "^4.0.0",
     "rxjs": "~7.8.0",
-    "stockfish": "^18.0.8",
     "tslib": "^2.3.0"
   },
   "devDependencies": {

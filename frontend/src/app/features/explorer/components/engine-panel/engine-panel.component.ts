@@ -3,13 +3,6 @@ import { Chess } from 'chess.js';
 import { EngineLine, EngineOption } from '../../services/engine.models';
 import { StockfishEngineService } from '../../services/stockfish-engine.service';
 
-/** One rendered piece of a variation: either a move number, or a move that can be played. */
-interface VariationToken {
-  text: string;
-  /** Index into the line's SAN moves, or null for a move number. */
-  moveIndex: number | null;
-}
-
 /**
  * Local-engine readout that sits under the board: an on/off switch, the evaluation, the
  * top variations, and the engine's own UCI options.
@@ -37,11 +30,44 @@ export class EnginePanelComponent implements OnInit, OnChanges {
   @Input() fen: string | null = null;
 
   /**
-   * Moves the user picked out of a variation, in SAN, from the analysed position up to and
-   * including the one clicked. The board plays them; the panel does not touch the position
-   * itself, so every move still goes through the same validation as a dragged piece.
+   * The first move of a line the user clicked, in SAN. The board plays it; the panel never
+   * touches the position itself, so the move goes through the same validation as a dragged
+   * piece.
    */
-  @Output() readonly variationMovesSelected = new EventEmitter<string[]>();
+  @Output() readonly lineMoveSelected = new EventEmitter<string>();
+
+  /**
+   * Plain-language names for options whose UCI names are jargon, and a sentence each on what
+   * they actually do - shown on the help icon beside every control, because "nodestime" and
+   * "MultiPV" tell a user nothing about whether they want them.
+   */
+  private static readonly optionLabels: Record<string, string> = {
+    Hash: 'Memory (MB)',
+    UCI_LimitStrength: 'Limit strength',
+    UCI_Elo: 'Target rating',
+    UCI_ShowWDL: 'Win / draw / loss'
+  };
+
+  private static readonly optionHelp: Record<string, string> = {
+    MultiPV:
+      'How many different continuations the engine reports. The search effort is split ' +
+      'between them, so five lines are each analysed less deeply than one.',
+    Threads:
+      'CPU cores the engine may use. More cores means more positions searched per second. ' +
+      'Leaving one free keeps the rest of the page responsive.',
+    Hash:
+      'Memory for the engine\'s table of positions it has already evaluated. Too little and ' +
+      'it keeps recalculating the same positions.',
+    'Clear Hash':
+      'Empties that table, so the next evaluation starts with no memory of earlier analysis.',
+    UCI_LimitStrength:
+      'Makes the engine play at the target rating below instead of at full strength.',
+    UCI_Elo:
+      'The rating the engine plays at once "Limit strength" is on. It does nothing while ' +
+      'that box is unchecked.',
+    UCI_ShowWDL:
+      'Adds the engine\'s estimated win / draw / loss chances beside the evaluation.'
+  };
 
   protected readonly isSettingsOpen = signal(false);
   protected readonly areAdvancedOptionsOpen = signal(false);
@@ -139,46 +165,56 @@ export class EnginePanelComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Splits a variation into the pieces the template renders: move numbers as plain text,
-   * and each move as its own clickable token. Numbering follows the move list - `14... Nf6
-   * 15. c4` - so a line can be read against the game score rather than as a bare list.
+   * Renders a variation the way the move list does - `14... Nf6 15. c4` - so it can be read
+   * against the game score rather than as a bare list of moves.
    */
-  protected variationTokens(line: EngineLine): VariationToken[] {
+  protected formatVariation(line: EngineLine): string {
     const start = this.variationStart();
     let moveNumber = start?.moveNumber ?? 1;
     let side = start?.side ?? 'w';
-
-    const tokens: VariationToken[] = [];
+    const parts: string[] = [];
 
     line.pvSan.forEach((san, index) => {
       if (side === 'w') {
-        tokens.push({ text: `${moveNumber}.`, moveIndex: null });
-        tokens.push({ text: san, moveIndex: index });
+        parts.push(`${moveNumber}. ${san}`);
         side = 'b';
         return;
       }
 
       // Only a variation that opens on Black's move needs the "14..." form; after that the
       // White move it answers is right there in the same line.
-      if (index === 0) {
-        tokens.push({ text: `${moveNumber}...`, moveIndex: null });
-      }
-
-      tokens.push({ text: san, moveIndex: index });
+      parts.push(index === 0 ? `${moveNumber}... ${san}` : san);
       moveNumber++;
       side = 'w';
     });
 
-    return tokens;
+    return parts.join(' ');
   }
 
-  /** Plays the variation up to the clicked move, so one click can follow a whole line. */
-  protected onVariationMoveClick(line: EngineLine, moveIndex: number | null): void {
-    if (moveIndex === null) {
-      return;
+  /**
+   * Playing a whole line at once would move the board several plies away from what the user
+   * is looking at, so a click takes the first move only - the position advances one step and
+   * the engine re-analyses from there, which is how a line gets explored in practice.
+   */
+  protected onLineClick(line: EngineLine): void {
+    const firstMove = line.pvSan[0];
+    if (firstMove) {
+      this.lineMoveSelected.emit(firstMove);
+    }
+  }
+
+  protected firstMoveOf(line: EngineLine): string {
+    return line.pvSan[0] ?? '';
+  }
+
+  /** Win/draw/loss for a line, as whole percentages. Null unless UCI_ShowWDL is on. */
+  protected formatWdl(line: EngineLine): string | null {
+    if (!line.wdl) {
+      return null;
     }
 
-    this.variationMovesSelected.emit(line.pvSan.slice(0, moveIndex + 1));
+    const asPercent = (perMille: number) => Math.round(perMille / 10);
+    return `${asPercent(line.wdl.win)} / ${asPercent(line.wdl.draw)} / ${asPercent(line.wdl.loss)}`;
   }
 
   protected formatDepth(): string {
@@ -197,6 +233,22 @@ export class EnginePanelComponent implements OnInit, OnChanges {
     }
 
     return `${Math.round(nps / 1000)}k nodes/s`;
+  }
+
+  protected labelFor(option: EngineOption): string {
+    return EnginePanelComponent.optionLabels[option.name] ?? option.name;
+  }
+
+  /** Help text for a control, with the raw UCI name so it stays traceable to the protocol. */
+  protected helpFor(name: string): string | null {
+    const help = EnginePanelComponent.optionHelp[name];
+    return help ? `${name} — ${help}` : null;
+  }
+
+  /** Win/draw/loss for the engine's best line, shown in the bar when UCI_ShowWDL is on. */
+  protected mainWdl(): string | null {
+    const line = this.engine.mainLine();
+    return line ? this.formatWdl(line) : null;
   }
 
   protected bounds(option: EngineOption): { min: number; max: number } {

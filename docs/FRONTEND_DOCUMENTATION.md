@@ -24,7 +24,7 @@ Core stack:
 - @microsoft/signalr 10
 - jwt-decode 4
 - chess.js 1.4 (client-side legality checks and SAN conversion)
-- stockfish 18 (WASM engine, served as a build asset rather than bundled)
+- Stockfish 18 (WASM engine, fetched by a script rather than depended on - see below)
 
 Scripts:
 
@@ -36,9 +36,17 @@ Note:
 
 - Angular signals simplify local component state compared to larger store setup for current scope.
 - SignalR package aligns with backend hub for real-time progress updates.
-- angular.json copies `node_modules/stockfish/bin/stockfish-18-lite*.{js,wasm}` to `engine/` in
-  the build output. The engine is never imported into a bundle: it is fetched at runtime, and
-  only when a user switches it on.
+- `scripts/fetch-engine.mjs` downloads the four Stockfish lite files into `frontend/.engine/`
+  (git-ignored) and angular.json copies them to `engine/` in the build output. It runs from
+  `postinstall`, or by hand with `npm run engine:fetch`, and is a no-op once the files verify.
+  Files are pinned by version *and* SHA-256: a changed byte fails the build rather than
+  shipping quietly. `STOCKFISH_MIRROR` overrides the source for an internal or offline build.
+- This replaced an `npm i stockfish` dependency. That package ships every build it has,
+  including two 113 MB full-strength ones no browser can sensibly download: 167 MB over the
+  wire and 248 MB on disk for the 14 MB actually used. It matters because this app is built on
+  the same machine that serves it.
+- The engine is never imported into a bundle: it is fetched at runtime, and only when a user
+  switches it on.
 - `ng serve` sends `Cross-Origin-Opener-Policy: same-origin` and
   `Cross-Origin-Embedder-Policy: require-corp`. Those two headers are what make
   `SharedArrayBuffer` available, and without it the engine falls back to a single-threaded
@@ -306,9 +314,13 @@ Display:
 - With the list hidden, `MultiPV` drops to 1: only the first line feeds the bar, so searching
   for the other four is effort nothing displays. The user's chosen line count is kept and
   restored when the list comes back.
-- Clicking a move inside a variation plays the line up to and including that move. Each move
-  goes through the same backend validation as a dragged piece, and playback stops at the first
-  move the backend rejects. The panel emits SAN and never touches the position itself.
+- A whole line is one click target, and a click plays its *first* move only. Playing a line to
+  its end would jump the board several plies from what the user is looking at; one move at a
+  time advances the position and re-analyses from there, which is how a line actually gets
+  explored. The move goes through the same backend validation as a dragged piece - the panel
+  emits SAN and never touches the position itself.
+- With UCI_ShowWDL on, the engine's win/draw/loss estimate is shown beside the evaluation,
+  reoriented to White the same way the scores are.
 
 Options:
 
@@ -317,8 +329,18 @@ Options:
 - `Hash` is exposed as "Memory (MB)", default 128, capped at 1024. Stockfish advertises a 32 TB
   maximum, which is meaningless in a browser: the WASM heap tops out at 2 GB.
 - Every other option the engine declares is rendered generically from its `uci` response, by
-  type, so a future build's options appear without a code change.
-- `EvalFile` and `EvalFileSmall` are the exception and are withheld. They name an NNUE file to
+  type, so a future build's options appear without a code change. Each control carries a help
+  icon explaining what it does, and the jargon names are relabelled (`UCI_Elo` reads as
+  "Target rating").
+- Options with no observable effect here are withheld: `Ponder` needs a GUI that plays games,
+  `Move Overhead` and `nodestime` only shape time management on a clock, and `UCI_Chess960`
+  needs a board that understands Chess960 castling, which this one does not.
+- `Skill Level` is withheld as a duplicate. Stockfish derives its internal level from
+  `UCI_Elo` whenever `UCI_LimitStrength` is on and ignores `Skill Level` entirely
+  (`Skill(int skill_level, int uci_elo)`: `if (uci_elo) level = f(elo); else level =
+  skill_level;`), so exposing both offers two controls where one silently wins. The Elo pair
+  is kept because its units mean something.
+- `EvalFile` and `EvalFileSmall` are withheld for a harder reason. They name an NNUE file to
   load from disk, and a WASM build has no filesystem - the network is compiled into the .wasm.
   Sending either, even at its own declared default, throws inside the worker and kills the
   engine. Only options whose value differs from the engine's default are sent at all.

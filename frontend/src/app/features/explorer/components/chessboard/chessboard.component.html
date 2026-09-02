@@ -233,5 +233,5 @@
   </div>
 
   <!-- Local Stockfish analysis. Runs in the visitor's browser, not on the server. -->
-  <app-engine-panel [fen]="engineFen" (variationMovesSelected)="playVariationMoves($event)" />
+  <app-engine-panel [fen]="engineFen" (lineMoveSelected)="playEngineMove($event)" />
 </article>

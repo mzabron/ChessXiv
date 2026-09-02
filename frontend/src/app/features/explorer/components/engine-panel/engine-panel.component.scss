@@ -85,11 +85,30 @@
   list-style: none;
 }
 
+/**
+ * The whole row is the click target - a line is one suggestion, and asking the user to hit
+ * a five-character move inside it would be a worse target for no gain.
+ */
 .engine-line {
   display: flex;
+  width: 100%;
   align-items: baseline;
   gap: var(--space-2);
-  padding: 0.14rem 0;
+  padding: 0.14rem 0.2rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--accent-soft);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent-ring);
+  }
 }
 
 .line-score {
@@ -110,37 +129,24 @@
   font: 500 var(--text-xs) / 1.35 var(--font-sans);
 }
 
-.move-number {
-  color: var(--text-subtle);
-  margin-left: 0.25rem;
-
-  &:first-child {
-    margin-left: 0;
-  }
+.engine-wdl {
+  flex: none;
+  color: var(--text-muted);
+  font: 600 var(--text-xs) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
 }
 
-/**
- * Each move is a button so it is reachable by keyboard, but it has to read as part of a
- * sentence of moves - hence no border, no background and the inherited font.
- */
-.pv-move {
-  margin-left: 0.22rem;
-  padding: 0 0.1rem;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
+/** Closes every settings row, so the icons line up rather than landing mid-row. */
+.option-help {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-subtle);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: help;
 
   &:hover {
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-  }
-
-  &:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px var(--accent-ring);
+    color: var(--text-muted);
   }
 }
 

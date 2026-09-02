@@ -9,6 +9,10 @@
       <span class="engine-score" [class]="engine.lines()[0] ? scoreClass(engine.lines()[0]) : 'is-level'"
         aria-live="polite">{{ formatMainScore() }}</span>
 
+      @if (mainWdl(); as wdl) {
+        <span class="engine-wdl" title="Estimated win / draw / loss chances for White">{{ wdl }}</span>
+      }
+
       <span class="engine-meta">
         @if (engine.status() === 'loading') {
           Loading Stockfish…
@@ -52,18 +56,12 @@
     @if (engine.areLinesVisible() && engine.lines().length > 0) {
       <ol class="engine-lines">
         @for (line of engine.lines(); track line.multipv) {
-          <li class="engine-line">
-            <span class="line-score" [class]="scoreClass(line)">{{ formatScore(line) }}</span>
-            <span class="line-moves">
-              @for (token of variationTokens(line); track $index) {
-                @if (token.moveIndex === null) {
-                  <span class="move-number">{{ token.text }}</span>
-                } @else {
-                  <button type="button" class="pv-move" (click)="onVariationMoveClick(line, token.moveIndex)"
-                    [title]="'Play up to ' + token.text">{{ token.text }}</button>
-                }
-              }
-            </span>
+          <li>
+            <button type="button" class="engine-line" (click)="onLineClick(line)"
+              [title]="'Play ' + firstMoveOf(line)">
+              <span class="line-score" [class]="scoreClass(line)">{{ formatScore(line) }}</span>
+              <span class="line-moves">{{ formatVariation(line) }}</span>
+            </button>
           </li>
         }
       </ol>
@@ -79,6 +77,8 @@
                 (click)="onLineCountInput(count.toString())">{{ count }}</button>
             }
           </div>
+          <span class="option-help material-symbols-outlined" [title]="helpFor('MultiPV')"
+            [attr.aria-label]="helpFor('MultiPV')" role="img">help</span>
         </div>
 
         @for (option of engine.options(); track option.name) {
@@ -87,12 +87,14 @@
           @if (option.name === 'Hash' || (option.name === 'Threads' && bounds(option).max > 1)) {
             <div class="setting">
               <label class="setting-label" [attr.for]="'engine-opt-' + option.name">
-                {{ option.name === 'Hash' ? 'Memory (MB)' : 'Threads' }}
+                {{ labelFor(option) }}
               </label>
               <input class="ui-input setting-number" type="number" [id]="'engine-opt-' + option.name"
                 [min]="bounds(option).min" [max]="bounds(option).max" [value]="engine.valueOf(option.name)"
                 (change)="onSpinOptionInput(option, $any($event.target).value)" />
               <span class="setting-range">{{ bounds(option).min }}–{{ bounds(option).max }}</span>
+              <span class="option-help material-symbols-outlined" [title]="helpFor(option.name)"
+                [attr.aria-label]="helpFor(option.name)" role="img">help</span>
             </div>
           }
         }
@@ -122,23 +124,23 @@
                       <label class="ui-check">
                         <input type="checkbox" [checked]="isOptionChecked(option)"
                           (change)="onCheckOptionChange(option, $any($event.target).checked)" />
-                        <span>{{ option.name }}</span>
+                        <span>{{ labelFor(option) }}</span>
                       </label>
                     }
                     @case ('button') {
                       <button type="button" class="ui-btn ui-btn--sm" (click)="engine.triggerOption(option.name)">
-                        {{ option.name }}
+                        {{ labelFor(option) }}
                       </button>
                     }
                     @case ('spin') {
-                      <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ option.name }}</label>
+                      <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
                       <input class="ui-input setting-number" type="number" [id]="'engine-opt-' + option.name"
                         [min]="bounds(option).min" [max]="bounds(option).max" [value]="engine.valueOf(option.name)"
                         (change)="onSpinOptionInput(option, $any($event.target).value)" />
                       <span class="setting-range">{{ bounds(option).min }}–{{ bounds(option).max }}</span>
                     }
                     @case ('combo') {
-                      <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ option.name }}</label>
+                      <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
                       <select class="ui-select setting-select" [id]="'engine-opt-' + option.name"
                         [value]="engine.valueOf(option.name)"
                         (change)="onTextOptionChange(option, $any($event.target).value)">
@@ -148,11 +150,16 @@
                       </select>
                     }
                     @default {
-                      <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ option.name }}</label>
+                      <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
                       <input class="ui-input setting-text" type="text" [id]="'engine-opt-' + option.name"
                         [value]="engine.valueOf(option.name)"
                         (change)="onTextOptionChange(option, $any($event.target).value)" />
                     }
+                  }
+
+                  @if (helpFor(option.name); as help) {
+                    <span class="option-help material-symbols-outlined" [title]="help" [attr.aria-label]="help"
+                      role="img">help</span>
                   }
                 </div>
               }

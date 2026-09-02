@@ -15,6 +15,8 @@ const UCI_OPTION_LINES = [
   'option name Ponder type check default false',
   'option name MultiPV type spin default 1 min 1 max 256',
   'option name Skill Level type spin default 20 min 0 max 20',
+  'option name Move Overhead type spin default 10 min 0 max 5000',
+  'option name UCI_LimitStrength type check default false',
   'option name UCI_Elo type spin default 1320 min 1320 max 3190',
   'option name EvalFile type string default nn-c288c895ea92.nnue'
 ];
@@ -90,7 +92,17 @@ describe('StockfishEngineService', () => {
     expect(threads).toEqual({ name: 'Threads', type: 'spin', defaultValue: '1', min: 1, max: 32 });
 
     expect(service.options().find(option => option.name === 'Clear Hash')?.type).toBe('button');
-    expect(service.options().find(option => option.name === 'Ponder')?.defaultValue).toBe('false');
+  });
+
+  it('hides options that cannot be observed in an analysis panel', () => {
+    bootEngine(START_FEN);
+    const names = service.options().map(option => option.name);
+
+    // Ponder needs a GUI that plays games; Skill Level is dead weight next to UCI_Elo, which
+    // overrides it outright the moment UCI_LimitStrength is on.
+    expect(names).not.toContain('Ponder');
+    expect(names).not.toContain('Skill Level');
+    expect(names).toContain('UCI_Elo');
   });
 
   it('withholds the NNUE file options, which crash a WASM build outright', () => {
@@ -108,8 +120,26 @@ describe('StockfishEngineService', () => {
 
     // MultiPV is overridden (3, against a default of 1); Skill Level is left alone.
     expect(sent).toContain('setoption name MultiPV value 3');
-    expect(sent.some(command => command.includes('Skill Level'))).toBe(false);
-    expect(sent.some(command => command.includes('Ponder'))).toBe(false);
+    expect(sent.some(command => command.includes('UCI_Elo'))).toBe(false);
+  });
+
+  it('reads win/draw/loss chances and reorients them to White', () => {
+    const white = bootEngine(AFTER_E4_E5);
+    white.emit('info depth 20 multipv 1 score cp 30 wdl 240 700 60 nodes 1 nps 1 pv g1f3');
+    expect(service.lines()[0].wdl).toEqual({ win: 240, draw: 700, loss: 60 });
+
+    service.disable();
+
+    // Identical output, but with Black to move those 240 are Black's wins, not White's.
+    const black = bootEngine(AFTER_E4);
+    black.emit('info depth 20 multipv 1 score cp 30 wdl 240 700 60 nodes 1 nps 1 pv e7e5');
+    expect(service.lines()[0].wdl).toEqual({ win: 60, draw: 700, loss: 240 });
+  });
+
+  it('leaves wdl unset while the engine is not reporting it', () => {
+    const worker = bootEngine(AFTER_E4_E5);
+    worker.emit('info depth 12 multipv 1 score cp 45 nodes 1 nps 1 pv g1f3');
+    expect(service.lines()[0].wdl).toBeNull();
   });
 
   it('starts a search on the requested position once the engine reports ready', () => {

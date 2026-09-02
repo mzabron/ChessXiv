@@ -56,7 +56,21 @@ export class StockfishEngineService implements OnDestroy {
    * network is compiled into the .wasm instead. Sending either, even at its own declared
    * default, throws inside the worker and takes the engine down with it.
    */
-  private static readonly unsupportedOptionNames = ['EvalFile', 'EvalFileSmall'];
+  private static readonly unsupportedOptionNames = [
+    'EvalFile',
+    'EvalFileSmall',
+    // Nothing below this line has an observable effect on an analysis panel. Ponder needs a
+    // GUI that plays games; Move Overhead and nodestime only shape time management on a
+    // clock; UCI_Chess960 needs a board that understands castling in Chess960, which this
+    // one does not. Skill Level is a duplicate: Stockfish takes the level from UCI_Elo the
+    // moment UCI_LimitStrength is on and ignores Skill Level entirely, so exposing both
+    // gives two controls where one silently wins.
+    'Ponder',
+    'Move Overhead',
+    'nodestime',
+    'UCI_Chess960',
+    'Skill Level'
+  ];
 
   readonly isEnabled = signal(false);
   /**
@@ -566,6 +580,7 @@ export class StockfishEngineService implements OnDestroy {
     let multipv = 1;
     let cp: number | null = null;
     let mate: number | null = null;
+    let wdl: { win: number; draw: number; loss: number } | null = null;
     let pvUci: string[] | null = null;
 
     for (let i = 1; i < tokens.length; i++) {
@@ -586,6 +601,14 @@ export class StockfishEngineService implements OnDestroy {
             mate = Number(tokens[i + 2]);
           }
           i += 2;
+          break;
+        case 'wdl':
+          wdl = {
+            win: Number(tokens[i + 1]),
+            draw: Number(tokens[i + 2]),
+            loss: Number(tokens[i + 3])
+          };
+          i += 3;
           break;
         case 'pv':
           pvUci = tokens.slice(i + 1, i + 1 + StockfishEngineService.pvPlyLimit);
@@ -609,6 +632,8 @@ export class StockfishEngineService implements OnDestroy {
       depth,
       cp: cp === null ? null : cp * perspective,
       mate: mate === null ? null : mate * perspective,
+      // Win and loss are reported for the side to move, so they swap with the scores.
+      wdl: wdl && perspective === -1 ? { win: wdl.loss, draw: wdl.draw, loss: wdl.win } : wdl,
       pvUci,
       pvSan: this.toSan(pvUci)
     });

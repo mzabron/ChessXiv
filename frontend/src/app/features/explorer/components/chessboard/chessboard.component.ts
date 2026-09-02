@@ -208,16 +208,11 @@ export class ChessboardComponent implements OnChanges {
   }
 
   /**
-   * Plays a variation the user clicked in the engine panel, move by move, through the same
-   * backend validation a dragged piece goes through. Stops at the first move the backend
-   * rejects rather than carrying on with a position that has diverged from the line.
+   * Plays the move the user picked from an engine line, through the same backend validation
+   * a dragged piece goes through.
    */
-  protected async playVariationMoves(sanMoves: string[]): Promise<void> {
-    for (const san of sanMoves) {
-      if (!(await this.tryApplySanMove(san))) {
-        return;
-      }
-    }
+  protected playEngineMove(san: string): void {
+    void this.tryApplySanMove(san);
   }
 
   getPieceTransform(piece: ChessPiece): string {
@@ -733,9 +728,9 @@ export class ChessboardComponent implements OnChanges {
     }
   }
 
-  private async tryApplySanMove(san: string): Promise<boolean> {
+  private async tryApplySanMove(san: string): Promise<void> {
     if (this.isSubmittingMove || this.pendingPromotionMove || this.isSetupMode) {
-      return false;
+      return;
     }
 
     this.isSubmittingMove = true;
@@ -751,14 +746,12 @@ export class ChessboardComponent implements OnChanges {
 
       if (!response.isValid || !response.fen) {
         this.statusMessage = null;
-        return false;
+        return;
       }
 
       this.applySuccessfulMove(response.fen, response.san ?? san);
-      return true;
     } catch (error) {
       this.statusMessage = this.resolveBackendErrorMessage(error);
-      return false;
     } finally {
       this.isSubmittingMove = false;
     }

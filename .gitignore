@@ -62,6 +62,8 @@ packages/
 .nuget/
 **/node_modules/
 **/dist/
+# Stockfish builds, fetched by frontend/scripts/fetch-engine.mjs rather than committed.
+frontend/.engine/
 **/out-tsc
 **/bazel-out
 **/tmp
