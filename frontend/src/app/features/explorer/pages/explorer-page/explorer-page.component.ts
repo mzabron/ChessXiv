@@ -1,6 +1,6 @@
 import { Component, ElementRef, HostListener, ViewChild, Input, Output, EventEmitter, computed, effect, inject, signal, untracked, OnDestroy, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { firstValueFrom, Subscription } from 'rxjs';
+import { firstValueFrom, Subject, Subscription, takeUntil } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChessboardComponent } from '../../components/chessboard/chessboard.component';
 import { GamesListComponent } from '../../components/games-list/games-list.component';
@@ -138,6 +138,18 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   protected readonly savedGamesLimit = signal(0);
   protected readonly selectedGameIds = signal<string[]>([]);
   protected readonly isLoadingGames = signal(false);
+
+  /**
+   * Cancels whatever game-list request is in flight. Clicking through sort columns fires a
+   * request per click, and on a large database those take seconds and finish out of order -
+   * so the list flickered through stale results and settled on whichever response happened
+   * to arrive last rather than the sort actually asked for. Emitting here unsubscribes the
+   * outstanding HttpClient call, which aborts the request instead of just ignoring it.
+   */
+  private readonly cancelGamesRequests = new Subject<void>();
+
+  /** Guards the loading flag against being cleared by a request that has been superseded. */
+  private gamesRequestVersion = 0;
   protected readonly currentUserName = this.authState.userName;
   protected moveRows: MoveRow[] = [];
   protected currentPly = 0;
@@ -274,6 +286,9 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.clearImportErrorTimers();
     this.detachProgressSubscription();
     this.boardMovesResizeObserver?.disconnect();
+    // Aborts any game-list request still running, then releases the subject itself.
+    this.cancelGamesRequests.next();
+    this.cancelGamesRequests.complete();
   }
 
   ngAfterViewInit(): void {
@@ -938,8 +953,14 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
           this.draftGamesSortDirection(),
           this.draftGamesResultSortMode(),
           filters
-        )
+        ).pipe(takeUntil(this.cancelGamesRequests)),
+        // A cancelled request completes without emitting; null says so rather than throwing.
+        { defaultValue: null }
       );
+
+      if (response === null) {
+        return;
+      }
 
       this.draftGames.set(response.items);
       this.draftGamesTotalCount.set(response.totalCount);
@@ -962,8 +983,14 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
           this.draftGamesSortDirection(),
           this.draftGamesResultSortMode(),
           filters
-        )
+        ).pipe(takeUntil(this.cancelGamesRequests)),
+        // A cancelled request completes without emitting; null says so rather than throwing.
+        { defaultValue: null }
       );
+
+      if (response === null) {
+        return;
+      }
 
       this.draftGames.set(response.items);
       this.draftGamesTotalCount.set(response.totalCount);
@@ -980,6 +1007,11 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     // switching databases alike.
     this.appliedGamesFilters.set({ ...this.gamesFilters() });
 
+    // Abort whatever is still in flight before starting the replacement, so a slow earlier
+    // sort can neither overwrite this one's results nor clear its loading state.
+    this.cancelGamesRequests.next();
+    const version = ++this.gamesRequestVersion;
+
     if (this.currentGamesSource === 'userDatabase') {
       const userDatabaseId = this.activeUserDatabaseId();
       if (!userDatabaseId) {
@@ -993,7 +1025,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       try {
         await this.loadUserDatabaseGamesPage(userDatabaseId);
       } finally {
-        this.isLoadingGames.set(false);
+        this.clearLoadingIfCurrent(version);
       }
 
       return;
@@ -1004,8 +1036,19 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       try {
         await this.loadDraftGamesPage();
       } finally {
-        this.isLoadingGames.set(false);
+        this.clearLoadingIfCurrent(version);
       }
+    }
+  }
+
+  /**
+   * Only the newest request may turn the spinner off. A superseded one reaching its finally
+   * block would otherwise clear the loading state while its replacement is still running,
+   * flashing the list back to a resolved-looking state mid-flight.
+   */
+  private clearLoadingIfCurrent(version: number): void {
+    if (version === this.gamesRequestVersion) {
+      this.isLoadingGames.set(false);
     }
   }
 
