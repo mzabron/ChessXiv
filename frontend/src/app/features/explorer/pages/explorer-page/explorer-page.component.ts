@@ -150,6 +150,15 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
   /** Guards the loading flag against being cleared by a request that has been superseded. */
   private gamesRequestVersion = 0;
+
+  /**
+   * Aborts an outstanding move-tree request. A stale response was already discarded by
+   * moveTreeRequestVersion, so this is about load rather than correctness: on a large
+   * database that query costs over a second of two-core CPU, and clicking through several
+   * databases left every abandoned one running to completion, competing with the one still
+   * wanted. Cached hits emit synchronously and are unaffected.
+   */
+  private readonly cancelMoveTreeRequests = new Subject<void>();
   protected readonly currentUserName = this.authState.userName;
   protected moveRows: MoveRow[] = [];
   protected currentPly = 0;
@@ -289,6 +298,8 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     // Aborts any game-list request still running, then releases the subject itself.
     this.cancelGamesRequests.next();
     this.cancelGamesRequests.complete();
+    this.cancelMoveTreeRequests.next();
+    this.cancelMoveTreeRequests.complete();
   }
 
   ngAfterViewInit(): void {
@@ -1283,6 +1294,11 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     const boardFen = this.boardFen().trim();
     const fen = boardFen.length > 0 ? boardFen : ExplorerPageComponent.initialBoardFen;
 
+    // Both of these precede the early return below: without the version bump, a request
+    // still in flight could land and repopulate a tree that was just cleared.
+    this.cancelMoveTreeRequests.next();
+    const requestVersion = ++this.moveTreeRequestVersion;
+
     if (this.currentGamesSource === 'userDatabase') {
       const userDatabaseId = this.activeUserDatabaseId();
       if (!userDatabaseId) {
@@ -1291,7 +1307,6 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       }
     }
 
-    const requestVersion = ++this.moveTreeRequestVersion;
     this.moveTreeLoading.set(true);
     this.moveTreeError.set(null);
 
@@ -1305,8 +1320,13 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     };
 
     try {
-      const response = await firstValueFrom(this.explorerBoardApi.getMoveTree(request));
-      if (requestVersion !== this.moveTreeRequestVersion) {
+      const response = await firstValueFrom(
+        this.explorerBoardApi.getMoveTree(request).pipe(takeUntil(this.cancelMoveTreeRequests)),
+        // A cancelled request completes without emitting; null says so rather than throwing.
+        { defaultValue: null }
+      );
+
+      if (response === null || requestVersion !== this.moveTreeRequestVersion) {
         return;
       }
 
