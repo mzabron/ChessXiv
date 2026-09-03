@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, ViewChild, Input, Output, EventEmitter, computed, effect, inject, signal, OnDestroy, AfterViewInit } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild, Input, Output, EventEmitter, computed, effect, inject, signal, untracked, OnDestroy, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -201,7 +201,14 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       // Signing in or out changes which games the caller may see, so every piece of
       // loaded state has to go - otherwise the previous session's database header, game
       // list and move tree stay on screen while the data behind them is no longer there.
-      void this.onSessionChanged(isAuthenticated);
+      //
+      // untracked, and not optional: onSessionChanged runs synchronously up to its first
+      // await, and on that path syncFilterStateFromListControls reads the sort, page and
+      // page-size signals. Without this they become dependencies of the effect, so merely
+      // sorting a column re-ran the whole sign-in/sign-out teardown - which clears the
+      // persisted active database and drops the view back to an empty "Imported Draft".
+      // Only a change of session should get in here.
+      untracked(() => void this.onSessionChanged(isAuthenticated));
     });
   }
 
