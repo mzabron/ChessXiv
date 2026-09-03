@@ -66,7 +66,11 @@
     </header>
     }
 
-    @if (!gamesLoaded) {
+    <!-- The empty state must not win while a load is still in flight. gamesLoaded only
+         becomes true once the first response lands, so on a first open - the slowest case,
+         and the one where feedback matters most - this branch used to show "import games"
+         with no sign anything was happening. The table's skeleton rows cover that gap. -->
+    @if (!gamesLoaded && !isLoadingGames) {
     <app-empty-games-state (importDatabase)="importDatabase.emit()"
       (browseDatabases)="selectTab('databases')" />
     } @else {
