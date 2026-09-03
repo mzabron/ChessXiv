@@ -56,8 +56,17 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
 
             // Covering index: position search and the opening tree are both answered from
             // the index alone, without visiting the heap.
+            //
+            // GameId is included even though it is already the leading key column of the
+            // primary key. The opening tree joins Positions to UserDatabaseGames on GameId
+            // to restrict a position to one database, and an index that cannot supply
+            // GameId forces that join to read the heap - once per matching row. At the
+            // starting position, which every game contains, the planner measured that as
+            // worse than reading the whole table and picked a sequential scan over 89M
+            // rows: 34 seconds, past the command timeout, so the request 500'd. With
+            // GameId here both sides of the join are index-only scans.
             entity.HasIndex(p => p.PosKey)
-                .IncludeProperties(p => new { p.NextMove, p.Result });
+                .IncludeProperties(p => new { p.NextMove, p.Result, p.GameId });
 
             entity
                 .HasOne(p => p.Game)
@@ -166,8 +175,10 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(x => x.PosKey).HasColumnType("bytea").IsRequired();
             entity.Property(x => x.Result).HasConversion<byte>().IsRequired();
 
+            // Same join-covering reason as Positions above, with StagingGameId as the key
+            // the draft move tree joins on.
             entity.HasIndex(x => x.PosKey)
-                .IncludeProperties(x => new { x.NextMove, x.Result });
+                .IncludeProperties(x => new { x.NextMove, x.Result, x.StagingGameId });
 
             entity
                 .HasOne(x => x.Game)
