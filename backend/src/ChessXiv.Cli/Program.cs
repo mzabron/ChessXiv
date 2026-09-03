@@ -129,6 +129,7 @@ try
 	var dbContext = services.GetRequiredService<ChessXivDbContext>();
 	var importService = services.GetRequiredService<IDirectDatabaseImportService>();
 	var statisticsRefresher = services.GetRequiredService<IImportStatisticsRefresher>();
+	var draftPromotionRepository = services.GetRequiredService<IDraftPromotionRepository>();
 	var unitOfWork = services.GetRequiredService<IUnitOfWork>();
 
 	Console.Write("Username or email: ");
@@ -230,12 +231,32 @@ try
 
 		if (!imported)
 		{
-			// The database was created a moment ago purely to hold this import. Leaving it
-			// behind would litter the user's database list with an empty entry they never
-			// asked for - the same rollback the web save flow does.
-			dbContext.UserDatabases.Remove(userDatabase);
-			await unitOfWork.SaveChangesAsync();
-			logger.LogInformation("Rolled back the empty database {Name} created for this import.", userDatabaseName);
+			// Only roll back when the failed import genuinely left nothing behind. Batches
+			// commit as they go, so a failure part-way through leaves real games linked to
+			// this database - and deleting it then cascades those links away and strands
+			// every imported game in Games and Positions with nothing pointing at it:
+			// invisible in the UI, impossible to delete from it, still occupying disk.
+			var committedGames = await dbContext.UserDatabaseGames
+				.CountAsync(link => link.UserDatabaseId == userDatabaseId);
+
+			if (committedGames == 0)
+			{
+				dbContext.UserDatabases.Remove(userDatabase);
+				await unitOfWork.SaveChangesAsync();
+				logger.LogInformation("Rolled back the empty database {Name} created for this import.", userDatabaseName);
+			}
+			else
+			{
+				// The count is normally stamped only on a successful run, so do it here -
+				// otherwise the database shows 0 games while actually holding thousands.
+				await draftPromotionRepository.SyncGameCountAsync(userDatabaseId);
+				logger.LogWarning(
+					"Import failed, but {Count} games had already been committed. Keeping database {Name} ({Id}) " +
+					"so they stay reachable - delete it from the UI if you intend to start over.",
+					committedGames,
+					userDatabaseName,
+					userDatabaseId);
+			}
 		}
 
 		return;
