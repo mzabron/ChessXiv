@@ -169,7 +169,8 @@ public class UserDatabasesController(
             {
                 d.Id,
                 d.OwnerUserId,
-                d.IsPublic
+                d.IsPublic,
+                d.GameCount
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -276,11 +277,32 @@ public class UserDatabasesController(
                 .ThenByDescending(x => x.AddedAtUtc),
             ("moves", true) => query.OrderByDescending(x => x.Game.MoveCount).ThenByDescending(x => x.AddedAtUtc),
             ("moves", false) => query.OrderBy(x => x.Game.MoveCount).ThenByDescending(x => x.AddedAtUtc),
-            (_, false) => query.OrderBy(x => x.AddedAtUtc).ThenBy(x => x.Game.Id),
-            _ => query.OrderByDescending(x => x.AddedAtUtc).ThenByDescending(x => x.Game.Id)
+            // GameId, not Game.Id: identical value, but reading it off the link means the
+            // default ordering never has to touch Games, so it can be served straight from
+            // IX_UserDatabaseGames_UserDatabaseId_AddedAtUtc_GameId.
+            (_, false) => query.OrderBy(x => x.AddedAtUtc).ThenBy(x => x.GameId),
+            _ => query.OrderByDescending(x => x.AddedAtUtc).ThenByDescending(x => x.GameId)
         };
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        // An unfiltered list is the whole database, and UserDatabases.GameCount already
+        // holds that number - counting 800k+ link rows on every page turn to rediscover it
+        // is the single most wasteful part of this endpoint.
+        var hasNarrowingFilters =
+            !string.IsNullOrWhiteSpace(normalizedWhiteFirstName) ||
+            !string.IsNullOrWhiteSpace(normalizedWhiteLastName) ||
+            !string.IsNullOrWhiteSpace(normalizedBlackFirstName) ||
+            !string.IsNullOrWhiteSpace(normalizedBlackLastName) ||
+            eloEnabled ||
+            yearEnabled ||
+            !string.IsNullOrWhiteSpace(ecoCode) ||
+            !string.IsNullOrWhiteSpace(result) ||
+            moveCountFrom.HasValue ||
+            moveCountTo.HasValue ||
+            positionTarget is not null;
+
+        var totalCount = hasNarrowingFilters
+            ? await query.CountAsync(cancellationToken)
+            : dbInfo.GameCount;
 
         var items = await query
             .Skip((page - 1) * pageSize)
