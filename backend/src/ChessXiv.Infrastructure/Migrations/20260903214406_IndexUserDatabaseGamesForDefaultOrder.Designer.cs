@@ -3,6 +3,7 @@ using System;
 using ChessXiv.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ChessXiv.Infrastructure.Migrations
 {
     [DbContext(typeof(ChessXivDbContext))]
-    partial class ChessXivDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260903214406_IndexUserDatabaseGamesForDefaultOrder")]
+    partial class IndexUserDatabaseGamesForDefaultOrder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -151,7 +154,7 @@ namespace ChessXiv.Infrastructure.Migrations
 
                     b.HasIndex("PosKey");
 
-                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("PosKey"), new[] { "NextMove", "Result", "GameId" });
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("PosKey"), new[] { "NextMove", "Result" });
 
                     b.ToTable("Positions");
                 });
@@ -313,7 +316,7 @@ namespace ChessXiv.Infrastructure.Migrations
 
                     b.HasIndex("PosKey");
 
-                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("PosKey"), new[] { "NextMove", "Result", "StagingGameId" });
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("PosKey"), new[] { "NextMove", "Result" });
 
                     b.ToTable("StagingPositions");
                 });

@@ -101,6 +101,12 @@ public class ChessXivDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(x => x.Round).HasMaxLength(64);
             entity.Property(x => x.Site).HasMaxLength(300);
 
+            // Serves the default listing order (newest first) without a sort step, and
+            // without joining Games at all: both ordering columns and the row identity the
+            // page needs live on the link itself. Deep pages then walk this index instead
+            // of joining and sorting the entire database to discard nearly all of it.
+            entity.HasIndex(x => new { x.UserDatabaseId, x.AddedAtUtc, x.GameId });
+
             entity
                 .HasOne(x => x.UserDatabase)
                 .WithMany(d => d.UserDatabaseGames)
