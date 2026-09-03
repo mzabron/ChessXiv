@@ -24,6 +24,19 @@ internal static class PostgresBulkCopy
         "Result", "Pgn", "MoveCount", "GameHash"
         """;
 
+    /// <summary>
+    /// How long a single COPY may take before Npgsql abandons it.
+    /// </summary>
+    /// <remarks>
+    /// Npgsql's default command timeout is 30 seconds, which suits ordinary queries and is
+    /// far too short for this. PosKey is a random 128-bit hash, so position rows scatter
+    /// across the whole index rather than appending to one end; once that index outgrows
+    /// the server's cache every batch costs real random I/O, and batches that took under a
+    /// second against an empty database were taking thirty against a million-game one. The
+    /// import then died on a timeout rather than on anything actually being wrong.
+    /// </remarks>
+    private static readonly TimeSpan CopyTimeout = TimeSpan.FromMinutes(30);
+
     public static async Task WriteGamesAsync(
         NpgsqlConnection connection,
         IEnumerable<Game> games,
@@ -32,6 +45,8 @@ internal static class PostgresBulkCopy
         await using var importer = await connection.BeginBinaryImportAsync(
             $"""COPY "Games" ("Id", "Date", "Year", {SharedGameColumns}) FROM STDIN (FORMAT BINARY)""",
             cancellationToken);
+
+        importer.Timeout = CopyTimeout;
 
         foreach (var game in games)
         {
@@ -64,6 +79,8 @@ internal static class PostgresBulkCopy
             """,
             cancellationToken);
 
+        importer.Timeout = CopyTimeout;
+
         foreach (var game in games)
         {
             await importer.StartRowAsync(cancellationToken);
@@ -94,6 +111,8 @@ internal static class PostgresBulkCopy
             """COPY "Positions" ("GameId", "PlyCount", "PosKey", "NextMove", "Result") FROM STDIN (FORMAT BINARY)""",
             cancellationToken);
 
+        importer.Timeout = CopyTimeout;
+
         foreach (var game in games)
         {
             foreach (var position in game.Positions)
@@ -118,6 +137,8 @@ internal static class PostgresBulkCopy
         await using var importer = await connection.BeginBinaryImportAsync(
             """COPY "StagingPositions" ("StagingGameId", "PlyCount", "PosKey", "NextMove", "Result") FROM STDIN (FORMAT BINARY)""",
             cancellationToken);
+
+        importer.Timeout = CopyTimeout;
 
         foreach (var game in games)
         {
@@ -146,6 +167,8 @@ internal static class PostgresBulkCopy
             FROM STDIN (FORMAT BINARY)
             """,
             cancellationToken);
+
+        importer.Timeout = CopyTimeout;
 
         foreach (var link in links)
         {
