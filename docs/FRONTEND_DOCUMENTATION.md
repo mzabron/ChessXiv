@@ -38,9 +38,19 @@ Note:
 - SignalR package aligns with backend hub for real-time progress updates.
 - `scripts/fetch-engine.mjs` downloads the four Stockfish lite files into `frontend/.engine/`
   (git-ignored) and angular.json copies them to `engine/` in the build output. It runs from
-  `postinstall`, or by hand with `npm run engine:fetch`, and is a no-op once the files verify.
-  Files are pinned by version *and* SHA-256: a changed byte fails the build rather than
-  shipping quietly. `STOCKFISH_MIRROR` overrides the source for an internal or offline build.
+  `postinstall` and again from `prebuild`, or by hand with `npm run engine:fetch`, and is a
+  no-op once the files verify. Files are pinned by version *and* SHA-256: a changed byte fails
+  the build rather than shipping quietly. `STOCKFISH_MIRROR` overrides the source for an
+  internal or offline build, and `STOCKFISH_SKIP=1` skips the fetch for a host with the files
+  copied in by hand.
+- Requests are bounded by a timeout (`STOCKFISH_TIMEOUT_MS`, default 60s) and retried three
+  times. npm hides script output behind its spinner, so a stalled download in `postinstall` is
+  indistinguishable from `npm ci` freezing with no explanation.
+- `postinstall` passes `--optional`, which downgrades a download failure to a warning: being
+  unable to reach the mirror is an environment problem, not a reason to block every other
+  dependency from installing. `prebuild` runs without it, because the build output is the
+  deliverable and `ng build` will otherwise happily ship a bundle whose analysis panel cannot
+  start. A checksum mismatch is fatal either way.
 - This replaced an `npm i stockfish` dependency. That package ships every build it has,
   including two 113 MB full-strength ones no browser can sensibly download: 167 MB over the
   wire and 248 MB on disk for the 14 MB actually used. It matters because this app is built on
