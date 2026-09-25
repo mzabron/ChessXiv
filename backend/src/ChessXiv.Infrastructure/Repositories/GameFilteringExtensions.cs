@@ -41,11 +41,18 @@ public static class GameFilteringExtensions
             };
         }
 
-        if (yearEnabled && yearFrom.HasValue && yearTo.HasValue)
+        // Either bound may be left empty: "from 1990" alone means 1990 or later. Undated
+        // games are stored as year 0 and must not slip in under a lone upper bound.
+        if (yearEnabled && yearFrom.HasValue)
         {
             var from = yearFrom.Value;
+            query = query.Where(g => g.Year >= from);
+        }
+
+        if (yearEnabled && yearTo.HasValue)
+        {
             var to = yearTo.Value;
-            query = query.Where(g => g.Year >= from && g.Year <= to);
+            query = query.Where(g => g.Year > 0 && g.Year <= to);
         }
 
         if (!string.IsNullOrWhiteSpace(ecoCode))
@@ -111,11 +118,18 @@ public static class GameFilteringExtensions
             };
         }
 
-        if (yearEnabled && yearFrom.HasValue && yearTo.HasValue)
+        // Either bound may be left empty: "from 1990" alone means 1990 or later. Undated
+        // games are stored as year 0 and must not slip in under a lone upper bound.
+        if (yearEnabled && yearFrom.HasValue)
         {
             var from = yearFrom.Value;
+            query = query.Where(g => g.Year >= from);
+        }
+
+        if (yearEnabled && yearTo.HasValue)
+        {
             var to = yearTo.Value;
-            query = query.Where(g => g.Year >= from && g.Year <= to);
+            query = query.Where(g => g.Year > 0 && g.Year <= to);
         }
 
         if (!string.IsNullOrWhiteSpace(ecoCode))
@@ -181,11 +195,18 @@ public static class GameFilteringExtensions
             };
         }
 
-        if (yearEnabled && yearFrom.HasValue && yearTo.HasValue)
+        // Either bound may be left empty: "from 1990" alone means 1990 or later. Undated
+        // games are stored as year 0 and must not slip in under a lone upper bound.
+        if (yearEnabled && yearFrom.HasValue)
         {
             var from = yearFrom.Value;
+            query = query.Where(g => g.Game.Year >= from);
+        }
+
+        if (yearEnabled && yearTo.HasValue)
+        {
             var to = yearTo.Value;
-            query = query.Where(g => g.Game.Year >= from && g.Game.Year <= to);
+            query = query.Where(g => g.Game.Year > 0 && g.Game.Year <= to);
         }
 
         if (!string.IsNullOrWhiteSpace(ecoCode))

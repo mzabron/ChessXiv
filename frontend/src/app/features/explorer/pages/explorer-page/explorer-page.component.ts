@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, ViewChild, Input, Output, EventEmitter, computed, effect, inject, signal, untracked, OnDestroy, AfterViewInit } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild, Input, Output, EventEmitter, computed, effect, inject, signal, untracked, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { firstValueFrom, Subject, Subscription, takeUntil } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -47,7 +47,7 @@ import {
   templateUrl: './explorer-page.component.html',
   styleUrl: './explorer-page.component.scss'
 })
-export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
+export class ExplorerPageComponent implements OnDestroy {
   private static readonly initialBoardFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
   /**
@@ -86,8 +86,26 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   @ViewChild('mainMoveList', { read: ElementRef })
   private readonly mainMoveListRef?: ElementRef<HTMLElement>;
 
+  private boardMovesRowRef?: ElementRef<HTMLElement>;
+
+  /**
+   * The board row sits behind *ngIf, so leaving focus mode builds a fresh row, board and
+   * move list. Wiring the height sync once, after the first render, left the observer on the
+   * old, detached elements and the new move list without a height cap. Re-wire on every new
+   * row; deferred a frame because the sibling queries are not guaranteed to be updated yet.
+   */
   @ViewChild('boardMovesRow', { read: ElementRef })
-  private readonly boardMovesRowRef?: ElementRef<HTMLElement>;
+  private set boardMovesRow(ref: ElementRef<HTMLElement> | undefined) {
+    if (ref?.nativeElement === this.boardMovesRowRef?.nativeElement) {
+      return;
+    }
+
+    this.boardMovesRowRef = ref;
+    this.boardMovesResizeObserver?.disconnect();
+    if (ref) {
+      requestAnimationFrame(() => this.initBoardMovesHeightSync());
+    }
+  }
 
   @ViewChild('focusTabs', { read: ElementRef })
   private readonly focusTabsRef?: ElementRef<HTMLElement>;
@@ -300,10 +318,6 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.cancelGamesRequests.complete();
     this.cancelMoveTreeRequests.next();
     this.cancelMoveTreeRequests.complete();
-  }
-
-  ngAfterViewInit(): void {
-    this.initBoardMovesHeightSync();
   }
 
   private initBoardMovesHeightSync(): void {
@@ -834,16 +848,8 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
 
   protected onGamesFiltersApplied(filters: ExplorerGamesFilterState): void {
     this.gamesFilters.set(filters);
-    this.draftGamesSortBy.set(filters.sortBy);
-    this.draftGamesSortDirection.set(filters.sortDirection);
-
-    if (filters.sortBy !== 'result') {
-      this.draftGamesResultSortMode.set('default');
-    }
-
     this.draftGamesPageSize.set(filters.pageSize);
-    this.draftGamesPage.set(filters.page);
-    this.syncFilterStateFromListControls();
+    this.resetListOrderAndPage();
 
     if (this.isFocusMode) {
       this.focusRightTab = 'games';
@@ -853,16 +859,8 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
   }
 
   protected onGamesFiltersReset(): void {
-    const cleared = createDefaultExplorerGamesFilterState({
-      sortBy: this.draftGamesSortBy(),
-      sortDirection: this.draftGamesSortDirection(),
-      page: 1,
-      pageSize: this.draftGamesPageSize()
-    });
-
-    this.gamesFilters.set(cleared);
-    this.draftGamesPage.set(1);
-    this.syncFilterStateFromListControls();
+    this.gamesFilters.set(createDefaultExplorerGamesFilterState({ pageSize: this.draftGamesPageSize() }));
+    this.resetListOrderAndPage();
     void this.reloadGamesAndMoveTree();
   }
 
@@ -939,7 +937,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.gamesLoaded = result.importedCount > 0;
     this.currentDatabaseName = 'Imported Draft';
     this.currentGamesSource = 'imported';
-    this.draftGamesPage.set(1);
+    this.resetListOrderAndPage();
     void this.reloadGamesAndMoveTree();
 
     if (!result.importedCount && result.skippedCount > 0) {
@@ -1203,8 +1201,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.activeUserDatabaseId.set(database.id);
     this.currentDatabaseName = database.name;
     this.currentGamesSource = 'userDatabase';
-    this.draftGamesPage.set(1);
-    this.syncFilterStateFromListControls();
+    this.resetListOrderAndPage();
     this.persistActiveDatabase(database);
     await this.reloadGamesAndMoveTree();
   }
@@ -1247,8 +1244,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.currentPly = 0;
     this.currentGamesSource = 'imported';
     this.currentDatabaseName = 'Imported Draft';
-    this.draftGamesPage.set(1);
-    this.syncFilterStateFromListControls();
+    this.resetListOrderAndPage();
     await this.reloadGamesAndMoveTree();
 
     if (!this.gamesLoaded) {
@@ -1279,8 +1275,7 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
     this.currentGamesSource = 'imported';
     this.draftGames.set([]);
     this.draftGamesTotalCount.set(0);
-    this.draftGamesPage.set(1);
-    this.syncFilterStateFromListControls();
+    this.resetListOrderAndPage();
     this.gamesLoaded = false;
     this.selectedGameId.set(null);
     this.selectedGameReplay.set(null);
@@ -1460,6 +1455,20 @@ export class ExplorerPageComponent implements OnDestroy, AfterViewInit {
       window.clearTimeout(this.importErrorClearTimerId);
       this.importErrorClearTimerId = null;
     }
+  }
+
+  /**
+   * Back to the default order and page 1. Called whenever the set of displayed games
+   * changes - new filters, a different database, a fresh import - since a sort column or a
+   * page number chosen for the previous set means nothing for the new one, and a stale
+   * page 10 can even point past the end of it.
+   */
+  private resetListOrderAndPage(): void {
+    this.draftGamesSortBy.set('createdAt');
+    this.draftGamesSortDirection.set('desc');
+    this.draftGamesResultSortMode.set('default');
+    this.draftGamesPage.set(1);
+    this.syncFilterStateFromListControls();
   }
 
   private syncFilterStateFromListControls(): void {
