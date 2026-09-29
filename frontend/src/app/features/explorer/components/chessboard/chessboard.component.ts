@@ -458,6 +458,8 @@ export class ChessboardComponent implements OnChanges {
       return;
     }
 
+    // Clearing drops the game's moves, so what is left is no longer that game.
+    this.abandonRecordedGame();
     this.resetGame();
   }
 
@@ -506,6 +508,10 @@ export class ChessboardComponent implements OnChanges {
     if (!this.isSetupMode) {
       return;
     }
+
+    // A position built in the editor is the user's own, not the loaded game's - the same as
+    // playing a move off the game's line. Cancel restores the game instead, players included.
+    this.abandonRecordedGame();
 
     const builtFen = this.buildFenFromSetup();
     this.startFen = builtFen;
@@ -879,8 +885,10 @@ export class ChessboardComponent implements OnChanges {
       this.fenHistory = this.fenHistory.slice(0, this.currentPly + 1);
     }
 
-    if (divergedFromRecordedGame || this.hasRecordedGameMetadata) {
+    if (divergedFromRecordedGame) {
       this.clearRecordedGameMetadata();
+    } else {
+      this.abandonRecordedGame();
     }
 
     this.sanHistory = [...this.sanHistory, san];
@@ -899,6 +907,13 @@ export class ChessboardComponent implements OnChanges {
       || this.clocksByPly.size > 0
       || this.topPlayerName !== 'Black'
       || this.bottomPlayerName !== 'White';
+  }
+
+  /** Clears the loaded game's players, ratings and clocks, if the board still shows any. */
+  private abandonRecordedGame(): void {
+    if (this.hasRecordedGameMetadata) {
+      this.clearRecordedGameMetadata();
+    }
   }
 
   private clearRecordedGameMetadata(): void {
