@@ -250,6 +250,72 @@
   font: 500 var(--text-sm) / 1.3 var(--font-sans);
 }
 
+/**
+ * Every checkbox and radio in the app. The browser's own boxes are drawn white whatever the
+ * theme, which read as holes punched in a dark table. Unchecked, these are just an outline
+ * in the colour of the text beside them (currentColor), so they sit in any context; checked,
+ * they take the accent like every other "on" control.
+ */
+input[type='checkbox'],
+input[type='radio'] {
+  appearance: none;
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  place-content: center;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+
+  &:checked {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-ring);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* The tick is drawn with borders rather than an icon, so it takes a token in both themes. */
+input[type='checkbox']:checked::after {
+  content: '';
+  width: 0.28rem;
+  height: 0.55rem;
+  margin-top: -0.12rem;
+  border: solid var(--text-on-accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+input[type='radio'] {
+  border-radius: 50%;
+
+  &:checked {
+    background: transparent;
+  }
+
+  &:checked::after {
+    content: '';
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+}
+
 /** Checkbox / radio with its label, aligned on one baseline. */
 .ui-check {
   display: inline-flex;
@@ -259,15 +325,6 @@
   font: 400 var(--text-sm) / 1.2 var(--font-sans);
   cursor: pointer;
   user-select: none;
-
-  input[type='checkbox'],
-  input[type='radio'] {
-    width: 1rem;
-    height: 1rem;
-    margin: 0;
-    accent-color: var(--accent);
-    cursor: pointer;
-  }
 
   &:has(input:disabled) {
     opacity: 0.45;
