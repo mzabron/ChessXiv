@@ -1,0 +1,41 @@
+:host {
+  display: block;
+}
+
+/* Same square colours as the real board, so the preview reads as the same board. */
+.mini-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.mini-square {
+  position: relative;
+  aspect-ratio: 1;
+
+  &.light {
+    background: var(--square-light);
+  }
+
+  &.dark {
+    background: var(--square-dark);
+  }
+
+  /* An overlay rather than a new colour, so it works on both square shades and themes. */
+  &.highlighted::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgb(255 179 71 / 45%);
+  }
+
+  img {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+}

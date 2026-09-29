@@ -3,24 +3,25 @@
 /**
  * Fetches the Stockfish builds the analysis panel loads at runtime.
  *
- * This exists instead of an `npm i stockfish` dependency. That package ships every build it
- * has, including two 113 MB full-strength ones the browser cannot sensibly download: 167 MB
- * over the wire and 248 MB on disk, of which we use 14 MB. On a machine that builds and
- * serves the app, that is 234 MB of nothing.
+ * This exists instead of an `npm i stockfish` dependency. That package is a 205 MB install
+ * that also carries an asm.js build and a CLI wrapper, and it would put the engine under
+ * node_modules where every `npm ci` deletes and re-downloads it. Here the files land in
+ * `.engine/` once and stay there across installs.
  *
  * Files are pinned by version and verified by SHA-256, so this is not "download whatever is
  * up there today" - a changed byte fails the build rather than shipping quietly.
  *
  * Runs from `postinstall`, and is a no-op once the files are present and verified. It must
  * never hang: npm hides script output behind its spinner, so a stalled download here looks
- * exactly like `npm ci` freezing with no explanation. Every request is therefore bounded by
- * a timeout and retried a few times before giving up loudly.
+ * exactly like `npm ci` freezing with no explanation. Every request is therefore abandoned
+ * once it stops receiving data, and retried a few times before giving up loudly.
  *
  * Environment:
  *   STOCKFISH_MIRROR  fetch from somewhere else (an internal mirror, an air-gapped build);
  *                     joined with `<version>/bin/<file>` like the default source.
  *   STOCKFISH_SKIP=1  skip entirely - for a host that has the files copied in by hand.
- *   STOCKFISH_TIMEOUT_MS  per-attempt timeout, default 60000.
+ *   STOCKFISH_TIMEOUT_MS  how long a download may receive nothing before it is retried,
+ *                         default 30000.
  *
  * `--optional` downgrades a download failure to a warning. `postinstall` passes it so that a
  * host which cannot reach the mirror can still install: being unable to fetch an engine is an
@@ -31,44 +32,70 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const VERSION = '18.0.8';
+const VERSION = '19.0.0';
 const DEFAULT_MIRROR = 'https://unpkg.com/stockfish@';
 
 /**
- * Only the "lite" builds. The full ones are ~113 MB each: stronger, but nobody is
- * downloading that in a browser tab. Both threading variants ship because which one the
- * page can use depends on whether it was served cross-origin isolated.
+ * Two strengths, each in both threading variants: which variant the page can use depends on
+ * whether it was served cross-origin isolated.
+ *
+ * - Lite (~1.7 MB) is what the panel loads by default. Its network is small enough that
+ *   switching the engine on costs about as much as a large image.
+ * - Full (~99 MB) carries Stockfish's full-size network. It is noticeably stronger, but only
+ *   downloaded by a browser whose user picks it in the engine settings.
+ *
+ * The package also ships an asm.js build, which predates WebAssembly and is not used here.
  */
 const FILES = [
   {
-    name: 'stockfish-18-lite.js',
-    sha256: '6e64f417a642c2f2a27d33c09f069522366d1bc33ed7ee8712afcc347e109af4',
-    bytes: 32868
+    name: 'stockfish-19-lite.js',
+    sha256: '2f98d35d20bf435c16925f8955fe4b0c2062e66962799a407667218ff9ea709d',
+    bytes: 32817
   },
   {
-    name: 'stockfish-18-lite.wasm',
-    sha256: 'd50136919dcd90e75eb8df78b255d47d618962b670028b38961343f6eb409174',
-    bytes: 7093151
+    name: 'stockfish-19-lite.wasm',
+    sha256: '18727c9ade11a8ca04391ab5a298232bc6fffebe2002e7cfffac82e7ad453447',
+    bytes: 1636291
   },
   {
-    name: 'stockfish-18-lite-single.js',
-    sha256: '5243fd9b276cab7dfe3ad1d43ab9ead73568fac76468c614242977a210c4a391',
-    bytes: 21429
+    name: 'stockfish-19-lite-single.js',
+    sha256: 'd3344124ab067fb0b90ee77873bb8e9fbf5fc01bc525fe714b0f942581e889e6',
+    bytes: 21415
   },
   {
-    name: 'stockfish-18-lite-single.wasm',
-    sha256: 'a8fbc05ec6920b56d7485826dcb02c5ffd2826bcbf751cf973046f237a9096f1',
-    bytes: 7295411
+    name: 'stockfish-19-lite-single.wasm',
+    sha256: '57ac2d72312aba346760e3f173f687a8c211208e97a87268436f7f0e10bb5387',
+    bytes: 1787571
+  },
+  {
+    name: 'stockfish-19.js',
+    sha256: '227b9317cb8fc347da722b3f6694c5f57eafe17842a8a1afbfe08c3aeeae5671',
+    bytes: 32718
+  },
+  {
+    name: 'stockfish-19.wasm',
+    sha256: 'e0ef90031a310479e5b0c3692a9839118ed785535c306252e68ed3300a45b02d',
+    bytes: 99065439
+  },
+  {
+    name: 'stockfish-19-single.js',
+    sha256: '72772f8bdd7353e4e24245d946bb831f56bcccf02fa16a779c1b92a6c00e5cc2',
+    bytes: 21315
+  },
+  {
+    name: 'stockfish-19-single.wasm',
+    sha256: '8725c26572762617fd96b2ea83ff130e6640b85815890d682bf8c49db0820721',
+    bytes: 99102793
   }
 ];
 
 const targetDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..', '.engine');
 const mirror = process.env.STOCKFISH_MIRROR ?? DEFAULT_MIRROR;
-const timeoutMs = Number(process.env.STOCKFISH_TIMEOUT_MS) || 60_000;
+const timeoutMs = Number(process.env.STOCKFISH_TIMEOUT_MS) || 30_000;
 const ATTEMPTS = 3;
 const isOptional = process.argv.includes('--optional');
 
@@ -88,20 +115,37 @@ async function alreadyPresent(file) {
   }
 }
 
-/** One attempt, bounded in time. Without the abort a dead network stalls npm indefinitely. */
+/**
+ * One attempt, abandoned once the connection goes quiet. The limit is on silence rather than
+ * on the whole transfer: the full builds are ~99 MB, which a slow but healthy link needs
+ * minutes for, while a dead one sends nothing at all. Without the abort a dead network
+ * stalls npm indefinitely.
+ */
 async function fetchOnce(url) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timer;
+  const armStallTimer = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), timeoutMs);
+  };
+
+  armStallTimer();
 
   try {
     const response = await fetch(url, { redirect: 'follow', signal: controller.signal });
     if (!response.ok) {
       throw new Error(`responded ${response.status} ${response.statusText}`);
     }
-    return Buffer.from(await response.arrayBuffer());
+
+    const chunks = [];
+    for await (const chunk of response.body) {
+      chunks.push(chunk);
+      armStallTimer();
+    }
+    return Buffer.concat(chunks);
   } catch (error) {
     if (error.name === 'AbortError' || error.name === 'TimeoutError') {
-      throw new Error(`no response within ${Math.round(timeoutMs / 1000)}s`);
+      throw new Error(`no data for ${Math.round(timeoutMs / 1000)}s`);
     }
     throw error;
   } finally {
@@ -142,6 +186,22 @@ async function download(file) {
   return body.length;
 }
 
+/**
+ * Deletes whatever an earlier version of this script left behind. The build copies engine
+ * files by name pattern, so an old build would not ship - but it would sit on the build
+ * host's disk indefinitely, which is what this avoids.
+ */
+async function removeStaleFiles() {
+  const wanted = new Set(FILES.map(file => file.name));
+
+  for (const name of await readdir(targetDirectory)) {
+    if (!wanted.has(name)) {
+      await rm(join(targetDirectory, name), { recursive: true, force: true });
+      console.log(`  removed ${name} (not part of Stockfish ${VERSION})`);
+    }
+  }
+}
+
 async function main() {
   if (process.env.STOCKFISH_SKIP === '1') {
     console.log('STOCKFISH_SKIP=1: leaving .engine alone.');
@@ -149,6 +209,7 @@ async function main() {
   }
 
   await mkdir(targetDirectory, { recursive: true });
+  await removeStaleFiles();
 
   const wanted = [];
   for (const file of FILES) {
@@ -181,7 +242,7 @@ main().catch(error => {
     '\n' +
       `Retry with:      npm run engine:fetch      (source: ${mirror}${VERSION}/bin/)\n` +
       'Behind a proxy:  STOCKFISH_MIRROR=<base-url> npm run engine:fetch\n' +
-      'Copied by hand:  put the four files in frontend/.engine/, then STOCKFISH_SKIP=1 npm run build\n'
+      'Copied by hand:  put the files listed in scripts/fetch-engine.mjs in frontend/.engine/, then STOCKFISH_SKIP=1 npm run build\n'
   );
 
   if (tolerable) {

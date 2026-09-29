@@ -1,19 +1,23 @@
 import { Injectable, OnDestroy, computed, signal } from '@angular/core';
 import { Chess } from 'chess.js';
-import { EngineLine, EngineOption, EngineOptionType, EngineStatus } from './engine.models';
+import { EngineBuild, EngineBuildInfo, EngineLine, EngineOption, EngineOptionType, EngineStatus } from './engine.models';
 
 /**
- * Drives a Stockfish 18 build compiled to WebAssembly, running in a Web Worker on the
+ * Drives a Stockfish 19 build compiled to WebAssembly, running in a Web Worker on the
  * user's own machine.
  *
  * Why client-side: analysis is open-ended and CPU-bound, so one server cannot run it for
- * every visitor at once. The cost is that the engine binary (~7 MB) is downloaded on first
- * use, which is why it is only fetched when the user actually switches the engine on.
+ * every visitor at once. The cost is that the engine binary is downloaded on first use,
+ * which is why it is only fetched when the user actually switches the engine on.
  *
- * Two builds ship: the multi-threaded one needs `SharedArrayBuffer`, which browsers only
- * expose to cross-origin-isolated documents (COOP + COEP headers - see angular.json). When
- * those headers are missing the single-threaded build is loaded instead. That build still
- * declares a `Threads` option, but as 1 to 1, so the panel hides the control and says why.
+ * Two strengths ship (see `builds`): Lite, ~1.7 MB, which everyone gets by default, and
+ * Full, ~99 MB, which a user has to pick in the settings before their browser downloads it.
+ *
+ * Each comes in two threading variants: the multi-threaded one needs `SharedArrayBuffer`,
+ * which browsers only expose to cross-origin-isolated documents (COOP + COEP headers - see
+ * angular.json). When those headers are missing the single-threaded build is loaded instead.
+ * That build still declares a `Threads` option, but as 1 to 1, so the panel hides the control
+ * and says why.
  *
  * Provided in root deliberately: the board is destroyed and recreated when the page enters
  * focus mode, and re-downloading and re-initialising the engine on every such switch would
@@ -22,8 +26,6 @@ import { EngineLine, EngineOption, EngineOptionType, EngineStatus } from './engi
 @Injectable({ providedIn: 'root' })
 export class StockfishEngineService implements OnDestroy {
   private static readonly engineDirectory = 'engine/';
-  private static readonly multiThreadedEngine = 'stockfish-18-lite.js';
-  private static readonly singleThreadedEngine = 'stockfish-18-lite-single.js';
   private static readonly storageKey = 'chessxiv.engine-settings.v1';
 
   /**
@@ -36,14 +38,34 @@ export class StockfishEngineService implements OnDestroy {
   private static readonly pvPlyLimit = 24;
 
   /**
-   * What to call the engine before it has introduced itself. The moment it answers `uci` its
-   * own `id name` replaces this, so the panel shows the build that is actually running rather
-   * than the one this code expects. Kept in step with scripts/fetch-engine.mjs.
+   * The builds scripts/fetch-engine.mjs puts in the app, kept in step with it. The pinned
+   * name stands in until the engine answers `uci`; from then on its own `id name` is shown,
+   * so the panel names the build that is actually running rather than the one expected.
    */
-  private static readonly pinnedName = 'Stockfish 18 Lite';
+  static readonly builds: Record<EngineBuild, EngineBuildInfo> = {
+    lite: {
+      id: 'lite',
+      label: 'Lite',
+      multiThreadedFile: 'stockfish-19-lite.js',
+      singleThreadedFile: 'stockfish-19-lite-single.js',
+      pinnedName: 'Stockfish 19 Lite',
+      downloadSizeLabel: '1.7 MB'
+    },
+    full: {
+      id: 'full',
+      label: 'Full',
+      multiThreadedFile: 'stockfish-19.js',
+      singleThreadedFile: 'stockfish-19-single.js',
+      pinnedName: 'Stockfish 19',
+      downloadSizeLabel: '99 MB'
+    }
+  };
 
-  /** Rounded size of one engine build, for warning what switching it on costs to download. */
-  private static readonly downloadMegabytes = 7;
+  /**
+   * Lite unless the user asks otherwise. Full is stronger, but 99 MB is not something to
+   * download on a visitor's behalf just because they flicked the engine on.
+   */
+  private static readonly defaultBuild: EngineBuild = 'lite';
 
   /** Bounds on the number of displayed lines, as opposed to what the engine would allow. */
   static readonly minLines = 1;
@@ -99,15 +121,17 @@ export class StockfishEngineService implements OnDestroy {
   readonly status = signal<EngineStatus>('off');
   readonly errorMessage = signal<string | null>(null);
   readonly engineName = signal<string>('');
+  readonly build = signal<EngineBuild>(StockfishEngineService.defaultBuild);
+  readonly buildInfo = computed(() => StockfishEngineService.builds[this.build()]);
 
   /**
-   * The engine's exact self-reported name once it has loaded - "Stockfish 18 Lite WASM
+   * The engine's exact self-reported name once it has loaded - "Stockfish 19 Lite WASM
    * Multithreaded", say, which names the version, the network size and the threading build
    * all at once. Falls back to the pinned name while it is still starting up.
    */
-  readonly displayName = computed(() => this.engineName() || StockfishEngineService.pinnedName);
+  readonly displayName = computed(() => this.engineName() || this.buildInfo().pinnedName);
 
-  readonly downloadSizeLabel = `${StockfishEngineService.downloadMegabytes} MB`;
+  readonly downloadSizeLabel = computed(() => this.buildInfo().downloadSizeLabel);
 
   readonly options = signal<EngineOption[]>([]);
   readonly optionValues = signal<Record<string, string>>({});
@@ -235,6 +259,24 @@ export class StockfishEngineService implements OnDestroy {
     this.scheduleRestart();
   }
 
+  /**
+   * Switches between the Lite and Full networks. The running worker cannot swap its network,
+   * so it is replaced; the position and the user's option values carry over.
+   */
+  setBuild(build: EngineBuild): void {
+    if (build === this.build()) {
+      return;
+    }
+
+    this.build.set(build);
+    this.persistSettings();
+
+    if (this.isEnabled()) {
+      this.terminate();
+      this.start();
+    }
+  }
+
   /** Points the engine at a new position. Safe to call for every board navigation. */
   setPosition(fen: string | null): void {
     if (fen === this.fen) {
@@ -328,10 +370,13 @@ export class StockfishEngineService implements OnDestroy {
 
     this.status.set('loading');
     this.errorMessage.set(null);
+    // Both describe the worker being replaced. Stale options would otherwise linger in the
+    // panel if the new build declared fewer of them than the old one.
+    this.engineName.set('');
+    this.options.set([]);
 
-    const file = this.supportsMultipleThreads
-      ? StockfishEngineService.multiThreadedEngine
-      : StockfishEngineService.singleThreadedEngine;
+    const build = this.buildInfo();
+    const file = this.supportsMultipleThreads ? build.multiThreadedFile : build.singleThreadedFile;
 
     try {
       // Resolved against the document base rather than bundled: the engine and its .wasm
@@ -723,6 +768,7 @@ export class StockfishEngineService implements OnDestroy {
 
       const parsed = JSON.parse(raw) as {
         enabled?: unknown;
+        build?: unknown;
         evalBar?: unknown;
         lines?: unknown;
         options?: unknown;
@@ -738,9 +784,13 @@ export class StockfishEngineService implements OnDestroy {
       }
 
       // The stored `enabled` flag only pre-selects the switch. The engine is started by
-      // the panel once it is on screen, so a stale flag can never download 7 MB in the
-      // background of a page the user never scrolled to.
+      // the panel once it is on screen, so a stale flag can never download the engine in
+      // the background of a page the user never scrolled to.
       this.isEnabled.set(parsed.enabled === true);
+
+      if (parsed.build === 'lite' || parsed.build === 'full') {
+        this.build.set(parsed.build);
+      }
 
       // The list is on unless explicitly turned off; the bar is off unless explicitly on.
       this.isEvalBarVisible.set(parsed.evalBar === true);
@@ -756,6 +806,7 @@ export class StockfishEngineService implements OnDestroy {
         StockfishEngineService.storageKey,
         JSON.stringify({
           enabled: this.isEnabled(),
+          build: this.build(),
           evalBar: this.isEvalBarVisible(),
           lines: this.areLinesVisible(),
           options: this.optionValues()

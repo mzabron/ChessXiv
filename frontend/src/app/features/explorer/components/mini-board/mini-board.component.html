@@ -1,0 +1,10 @@
+<div class="mini-board" aria-hidden="true">
+  @for (cell of squares(); track cell.square) {
+    <div class="mini-square" [class.light]="cell.isLight" [class.dark]="!cell.isLight"
+      [class.highlighted]="cell.isHighlighted">
+      @if (cell.pieceUrl) {
+        <img crossorigin="anonymous" [src]="cell.pieceUrl" alt="" draggable="false" />
+      }
+    </div>
+  }
+</div>

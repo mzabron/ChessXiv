@@ -3,12 +3,12 @@ import { StockfishEngineService } from './stockfish-engine.service';
 
 /**
  * The engine is driven over the UCI text protocol, so it can be exercised end to end by
- * replaying what a real Stockfish 18 build emits. Every fixture below is copied verbatim
- * from `node stockfish/scripts/cli.js`, which is what keeps these tests honest about the
+ * replaying what a real Stockfish 19 build emits. Every fixture below is copied verbatim
+ * from `node .engine/stockfish-19.js`, which is what keeps these tests honest about the
  * format rather than about my reading of it.
  */
 const UCI_OPTION_LINES = [
-  'id name Stockfish 18 WASM Multithreaded',
+  'id name Stockfish 19 WASM Multithreaded',
   'option name Threads type spin default 1 min 1 max 32',
   'option name Hash type spin default 16 min 1 max 33554432',
   'option name Clear Hash type button',
@@ -19,7 +19,7 @@ const UCI_OPTION_LINES = [
   'option name UCI_LimitStrength type check default false',
   'option name UCI_ShowWDL type check default false',
   'option name UCI_Elo type spin default 1320 min 1320 max 3190',
-  'option name EvalFile type string default nn-c288c895ea92.nnue'
+  'option name EvalFile type string default nn-1a298aa575a0.nnue'
 ];
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -324,6 +324,46 @@ describe('StockfishEngineService', () => {
 
     expect(reloaded.areLinesVisible()).toBe(false);
     expect(reloaded.isEvalBarVisible()).toBe(true);
+  });
+
+  it('loads the lite build unless the full one was chosen', () => {
+    bootEngine(AFTER_E4_E5);
+
+    // The test environment is not cross-origin isolated, so the single-threaded variant.
+    expect(service.build()).toBe('lite');
+    expect(FakeWorker.instances[0].url).toMatch(/\/engine\/stockfish-19-lite-single\.js$/);
+    expect(service.downloadSizeLabel()).toBe('1.7 MB');
+  });
+
+  it('replaces the worker when switching builds, keeping the position and options', () => {
+    const lite = bootEngine(AFTER_E4_E5);
+    service.setOption('Hash', '256');
+
+    service.setBuild('full');
+
+    expect(lite.terminated).toBe(true);
+    const full = FakeWorker.instances.at(-1)!;
+    expect(full.url).toMatch(/\/engine\/stockfish-19-single\.js$/);
+    expect(service.status()).toBe('loading');
+    // Nothing from the old worker is presented as the new one's.
+    expect(service.engineName()).toBe('');
+    expect(service.options()).toEqual([]);
+
+    full.emit(...UCI_OPTION_LINES, 'uciok');
+    full.emit('readyok');
+
+    expect(full.sent).toContain('setoption name Hash value 256');
+    expect(full.sent).toContain(`position fen ${AFTER_E4_E5}`);
+    expect(service.downloadSizeLabel()).toBe('99 MB');
+  });
+
+  it('remembers the chosen build without downloading it while switched off', () => {
+    service.setBuild('full');
+    expect(FakeWorker.instances).toEqual([]);
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    expect(TestBed.inject(StockfishEngineService).build()).toBe('full');
   });
 
   it('shuts the worker down when switched off', () => {

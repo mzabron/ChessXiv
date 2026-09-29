@@ -30,7 +30,7 @@
                 "input": "public"
               },
               {
-                "glob": "stockfish-18-lite*.{js,wasm}",
+                "glob": "stockfish-19*.{js,wasm}",
                 "input": ".engine",
                 "output": "engine"
               }

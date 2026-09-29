@@ -4,7 +4,7 @@
       <input type="checkbox" [checked]="engine.isEnabled()" (change)="toggleEngine()" />
       <span class="engine-identity">
         <span class="engine-name" [title]="engine.displayName()">{{ condensedEngineName() }}</span>
-        <span class="engine-origin">{{ engine.downloadSizeLabel }} · in your browser</span>
+        <span class="engine-origin">{{ engine.downloadSizeLabel() }} · in your browser</span>
       </span>
     </label>
 
@@ -57,20 +57,49 @@
 
     @if (engine.areLinesVisible() && engine.lines().length > 0) {
       <ol class="engine-lines">
-        @for (line of engine.lines(); track line.multipv) {
-          <li>
-            <button type="button" class="engine-line" (click)="onLineClick(line)"
-              [title]="'Play ' + firstMoveOf(line)">
-              <span class="line-score" [class]="scoreClass(line)">{{ formatScore(line) }}</span>
-              <span class="line-moves">{{ formatVariation(line) }}</span>
-            </button>
+        @for (entry of displayedLines(); track entry.line.multipv) {
+          <li class="engine-line">
+            <span class="line-score" [class]="scoreClass(entry.line)">{{ formatScore(entry.line) }}</span>
+            <!-- Every move is its own target: clicking one plays the line up to it. Only the
+                 first move of each line is a tab stop, so five lines of up to 24 moves do not
+                 put a hundred stops between the board and the rest of the page. -->
+            <span class="line-moves">
+              @for (move of entry.moves; track move.ply) {
+                @if (move.prefix) {
+                  <span class="move-number">{{ move.prefix }}</span>
+                }
+                <button type="button" class="line-move" [class.is-previewed]="isPreviewed(entry.line, move.ply)"
+                  [attr.tabindex]="move.ply === 0 ? 0 : -1"
+                  (click)="onMoveClick(entry.line, move.ply)"
+                  (mouseenter)="showPreview(entry.line, move.ply, $event)" (mouseleave)="hidePreview()"
+                  (focus)="showPreview(entry.line, move.ply, $event)" (blur)="hidePreview()">{{ move.san }}</button>
+              }
+            </span>
           </li>
         }
       </ol>
     }
 
+    @if (preview(); as shown) {
+      <!-- Fixed rather than absolute: the board panel clips its overflow, and the preview
+           sits above the lines, over the board. -->
+      <div class="move-preview" [style.top.px]="shown.top" [style.left.px]="shown.left" aria-hidden="true">
+        <app-mini-board [fen]="shown.fen" [flipped]="flipped" [lastMove]="shown.lastMove" />
+      </div>
+    }
+
     @if (isSettingsOpen()) {
       <div class="engine-settings">
+        <div class="setting">
+          <label class="setting-label" for="engine-build">Engine</label>
+          <select class="ui-select setting-select" id="engine-build" [value]="engine.build()"
+            (change)="onBuildSelect($any($event.target).value)">
+            @for (build of builds; track build.id) {
+              <option [value]="build.id" [selected]="engine.build() === build.id">{{ build.label }} · {{ build.downloadSizeLabel }}</option>
+            }
+          </select>
+        </div>
+
         <div class="setting">
           <span class="setting-label" id="engine-lines-label">Lines</span>
           <div class="line-choices" role="group" aria-labelledby="engine-lines-label">

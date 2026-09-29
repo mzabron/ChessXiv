@@ -7,6 +7,7 @@ import { GameReplayResponse } from '../../services/game-replay.models';
 import { StockfishEngineService } from '../../services/stockfish-engine.service';
 import { EnginePanelComponent } from '../engine-panel/engine-panel.component';
 import { MoveRow } from '../move-list/move-list.component';
+import { PIECE_URLS } from './piece-images';
 
 interface ChessPiece {
   id: string;
@@ -31,21 +32,6 @@ interface PendingPromotionMove {
 }
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-
-const PIECE_URLS: Record<string, string> = {
-  'wk': 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
-  'wq': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
-  'wr': 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
-  'wb': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
-  'wn': 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
-  'wp': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg',
-  'bk': 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
-  'bq': 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg',
-  'br': 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg',
-  'bb': 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg',
-  'bn': 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg',
-  'bp': 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg',
-};
 
 @Component({
   selector: 'app-chessboard',
@@ -158,6 +144,12 @@ export class ChessboardComponent implements OnChanges {
     }
 
     const target = event.target as HTMLElement | null;
+
+    if (event.key === ' ') {
+      this.onSpaceKey(event, target);
+      return;
+    }
+
     if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
       return;
     }
@@ -180,6 +172,39 @@ export class ChessboardComponent implements OnChanges {
         this.goToGameEnd();
         break;
     }
+  }
+
+  /**
+   * Space plays the engine's best move, the way it does on most analysis boards. It is taken
+   * even from a focused button or checkbox - clicking the engine switch or a line leaves focus
+   * there, and Space would otherwise toggle the engine off or replay that line - but never
+   * from a field the user is typing in. Auto-repeat is ignored: holding the key would play
+   * whatever the engine had found a few milliseconds into each new position.
+   */
+  private onSpaceKey(event: KeyboardEvent, target: HTMLElement | null): void {
+    if (target && this.isTextEntry(target)) {
+      return;
+    }
+
+    const bestMove = this.engine.mainLine()?.pvSan[0];
+    const isCurrent = this.engine.analysedFen() === this.currentFen;
+    if (!this.engine.isEnabled() || !bestMove || !isCurrent) {
+      return;
+    }
+
+    event.preventDefault();
+    if (!event.repeat) {
+      void this.tryApplySanMoves([bestMove]);
+    }
+  }
+
+  private isTextEntry(element: HTMLElement): boolean {
+    if (element.isContentEditable || ['TEXTAREA', 'SELECT'].includes(element.tagName)) {
+      return true;
+    }
+
+    return element instanceof HTMLInputElement
+      && !['checkbox', 'radio', 'button', 'submit', 'reset'].includes(element.type);
   }
 
   getPieceUrl(type: string): string {
@@ -208,11 +233,11 @@ export class ChessboardComponent implements OnChanges {
   }
 
   /**
-   * Plays the move the user picked from an engine line, through the same backend validation
+   * Plays the moves the user picked from an engine line, through the same backend validation
    * a dragged piece goes through.
    */
-  protected playEngineMove(san: string): void {
-    void this.tryApplySanMove(san);
+  protected playEngineMoves(moves: string[]): void {
+    void this.tryApplySanMoves(moves);
   }
 
   getPieceTransform(piece: ChessPiece): string {
@@ -728,32 +753,52 @@ export class ChessboardComponent implements OnChanges {
     }
   }
 
-  private async tryApplySanMove(san: string): Promise<void> {
-    if (this.isSubmittingMove || this.pendingPromotionMove || this.isSetupMode) {
+  /**
+   * Plays SAN moves in order, each validated by the backend against the position the one
+   * before it produced, stopping at the first that is refused.
+   *
+   * The page only hears about the position the sequence ends on. Announcing each one in
+   * between would have the page query the opening tree for every intermediate position of
+   * an engine line it is jumping past.
+   */
+  private async tryApplySanMoves(moves: string[]): Promise<void> {
+    if (this.isSubmittingMove || this.pendingPromotionMove || this.isSetupMode || moves.length === 0) {
       return;
     }
 
     this.isSubmittingMove = true;
     this.statusMessage = null;
 
+    let played = 0;
+    let moveRowsChanged = false;
+
     try {
-      const response = await firstValueFrom(
-        this.boardApi.applyMove({
-          fen: this.currentFen,
-          san
-        })
-      );
+      for (const san of moves) {
+        const response = await firstValueFrom(
+          this.boardApi.applyMove({
+            fen: this.currentFen,
+            san
+          })
+        );
 
-      if (!response.isValid || !response.fen) {
-        this.statusMessage = null;
-        return;
+        if (!response.isValid || !response.fen) {
+          break;
+        }
+
+        moveRowsChanged = this.recordMove(response.fen, response.san ?? san) || moveRowsChanged;
+        played++;
       }
-
-      this.applySuccessfulMove(response.fen, response.san ?? san);
     } catch (error) {
       this.statusMessage = this.resolveBackendErrorMessage(error);
     } finally {
       this.isSubmittingMove = false;
+
+      if (moveRowsChanged) {
+        this.emitMoveRows();
+      }
+      if (played > 0) {
+        this.emitNavigationState();
+      }
     }
   }
 
@@ -769,7 +814,7 @@ export class ChessboardComponent implements OnChanges {
     }
 
     this.lastProcessedSanMoveVersion = request.version;
-    void this.tryApplySanMove(san);
+    void this.tryApplySanMoves([san]);
   }
 
   private resolveBackendErrorMessage(error: unknown): string {
@@ -804,6 +849,17 @@ export class ChessboardComponent implements OnChanges {
   }
 
   private applySuccessfulMove(nextFen: string, san: string): void {
+    if (this.recordMove(nextFen, san)) {
+      this.emitMoveRows();
+    }
+    this.emitNavigationState();
+  }
+
+  /**
+   * Puts a validated move on the board without announcing it. Returns true when it changed the
+   * move list, as opposed to stepping forward along moves the list already holds.
+   */
+  private recordMove(nextFen: string, san: string): boolean {
     this.pendingPromotionMove = null;
 
     const continuationFen = this.fenHistory[this.currentPly + 1];
@@ -811,8 +867,7 @@ export class ChessboardComponent implements OnChanges {
       this.currentPly++;
       this.currentFen = nextFen;
       this.pieces = this.parseFenToPieces(this.currentFen, this.pieces);
-      this.emitNavigationState();
-      return;
+      return false;
     }
 
     // Playing a move that is not the game's own continuation forks off into a line that is
@@ -834,8 +889,7 @@ export class ChessboardComponent implements OnChanges {
     this.currentFen = nextFen;
     this.pieces = this.parseFenToPieces(this.currentFen, this.pieces);
     this.clearArrows();
-    this.emitMoveRows();
-    this.emitNavigationState();
+    return true;
   }
 
   /** True while the board still represents the loaded game rather than a user's own line. */

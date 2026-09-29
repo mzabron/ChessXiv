@@ -7,6 +7,24 @@
 
 export type EngineStatus = 'off' | 'loading' | 'ready' | 'error';
 
+/**
+ * Which Stockfish network the browser downloads. Both run the same search; they differ in
+ * the size of the neural network that evaluates positions, and so in strength and download.
+ */
+export type EngineBuild = 'lite' | 'full';
+
+export interface EngineBuildInfo {
+  id: EngineBuild;
+  label: string;
+  /** Loaded when the page is cross-origin isolated and `SharedArrayBuffer` exists. */
+  multiThreadedFile: string;
+  singleThreadedFile: string;
+  /** What to call the engine until it reports its own `id name`. */
+  pinnedName: string;
+  /** Rounded download size, shown before the user commits to fetching it. */
+  downloadSizeLabel: string;
+}
+
 export type EngineOptionType = 'check' | 'spin' | 'combo' | 'button' | 'string';
 
 /**

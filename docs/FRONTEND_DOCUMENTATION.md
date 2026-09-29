@@ -24,7 +24,7 @@ Core stack:
 - @microsoft/signalr 10
 - jwt-decode 4
 - chess.js 1.4 (client-side legality checks and SAN conversion)
-- Stockfish 18 (WASM engine, fetched by a script rather than depended on - see below)
+- Stockfish 19 (WASM engine, fetched by a script rather than depended on - see below)
 
 Scripts:
 
@@ -36,27 +36,32 @@ Note:
 
 - Angular signals simplify local component state compared to larger store setup for current scope.
 - SignalR package aligns with backend hub for real-time progress updates.
-- `scripts/fetch-engine.mjs` downloads the four Stockfish lite files into `frontend/.engine/`
-  (git-ignored) and angular.json copies them to `engine/` in the build output. It runs from
+- `scripts/fetch-engine.mjs` downloads eight Stockfish files into `frontend/.engine/`
+  (git-ignored) - the Lite and Full builds, each multi- and single-threaded, ~202 MB in all -
+  and angular.json copies them to `engine/` in the build output. Anything else in `.engine/`,
+  such as an earlier version's files, is deleted. It runs from
   `postinstall` and again from `prebuild`, or by hand with `npm run engine:fetch`, and is a
   no-op once the files verify. Files are pinned by version *and* SHA-256: a changed byte fails
   the build rather than shipping quietly. `STOCKFISH_MIRROR` overrides the source for an
   internal or offline build, and `STOCKFISH_SKIP=1` skips the fetch for a host with the files
   copied in by hand.
-- Requests are bounded by a timeout (`STOCKFISH_TIMEOUT_MS`, default 60s) and retried three
-  times. npm hides script output behind its spinner, so a stalled download in `postinstall` is
-  indistinguishable from `npm ci` freezing with no explanation.
+- A request is abandoned once it has received nothing for `STOCKFISH_TIMEOUT_MS` (default
+  30s) and retried three times. The limit is on silence, not total time: a Full build is 99 MB,
+  which a slow but healthy link needs minutes for. npm hides script output behind its spinner,
+  so a stalled download in `postinstall` is indistinguishable from `npm ci` freezing with no
+  explanation.
 - `postinstall` passes `--optional`, which downgrades a download failure to a warning: being
   unable to reach the mirror is an environment problem, not a reason to block every other
   dependency from installing. `prebuild` runs without it, because the build output is the
   deliverable and `ng build` will otherwise happily ship a bundle whose analysis panel cannot
   start. A checksum mismatch is fatal either way.
-- This replaced an `npm i stockfish` dependency. That package ships every build it has,
-  including two 113 MB full-strength ones no browser can sensibly download: 167 MB over the
-  wire and 248 MB on disk for the 14 MB actually used. It matters because this app is built on
-  the same machine that serves it.
+- This replaced an `npm i stockfish` dependency: a 205 MB install that also carries an asm.js
+  build, and that `npm ci` would delete and re-download every time. It matters because this
+  app is built on the same machine that serves it. The files in `.engine/` survive installs,
+  so the ~202 MB is downloaded once per host, not once per deploy.
 - The engine is never imported into a bundle: it is fetched at runtime, and only when a user
-  switches it on.
+  switches it on. A browser only ever downloads the build it runs - 1.7 MB for Lite, 99 MB
+  for Full.
 - `ng serve` sends `Cross-Origin-Opener-Policy: same-origin` and
   `Cross-Origin-Embedder-Policy: require-corp`. Those two headers are what make
   `SharedArrayBuffer` available, and without it the engine falls back to a single-threaded
@@ -295,8 +300,8 @@ Note:
 
 Service: stockfish-engine.service.ts | Component: engine-panel.component.ts
 
-Stockfish 18 runs in the visitor's own browser, in a Web Worker. Analysis is open-ended and
-CPU-bound, so a single backend cannot run it for every visitor at once; the trade is a ~7 MB
+Stockfish 19 runs in the visitor's own browser, in a Web Worker. Analysis is open-ended and
+CPU-bound, so a single backend cannot run it for every visitor at once; the trade is an
 engine download on first use, which is why nothing is fetched until the engine is switched on.
 
 Structure:
@@ -310,16 +315,21 @@ Structure:
 
 Engine builds:
 
-- Multi-threaded (`stockfish-18-lite.js`) when `crossOriginIsolated` is true.
-- Single-threaded (`stockfish-18-lite-single.js`) otherwise, with a hint in the settings
-  explaining why threads are unavailable. Measured locally: ~7.5M nodes/s against ~1.5M.
+- Two strengths, picked under Settings -> Engine and remembered. **Lite** (~1.7 MB) is the
+  default. **Full** (~99 MB) carries Stockfish's full-size network and is stronger, but is only
+  downloaded once a user chooses it. Both run the same search; they differ only in the
+  network that evaluates positions. Switching replaces the worker, keeping the position and
+  the option values.
+- Each strength is multi-threaded (`stockfish-19-lite.js`, `stockfish-19.js`) when
+  `crossOriginIsolated` is true, and single-threaded (`-single.js`) otherwise, with a hint in
+  the settings explaining why threads are unavailable.
 
 Display:
 
 - The switch is labelled with the engine's own `id name` rather than the word "Engine" -
   which build is running is the one thing a user cannot otherwise tell, and it decides what
-  the numbers are worth. The platform words are dropped ("Stockfish 18 Lite WASM
-  Multithreaded" reads as "Stockfish 18 Lite") with the exact string kept on the hover title,
+  the numbers are worth. The platform words are dropped ("Stockfish 19 Lite WASM
+  Multithreaded" reads as "Stockfish 19 Lite") with the exact string kept on the hover title,
   and a second line gives the download size and says the work happens locally. Before the
   engine has introduced itself the pinned name stands in.
 - The evaluation bar and the variation list are toggled separately, and either can be used
@@ -331,11 +341,21 @@ Display:
 - With the list hidden, `MultiPV` drops to 1: only the first line feeds the bar, so searching
   for the other four is effort nothing displays. The user's chosen line count is kept and
   restored when the list comes back.
-- A whole line is one click target, and a click plays its *first* move only. Playing a line to
-  its end would jump the board several plies from what the user is looking at; one move at a
-  time advances the position and re-analyses from there, which is how a line actually gets
-  explored. The move goes through the same backend validation as a dragged piece - the panel
-  emits SAN and never touches the position itself.
+- Every move in a line is its own click target. Clicking one plays the line up to and
+  including it, so clicking the first move steps one ply and clicking further along jumps
+  straight to where the line leads. The moves go through the same backend validation as a
+  dragged piece, one request each - the panel emits SAN and never touches the position itself.
+  The page is told only about the final position, so the opening tree is not queried for
+  every position in between.
+- Hovering (or focusing) a move shows a miniature board of the position after it, with that
+  move's squares tinted, oriented like the real board. The preview follows the line and ply
+  under the pointer rather than a snapshot, so it stays truthful while the engine rewrites the
+  line. It is `position: fixed` because the board panel clips its overflow. Only the first move
+  of each line is a tab stop.
+- Space plays the first move of the top line. It is taken even from a focused button or
+  checkbox (clicking the engine switch or a move leaves focus there), but never from a text
+  field, and auto-repeat is ignored so holding it does not play the engine's first
+  shallow guess in every new position.
 
 Options:
 
