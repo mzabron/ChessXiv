@@ -26,19 +26,17 @@
         </span>
       </span>
 
-      <button type="button" class="ui-btn ui-btn--sm ui-btn--icon engine-toggle"
-        [class.active]="engine.isEvalBarVisible()" [attr.aria-pressed]="engine.isEvalBarVisible()"
+      <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm ui-btn--icon" [attr.aria-pressed]="engine.isEvalBarVisible()"
         aria-label="Evaluation bar" title="Evaluation bar" (click)="toggleEvalBar()">
         <span class="material-symbols-outlined" aria-hidden="true">align_horizontal_left</span>
       </button>
 
-      <button type="button" class="ui-btn ui-btn--sm ui-btn--icon engine-toggle"
-        [class.active]="engine.areLinesVisible()" [attr.aria-pressed]="engine.areLinesVisible()"
+      <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm ui-btn--icon" [attr.aria-pressed]="engine.areLinesVisible()"
         aria-label="Engine lines" title="Engine lines" (click)="toggleLines()">
         <span class="material-symbols-outlined" aria-hidden="true">format_list_bulleted</span>
       </button>
 
-      <button type="button" class="ui-btn ui-btn--sm ui-btn--icon engine-settings-toggle" [class.active]="isSettingsOpen()"
+      <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm ui-btn--icon" [class.is-active]="isSettingsOpen()"
         [attr.aria-expanded]="isSettingsOpen()" aria-label="Engine settings" title="Engine settings"
         (click)="toggleSettings()">
         <span class="material-symbols-outlined" aria-hidden="true">tune</span>
@@ -92,7 +90,7 @@
       <div class="engine-settings">
         <div class="setting">
           <label class="setting-label" for="engine-build">Engine</label>
-          <select class="ui-select setting-select" id="engine-build" [value]="engine.build()"
+          <select class="ui-select ui-select--sm setting-select" id="engine-build" [value]="engine.build()"
             (change)="onBuildSelect($any($event.target).value)">
             @for (build of builds; track build.id) {
               <option [value]="build.id" [selected]="engine.build() === build.id">{{ build.label }} · {{ build.downloadSizeLabel }}</option>
@@ -104,7 +102,7 @@
           <span class="setting-label" id="engine-lines-label">Lines</span>
           <div class="line-choices" role="group" aria-labelledby="engine-lines-label">
             @for (count of lineChoices; track count) {
-              <button type="button" class="ui-chip" [attr.aria-pressed]="engine.lineCount() === count"
+              <button type="button" class="ui-btn ui-btn--sm line-choice" [attr.aria-pressed]="engine.lineCount() === count"
                 (click)="onLineCountInput(count.toString())">{{ count }}</button>
             }
           </div>
@@ -118,7 +116,7 @@
               <label class="setting-label" [attr.for]="'engine-opt-' + option.name">
                 {{ labelFor(option) }}
               </label>
-              <input class="ui-input setting-number" type="number" [id]="'engine-opt-' + option.name"
+              <input class="ui-input ui-input--sm setting-number" type="number" [id]="'engine-opt-' + option.name"
                 [min]="bounds(option).min" [max]="bounds(option).max" [value]="engine.valueOf(option.name)"
                 (change)="onSpinOptionInput(option, $any($event.target).value)" />
               <span class="setting-range">{{ bounds(option).min }}–{{ bounds(option).max }}</span>
@@ -138,14 +136,14 @@
               }
               @case ('spin') {
                 <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
-                <input class="ui-input setting-number" type="number" [id]="'engine-opt-' + option.name"
+                <input class="ui-input ui-input--sm setting-number" type="number" [id]="'engine-opt-' + option.name"
                   [min]="bounds(option).min" [max]="bounds(option).max" [value]="engine.valueOf(option.name)"
                   (change)="onSpinOptionInput(option, $any($event.target).value)" />
                 <span class="setting-range">{{ bounds(option).min }}–{{ bounds(option).max }}</span>
               }
               @case ('combo') {
                 <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
-                <select class="ui-select setting-select" [id]="'engine-opt-' + option.name"
+                <select class="ui-select ui-select--sm setting-select" [id]="'engine-opt-' + option.name"
                   [value]="engine.valueOf(option.name)"
                   (change)="onTextOptionChange(option, $any($event.target).value)">
                   @for (choice of option.choices ?? []; track choice) {
@@ -155,7 +153,7 @@
               }
               @default {
                 <label class="setting-label" [attr.for]="'engine-opt-' + option.name">{{ labelFor(option) }}</label>
-                <input class="ui-input setting-text" type="text" [id]="'engine-opt-' + option.name"
+                <input class="ui-input ui-input--sm setting-text" type="text" [id]="'engine-opt-' + option.name"
                   [value]="engine.valueOf(option.name)"
                   (change)="onTextOptionChange(option, $any($event.target).value)" />
               }

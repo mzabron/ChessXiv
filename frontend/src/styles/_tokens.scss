@@ -27,10 +27,15 @@
   --line: #d8ccba;
   --line-strong: #c3b39c;
 
+  /* The one "this is the current item" fill - a selected database, table row, move, piece
+     or pressed toggle. Neutral on purpose: the accent is reserved for the primary action,
+     so a green selection would compete with the button that acts on it. */
+  --selected: #ece3d2;
+  --hover: #f6f1e7;
+
   /* The single accent, plus the states derived from it. */
   --accent: #2e6f56;
   --accent-strong: #215040;
-  --accent-soft: rgb(46 111 86 / 12%);
   --accent-ring: rgb(46 111 86 / 35%);
 
   /* Semantic feedback. */
@@ -59,15 +64,16 @@
      black piece artwork reads against it. */
   --piece-tray: #e6dcc8;
 
-  /* Elevation. Three steps is enough; more just looks noisy. */
+  /* Elevation, for things that float above the page only - menus, popovers, dialogs.
+     Panels that sit in the layout are separated by their border, not by a shadow. */
   --shadow-sm: 0 1px 2px rgb(43 33 24 / 6%);
-  --shadow-md: 0 6px 16px rgb(43 33 24 / 8%);
-  --shadow-lg: 0 20px 40px rgb(43 33 24 / 14%);
+  --shadow-md: 0 4px 12px rgb(43 33 24 / 10%);
+  --shadow-lg: 0 12px 32px rgb(43 33 24 / 16%);
 
-  /* Shape. */
+  /* Shape. Two radii: controls, and the containers that hold them. */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
   --radius-pill: 999px;
 
   /* Type. */
@@ -112,11 +118,13 @@ body.dark-theme {
   --line: #464a55;
   --line-strong: #5d6270;
 
+  --selected: #363943;
+  --hover: #2a2c33;
+
   /* A desaturated green rather than the old blue: it keeps the light theme's identity and
      reads far better against a warm-neutral dark surface than #3b82f6 did. */
   --accent: #6fc79b;
   --accent-strong: #8fd9b3;
-  --accent-soft: rgb(111 199 155 / 14%);
   --accent-ring: rgb(111 199 155 / 40%);
 
   --danger: #f2837b;
@@ -134,9 +142,9 @@ body.dark-theme {
   --winbar-black: #4d463b;
   --winbar-edge: rgb(255 255 255 / 30%);
 
-  /* Slightly muted, still light enough for black pieces to show. Following --square-light
-     here made the tray blue, which clashed with the warm palette everywhere else. */
-  --piece-tray: #cdc3b2;
+  /* Between the two board squares, so the tray reads as part of the dark board rather than
+     a light-theme leftover. Black pieces measure about 6:1 against it, white about 3.4:1. */
+  --piece-tray: #7d909c;
 
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
   --shadow-md: 0 6px 16px rgb(0 0 0 / 38%);

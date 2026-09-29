@@ -1,7 +1,7 @@
 <aside class="sidebar">
   <div class="sidebar-top">
     @if (showMobileCollapse) {
-      <button class="icon-btn" (click)="onMobileCollapseClick()" title="Minimize sidebar" aria-label="Minimize sidebar">
+      <button class="ui-btn ui-btn--ghost ui-btn--icon rail-btn" (click)="onMobileCollapseClick()" title="Minimize sidebar" aria-label="Minimize sidebar">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-panel-left-close">
           <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
           <path d="M9 3v18"/>
@@ -11,7 +11,7 @@
     }
 
     <div class="user-control" [class.open]="isUserMenuOpen">
-      <button class="icon-btn user-btn" (click)="onUserButtonClick($event)" [title]="isAuthenticated ? userName : 'Sign in'">
+      <button class="ui-btn ui-btn--ghost ui-btn--icon rail-btn user-btn" (click)="onUserButtonClick($event)" [title]="isAuthenticated ? userName : 'Sign in'">
         @if (isAuthenticated) {
           <span class="user-initial">{{ userInitial }}</span>
         } @else {
@@ -23,17 +23,17 @@
       </button>
 
       @if (isAuthenticated && isUserMenuOpen) {
-        <div class="user-menu" (click)="$event.stopPropagation()">
+        <div class="ui-menu user-menu" (click)="$event.stopPropagation()">
           @if (accountError()) {
-            <p class="menu-feedback error">{{ accountError() }}</p>
+            <p class="ui-notice ui-notice--error menu-feedback">{{ accountError() }}</p>
           }
 
           @if (accountInfo()) {
-            <p class="menu-feedback info">{{ accountInfo() }}</p>
+            <p class="ui-notice menu-feedback">{{ accountInfo() }}</p>
           }
 
           @if (isLoadingSummary()) {
-            <p class="menu-loading">Loading account...</p>
+            <p class="ui-hint menu-loading">Loading account...</p>
           } @else if (accountSummary(); as summary) {
             <div class="menu-profile">
               <p class="menu-nickname">{{ summary.nickname || userName }}</p>
@@ -52,47 +52,48 @@
 
           @if (activePanel() === 'none') {
             <div class="menu-actions">
-              <button type="button" class="menu-btn" (click)="openPanel('change-email')">Change email</button>
-              <button type="button" class="menu-btn" (click)="openPanel('change-password')">Change password</button>
-              <button type="button" class="menu-btn danger" (click)="openPanel('delete-account')">Delete account</button>
-              <button type="button" class="signout-btn" (click)="onSignOutClick($event)">Sign out</button>
+              <button type="button" class="ui-menu-item" (click)="openPanel('change-email')">Change email</button>
+              <button type="button" class="ui-menu-item" (click)="openPanel('change-password')">Change password</button>
+              <button type="button" class="ui-menu-item" (click)="onSignOutClick($event)">Sign out</button>
+              <div class="ui-menu-divider" role="separator"></div>
+              <button type="button" class="ui-menu-item ui-menu-item--danger" (click)="openPanel('delete-account')">Delete account</button>
             </div>
           }
 
           @if (activePanel() === 'change-email') {
             <form class="menu-form" [formGroup]="changeEmailForm" (ngSubmit)="submitChangeEmail()">
               @if (accountSummary(); as summary) {
-                <p class="menu-current-email">Current email: <strong>{{ summary.email || 'not set' }}</strong></p>
+                <p class="ui-hint">Current email: <strong>{{ summary.email || 'not set' }}</strong></p>
               }
-              <label for="menu-new-email">New email</label>
-              <input id="menu-new-email" type="email" formControlName="newEmail" placeholder="new@email.com" />
-              <label for="menu-email-password">Current password</label>
-              <input id="menu-email-password" type="password" formControlName="currentPassword" placeholder="Current password" />
-              <button type="submit" class="menu-btn primary">Save email</button>
-              <button type="button" class="menu-btn ghost" (click)="closePanel()">Back</button>
+              <label class="ui-label" for="menu-new-email">New email</label>
+              <input id="menu-new-email" class="ui-input ui-input--sm" type="email" formControlName="newEmail" placeholder="new@email.com" />
+              <label class="ui-label" for="menu-email-password">Current password</label>
+              <input id="menu-email-password" class="ui-input ui-input--sm" type="password" formControlName="currentPassword" placeholder="Current password" />
+              <button type="submit" class="ui-btn ui-btn--sm ui-btn--primary">Save email</button>
+              <button type="button" class="ui-btn ui-btn--sm" (click)="closePanel()">Back</button>
             </form>
           }
 
           @if (activePanel() === 'change-password') {
             <form class="menu-form" [formGroup]="changePasswordForm" (ngSubmit)="submitChangePassword()">
-              <label for="menu-current-password">Current password</label>
-              <input id="menu-current-password" type="password" formControlName="currentPassword" placeholder="Current password" />
-              <label for="menu-new-password">New password</label>
-              <input id="menu-new-password" type="password" formControlName="newPassword" placeholder="At least 8 characters" />
-              <label for="menu-confirm-new-password">Retype new password</label>
-              <input id="menu-confirm-new-password" type="password" formControlName="confirmNewPassword" placeholder="Retype new password" />
-              <button type="submit" class="menu-btn primary">Update password</button>
-              <button type="button" class="menu-btn ghost" (click)="closePanel()">Back</button>
+              <label class="ui-label" for="menu-current-password">Current password</label>
+              <input id="menu-current-password" class="ui-input ui-input--sm" type="password" formControlName="currentPassword" placeholder="Current password" />
+              <label class="ui-label" for="menu-new-password">New password</label>
+              <input id="menu-new-password" class="ui-input ui-input--sm" type="password" formControlName="newPassword" placeholder="At least 8 characters" />
+              <label class="ui-label" for="menu-confirm-new-password">Retype new password</label>
+              <input id="menu-confirm-new-password" class="ui-input ui-input--sm" type="password" formControlName="confirmNewPassword" placeholder="Retype new password" />
+              <button type="submit" class="ui-btn ui-btn--sm ui-btn--primary">Update password</button>
+              <button type="button" class="ui-btn ui-btn--sm" (click)="closePanel()">Back</button>
             </form>
           }
 
           @if (activePanel() === 'delete-account') {
             <form class="menu-form" [formGroup]="deleteAccountForm" (ngSubmit)="submitDeleteAccount()">
-              <p class="menu-warning">This will permanently delete your account and data.</p>
-              <label for="menu-delete-password">Current password</label>
-              <input id="menu-delete-password" type="password" formControlName="password" placeholder="Current password" />
-              <button type="submit" class="menu-btn danger">Delete permanently</button>
-              <button type="button" class="menu-btn ghost" (click)="closePanel()">Back</button>
+              <p class="ui-error">This will permanently delete your account and data.</p>
+              <label class="ui-label" for="menu-delete-password">Current password</label>
+              <input id="menu-delete-password" class="ui-input ui-input--sm" type="password" formControlName="password" placeholder="Current password" />
+              <button type="submit" class="ui-btn ui-btn--sm ui-btn--danger">Delete permanently</button>
+              <button type="button" class="ui-btn ui-btn--sm" (click)="closePanel()">Back</button>
             </form>
           }
         </div>
@@ -101,7 +102,7 @@
     
     @if (showFocusToggle) {
       <!-- Focus Layout Icon -->
-      <button class="icon-btn" (click)="onToggleLayout()" title="Toggle Focus Mode">
+      <button class="ui-btn ui-btn--ghost ui-btn--icon rail-btn" (click)="onToggleLayout()" title="Toggle Focus Mode">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-panel-left-close">
           <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
           <path d="M9 3v18"/>
@@ -111,7 +112,7 @@
     }
 
     <!-- Dark Mode Icon -->
-    <button class="icon-btn" (click)="toggleDarkMode()" title="Toggle Dark Mode">
+    <button class="ui-btn ui-btn--ghost ui-btn--icon rail-btn" (click)="toggleDarkMode()" title="Toggle Dark Mode">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon">
         <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
       </svg>
@@ -119,7 +120,7 @@
   </div>
   <div class="sidebar-bottom">
     <!-- About/Info Icon -->
-    <button class="icon-btn" (click)="onAboutClick()" title="About / Attributions">
+    <button class="ui-btn ui-btn--ghost ui-btn--icon rail-btn" (click)="onAboutClick()" title="About / Attributions">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info">
         <circle cx="12" cy="12" r="10"/>
         <path d="M12 16v-4"/>

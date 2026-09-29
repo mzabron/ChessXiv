@@ -24,7 +24,7 @@
   width: 42px;
   height: 42px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text);
   display: inline-flex;
@@ -40,9 +40,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-5);
-  background:
-    radial-gradient(circle at 10% 10%, var(--accent-soft), transparent 45%),
-    var(--bg);
+  background: var(--bg);
 }
 
 .confirm-email-card {

@@ -5,7 +5,6 @@
  */
 .engine {
   border-top: 1px solid var(--line);
-  background: var(--surface-raised);
 }
 
 .engine-bar {
@@ -92,18 +91,6 @@
   margin: 0 0.3rem;
 }
 
-.engine-settings-toggle.active,
-.engine-toggle.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
-
-/* An off toggle is legible but clearly inactive, rather than looking disabled. */
-.engine-toggle {
-  color: var(--text-subtle);
-}
-
 .engine-note {
   margin: 0;
   padding: 0 0.65rem 0.5rem;
@@ -170,8 +157,7 @@
 
   &:hover,
   &.is-previewed {
-    background: var(--accent-soft);
-    color: var(--accent-strong);
+    background: var(--selected);
   }
 
   &:focus-visible {
@@ -208,7 +194,6 @@
   overflow-y: auto;
   padding: 0.55rem 0.65rem 0.6rem;
   border-top: 1px solid var(--line);
-  background: var(--surface);
 }
 
 .setting {
@@ -227,13 +212,11 @@
 
 .setting-number {
   width: 5.5rem;
-  min-height: var(--control-height-sm);
 }
 
 .setting-select,
 .setting-text {
   width: 11rem;
-  min-height: var(--control-height-sm);
 }
 
 .setting-range {
@@ -247,8 +230,8 @@
   gap: var(--space-1);
 }
 
-.line-choices .ui-chip {
-  min-width: 1.9rem;
+.line-choice {
+  min-width: var(--control-height-sm);
 }
 
 /** Sits below the settings, separated from them: these act, they do not hold a value. */

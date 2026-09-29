@@ -1,66 +1,66 @@
 <div class="filter-form">
-  <div class="filter-actions top-actions">
-    <button type="button" class="action-btn" [disabled]="!gamesLoaded" (click)="resetFilters()">Reset</button>
-    <button type="button" class="action-btn primary" [disabled]="!gamesLoaded" (click)="applyFilters()">Apply filters</button>
+  <div class="ui-btn-row filter-actions">
+    <button type="button" class="ui-btn ui-btn--sm" [disabled]="!gamesLoaded" (click)="resetFilters()">Reset</button>
+    <button type="button" class="ui-btn ui-btn--sm ui-btn--primary" [disabled]="!gamesLoaded" (click)="applyFilters()">Apply filters</button>
   </div>
 
   @if (!gamesLoaded) {
-  <p class="tab-note" [class.disabled]="!gamesLoaded">
+  <p class="ui-hint tab-note">
     Search filters are disabled until a database is loaded.
   </p>
   }
 
   <fieldset class="sections" [disabled]="!gamesLoaded">
-    <section class="section-card">
+    <section class="section">
       <h3>Names</h3>
       <div class="filters-grid">
-        <label class="control">
-          <span>White first name</span>
-          <input type="text" placeholder="e.g. Magnus" [(ngModel)]="model.whiteFirstName" (ngModelChange)="onModelChanged()" />
+        <label class="ui-field">
+          <span class="ui-label">White first name</span>
+          <input type="text" class="ui-input ui-input--sm" placeholder="e.g. Magnus" [(ngModel)]="model.whiteFirstName" (ngModelChange)="onModelChanged()" />
         </label>
 
-        <label class="control">
-          <span>White last name</span>
-          <input type="text" placeholder="e.g. Carlsen" [(ngModel)]="model.whiteLastName" (ngModelChange)="onModelChanged()" />
+        <label class="ui-field">
+          <span class="ui-label">White last name</span>
+          <input type="text" class="ui-input ui-input--sm" placeholder="e.g. Carlsen" [(ngModel)]="model.whiteLastName" (ngModelChange)="onModelChanged()" />
         </label>
 
-        <label class="control">
-          <span>Black first name</span>
-          <input type="text" placeholder="e.g. Hikaru" [(ngModel)]="model.blackFirstName" (ngModelChange)="onModelChanged()" />
+        <label class="ui-field">
+          <span class="ui-label">Black first name</span>
+          <input type="text" class="ui-input ui-input--sm" placeholder="e.g. Hikaru" [(ngModel)]="model.blackFirstName" (ngModelChange)="onModelChanged()" />
         </label>
 
-        <label class="control">
-          <span>Black last name</span>
-          <input type="text" placeholder="e.g. Nakamura" [(ngModel)]="model.blackLastName" (ngModelChange)="onModelChanged()" />
+        <label class="ui-field">
+          <span class="ui-label">Black last name</span>
+          <input type="text" class="ui-input ui-input--sm" placeholder="e.g. Nakamura" [(ngModel)]="model.blackLastName" (ngModelChange)="onModelChanged()" />
         </label>
 
-        <label class="control control-checkbox wide">
+        <label class="ui-check wide">
           <input type="checkbox" [(ngModel)]="model.ignoreColors" (ngModelChange)="onModelChanged()" />
           <span>Ignore colors</span>
         </label>
       </div>
     </section>
 
-    <section class="section-card">
-      <label class="section-toggle">
+    <section class="section">
+      <label class="ui-check section-toggle">
         <input type="checkbox" [(ngModel)]="model.eloEnabled" (ngModelChange)="onModelChanged()" />
         <span>Elo</span>
       </label>
 
       <fieldset class="filters-grid section-body" [disabled]="!model.eloEnabled">
-        <label class="control">
-          <span>Elo from</span>
-          <input type="number" placeholder="e.g. 1200" [(ngModel)]="model.eloFrom" (ngModelChange)="onModelChanged()" />
+        <label class="ui-field">
+          <span class="ui-label">Elo from</span>
+          <input type="number" class="ui-input ui-input--sm" placeholder="e.g. 1200" [(ngModel)]="model.eloFrom" (ngModelChange)="onModelChanged()" />
         </label>
 
-        <label class="control">
-          <span>Elo to</span>
-          <input type="number" placeholder="e.g. 2900" [(ngModel)]="model.eloTo" (ngModelChange)="onModelChanged()" />
+        <label class="ui-field">
+          <span class="ui-label">Elo to</span>
+          <input type="number" class="ui-input ui-input--sm" placeholder="e.g. 2900" [(ngModel)]="model.eloTo" (ngModelChange)="onModelChanged()" />
         </label>
 
-        <label class="control wide">
-          <span>Elo mode</span>
-          <select [(ngModel)]="model.eloMode" (ngModelChange)="onModelChanged()">
+        <label class="ui-field wide">
+          <span class="ui-label">Elo mode</span>
+          <select class="ui-select ui-select--sm" [(ngModel)]="model.eloMode" (ngModelChange)="onModelChanged()">
             <option value="none">None</option>
             <option value="one">Any Player</option>
             <option value="both">Both Players</option>
@@ -70,40 +70,40 @@
       </fieldset>
     </section>
 
-    <section class="section-card">
-      <label class="section-toggle">
+    <section class="section">
+      <label class="ui-check section-toggle">
         <input type="checkbox" [(ngModel)]="model.yearEnabled" (ngModelChange)="onModelChanged()" />
         <span>Year</span>
       </label>
 
       <fieldset class="filters-grid section-body" [disabled]="!model.yearEnabled">
-        <label class="control">
-          <span>Year from</span>
-          <input type="number" placeholder="e.g. 1990" [(ngModel)]="model.yearFrom" (ngModelChange)="onModelChanged()" />
+        <label class="ui-field">
+          <span class="ui-label">Year from</span>
+          <input type="number" class="ui-input ui-input--sm" placeholder="e.g. 1990" [(ngModel)]="model.yearFrom" (ngModelChange)="onModelChanged()" />
         </label>
 
-        <label class="control">
-          <span>Year to</span>
-          <input type="number" placeholder="e.g. 2026" [(ngModel)]="model.yearTo" (ngModelChange)="onModelChanged()" />
+        <label class="ui-field">
+          <span class="ui-label">Year to</span>
+          <input type="number" class="ui-input ui-input--sm" placeholder="e.g. 2026" [(ngModel)]="model.yearTo" (ngModelChange)="onModelChanged()" />
         </label>
       </fieldset>
     </section>
 
-    <section class="section-card">
-      <label class="section-toggle">
+    <section class="section">
+      <label class="ui-check section-toggle">
         <input type="checkbox" [(ngModel)]="model.searchByPosition" (ngModelChange)="onModelChanged()" />
         <span>Board</span>
       </label>
 
       <fieldset class="filters-grid section-body" [disabled]="!model.searchByPosition">
-        <label class="control wide">
-          <span>Position searched for</span>
-          <textarea rows="2" [value]="effectiveFen || 'No active board position yet.'" readonly></textarea>
+        <label class="ui-field wide">
+          <span class="ui-label">Position searched for</span>
+          <textarea class="ui-textarea" rows="2" [value]="effectiveFen || 'No active board position yet.'" readonly></textarea>
         </label>
 
-        <label class="control wide board-meta">
-          <span class="board-meta-title">Match</span>
-          <select class="ui-select" [(ngModel)]="model.positionMode" (ngModelChange)="onModelChanged()">
+        <label class="ui-field wide">
+          <span class="ui-label">Match</span>
+          <select class="ui-select ui-select--sm" [(ngModel)]="model.positionMode" (ngModelChange)="onModelChanged()">
             <option value="samePosition">Same position, regardless of moves</option>
             <option value="exactPly">Same position, on this move number</option>
           </select>
@@ -112,17 +112,17 @@
       </fieldset>
     </section>
 
-    <section class="section-card">
+    <section class="section">
       <h3>Game Meta</h3>
       <div class="filters-grid">
-        <label class="control">
-          <span>ECO code</span>
-          <input type="text" placeholder="e.g. B90" [(ngModel)]="model.ecoCode" (ngModelChange)="onModelChanged()" />
+        <label class="ui-field">
+          <span class="ui-label">ECO code</span>
+          <input type="text" class="ui-input ui-input--sm" placeholder="e.g. B90" [(ngModel)]="model.ecoCode" (ngModelChange)="onModelChanged()" />
         </label>
 
-        <label class="control">
-          <span>Result</span>
-          <select [(ngModel)]="model.result" (ngModelChange)="onModelChanged()">
+        <label class="ui-field">
+          <span class="ui-label">Result</span>
+          <select class="ui-select ui-select--sm" [(ngModel)]="model.result" (ngModelChange)="onModelChanged()">
             <option value="">Any</option>
             <option value="1-0">1-0</option>
             <option value="0-1">0-1</option>
@@ -132,27 +132,27 @@
       </div>
     </section>
 
-    <section class="section-card">
-      <label class="section-toggle">
+    <section class="section">
+      <label class="ui-check section-toggle">
         <input type="checkbox" [(ngModel)]="model.moveEnabled" (ngModelChange)="onModelChanged()" />
         <span>Moves</span>
       </label>
 
       <fieldset class="filters-grid section-body" [disabled]="!model.moveEnabled">
-        <label class="control">
-          <span>Move count from</span>
-          <input type="number" placeholder="e.g. 20" [(ngModel)]="model.moveCountFrom" (ngModelChange)="onModelChanged()" />
+        <label class="ui-field">
+          <span class="ui-label">Move count from</span>
+          <input type="number" class="ui-input ui-input--sm" placeholder="e.g. 20" [(ngModel)]="model.moveCountFrom" (ngModelChange)="onModelChanged()" />
         </label>
 
-        <label class="control">
-          <span>Move count to</span>
-          <input type="number" placeholder="e.g. 120" [(ngModel)]="model.moveCountTo" (ngModelChange)="onModelChanged()" />
+        <label class="ui-field">
+          <span class="ui-label">Move count to</span>
+          <input type="number" class="ui-input ui-input--sm" placeholder="e.g. 120" [(ngModel)]="model.moveCountTo" (ngModelChange)="onModelChanged()" />
         </label>
       </fieldset>
     </section>
   </fieldset>
 
   @if (validationError) {
-    <p class="validation-error">{{ validationError }}</p>
+    <p class="ui-error validation-error">{{ validationError }}</p>
   }
 </div>

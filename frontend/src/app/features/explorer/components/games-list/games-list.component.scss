@@ -1,189 +1,5 @@
-.panel {
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface);
-  box-shadow: 0 14px 28px rgb(61 42 27 / 8%);
-}
-
-.tabs {
-  display: flex;
-  padding: 0.35rem 0.35rem 0;
-  gap: 0.35rem;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface-raised);
-}
-
-.tab-btn {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-muted);
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
-  padding: 0.56rem 0.85rem;
-  font: 600 0.86rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
-  cursor: pointer;
-}
-
-.tab-btn.active {
-  background: var(--surface);
-  color: var(--text);
-  border-color: var(--line);
-  border-bottom-color: var(--surface);
-}
-
-.panel-header {
-  padding: 1rem 1rem 0.75rem;
-
-  h2 {
-    margin: 0;
-    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
-    font-weight: 700;
-    font-size: 1rem;
-    letter-spacing: 0.02em;
-  }
-
-  p {
-    margin: 0.35rem 0 0;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-  }
-}
-
-.db-summary {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.db-summary-main {
-  min-width: 0;
-}
-
-.db-summary-main h2 {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.db-summary-actions {
-  margin-top: 0.05rem;
-}
-
-.summary-btn {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-raised);
-  color: var(--text);
-  padding: 0.4rem 0.62rem;
-  font: 600 0.78rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
-  cursor: pointer;
-}
-
-.summary-btn.primary {
-  background: var(--accent-soft);
-  border-color: var(--line-strong);
-  color: var(--text);
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(25 18 13 / 38%);
-  z-index: 1200;
-}
-
-.save-modal {
-  width: min(420px, calc(100% - 2rem));
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-  padding: 0.9rem;
-  box-shadow: 0 14px 32px rgb(0 0 0 / 24%);
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-
-.save-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.save-modal-header h3 {
-  margin: 0;
-  font: 700 0.98rem/1.2 'Space Grotesk', 'Segoe UI', sans-serif;
-  color: var(--text);
-}
-
-.close-btn {
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 1.25rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.save-mode-switch {
-  display: flex;
-  gap: 0.35rem;
-}
-
-.mode-btn {
-  flex: 1;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-raised);
-  color: var(--text);
-  padding: 0.45rem 0.55rem;
-  font: 600 0.76rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
-  cursor: pointer;
-}
-
-.mode-btn.active {
-  background: var(--accent-soft);
-  border-color: var(--line-strong);
-}
-
-.field-label {
-  margin: 0.1rem 0 0;
-  color: var(--text-muted);
-  font: 600 0.72rem/1.2 'IBM Plex Sans', 'Segoe UI', sans-serif;
-}
-
-.field-input {
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text);
-  padding: 0.5rem 0.6rem;
-  font: 500 0.86rem/1.2 'IBM Plex Sans', 'Segoe UI', sans-serif;
-}
-
-.modal-error {
-  margin: 0;
-  color: var(--danger);
-  font: 600 0.72rem/1.2 'IBM Plex Sans', 'Segoe UI', sans-serif;
-}
-
-.save-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.4rem;
-}
-
-@media (max-width: 980px) {
-  .db-summary {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
+/* Layout only: panel, tabs, buttons and the dialog are the shared primitives in
+   styles/_ui.scss. */
 
 .games-panel {
   min-height: 480px;
@@ -191,7 +7,6 @@
   flex-direction: column;
   position: relative;
   z-index: 1;
-  overflow: visible;
 }
 
 .tab-body {
@@ -199,60 +14,44 @@
   flex-direction: column;
   min-height: 0;
   flex: 1;
-  overflow: visible;
 }
 
-:host-context(body.dark-theme) {
-  .tabs {
-    background: var(--bg);
-    border-bottom-color: var(--line);
-  }
+.db-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
 
-  .tab-btn {
-    color: var(--text-muted);
-  }
+.db-summary-main {
+  min-width: 0;
 
-  .tab-btn.active {
-    background: var(--surface);
-    color: var(--text);
-    border-color: var(--line);
-    border-bottom-color: var(--surface);
+  h2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .summary-btn {
-    background: var(--surface-raised);
-    color: var(--text);
-    border-color: var(--line);
-  }
+}
 
-  .summary-btn.primary {
-    background: var(--line);
-    border-color: var(--text-muted);
-  }
+.db-summary-actions {
+  flex: none;
+}
 
-  .modal-overlay {
-    background: rgb(2 6 23 / 52%);
-  }
+.save-mode {
+  display: flex;
+  gap: var(--space-4);
+}
 
-  .mode-btn {
-    background: var(--surface-raised);
-    color: var(--text);
-    border-color: var(--line);
-  }
-
-  .mode-btn.active {
-    background: var(--line);
-    border-color: var(--text-muted);
-  }
-
-  .modal-error {
-    color: var(--danger);
+@media (max-width: 980px) {
+  .db-summary {
+    flex-direction: column;
   }
 }
 
 /* Marks the Filters tab while applied filters are narrowing the list - easy to forget after
    switching databases, and the cause of "why is this database empty?" confusion. */
 .filter-marker {
-  margin-left: 0.15rem;
+  margin-left: -0.3rem;
   color: var(--accent);
   font-weight: 700;
 }
@@ -272,7 +71,7 @@
     z-index: 2;
     transition: none;
     cursor: grabbing;
-    box-shadow: var(--shadow-md);
+    background: var(--surface);
   }
 
   &.is-drop-target {

@@ -70,7 +70,7 @@
     <label class="page-size" for="page-size-select">Rows</label>
     <select
       id="page-size-select"
-      class="page-size-select"
+      class="ui-select ui-select--sm page-size-select"
       [value]="pageSize"
       (change)="onPageSizeChanged($any($event.target).value)">
       <option [value]="10">10</option>
@@ -78,9 +78,15 @@
       <option [value]="25">25</option>
       <option [value]="50">50</option>
     </select>
-    <button type="button" (click)="goToPreviousPage()" [disabled]="page <= 1">Previous</button>
+    <button type="button" class="ui-btn ui-btn--sm ui-btn--icon" (click)="goToPreviousPage()" [disabled]="page <= 1"
+      aria-label="Previous page" title="Previous page">
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+    </button>
     <span>Page {{ page }} / {{ totalPages() }}</span>
-    <button type="button" (click)="goToNextPage()" [disabled]="page >= totalPages()">Next</button>
-    <span>{{ totalCount }} games</span>
+    <button type="button" class="ui-btn ui-btn--sm ui-btn--icon" (click)="goToNextPage()" [disabled]="page >= totalPages()"
+      aria-label="Next page" title="Next page">
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+    </button>
+    <span class="pager-total">{{ totalCount | number }} games</span>
   </footer>
 </div>

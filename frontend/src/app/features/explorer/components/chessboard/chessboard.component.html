@@ -1,4 +1,4 @@
-<article class="panel board-panel">
+<article class="ui-panel board-panel">
   @if (!isSetupMode) {
     <div class="player-strip top" aria-label="Black player details">
       <div class="player-main">
@@ -143,90 +143,100 @@
 
   <div class="board-toolbar">
     @if (!isSetupMode) {
-      <button type="button" class="tool-btn icon-only" (click)="flipBoard()" aria-label="Reverse board">&#8635;</button>
-      <button type="button" class="tool-btn" (click)="setPosition()">Set position</button>
+      <div class="ui-btn-row">
+        <button type="button" class="ui-btn ui-btn--sm ui-btn--icon" (click)="flipBoard()" aria-label="Flip board" title="Flip board">
+          <span class="material-symbols-outlined" aria-hidden="true">swap_vert</span>
+        </button>
+        <button type="button" class="ui-btn ui-btn--sm" (click)="setPosition()">Set position</button>
+        <button type="button" class="ui-btn ui-btn--sm" (click)="clearPosition()">Clear</button>
+      </div>
       <div class="move-controls" aria-label="Move navigation controls">
-        <button type="button" class="icon-btn" (click)="goToGameStart()" aria-label="Go to game start">
+        <button type="button" class="ui-btn ui-btn--sm ui-btn--icon" (click)="goToGameStart()" aria-label="Go to game start">
           <span class="material-symbols-outlined" aria-hidden="true">first_page</span>
         </button>
-        <button type="button" class="icon-btn" (click)="goPreviousMove()" aria-label="Previous move">
+        <button type="button" class="ui-btn ui-btn--sm ui-btn--icon" (click)="goPreviousMove()" aria-label="Previous move">
           <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
         </button>
-        <button type="button" class="icon-btn" (click)="goNextMove()" aria-label="Next move">
+        <button type="button" class="ui-btn ui-btn--sm ui-btn--icon" (click)="goNextMove()" aria-label="Next move">
           <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
         </button>
-        <button type="button" class="icon-btn" (click)="goToGameEnd()" aria-label="Go to game end">
+        <button type="button" class="ui-btn ui-btn--sm ui-btn--icon" (click)="goToGameEnd()" aria-label="Go to game end">
           <span class="material-symbols-outlined" aria-hidden="true">last_page</span>
         </button>
-        <button type="button" class="tool-btn clear" (click)="clearPosition()">Clear</button>
       </div>
     } @else {
       <div class="setup-controls" aria-label="Position setup controls">
-        <div class="setup-meta">
-          <div class="meta-block">
-            <span class="meta-label">Turn</span>
-            <div class="turn-group" role="radiogroup" aria-label="Side to move">
-              <label class="ui-check">
-                <input type="radio" name="setup-side-to-move" [checked]="setupSideToMove === 'w'"
-                  (change)="setSetupSideToMove('w')" />
-                <span>White</span>
-              </label>
-              <label class="ui-check">
-                <input type="radio" name="setup-side-to-move" [checked]="setupSideToMove === 'b'"
-                  (change)="setSetupSideToMove('b')" />
-                <span>Black</span>
-              </label>
-            </div>
-          </div>
-          <div class="meta-block">
-            <span class="meta-label">Castling</span>
-            <div class="castling-group" role="group" aria-label="Castling rights">
-              <div class="castle-side">
-                <span class="castle-label">White</span>
-                <label class="ui-check" title="White kingside castling">
-                  <input type="checkbox" [checked]="setupCastling.whiteKingSide"
-                    [disabled]="!canSetupCastle('whiteKingSide')" (change)="toggleCastlingRight('whiteKingSide')" />
-                  <span>0-0</span>
-                </label>
-                <label class="ui-check" title="White queenside castling">
-                  <input type="checkbox" [checked]="setupCastling.whiteQueenSide"
-                    [disabled]="!canSetupCastle('whiteQueenSide')" (change)="toggleCastlingRight('whiteQueenSide')" />
-                  <span>0-0-0</span>
-                </label>
-              </div>
-              <div class="castle-side">
-                <span class="castle-label">Black</span>
-                <label class="ui-check" title="Black kingside castling">
-                  <input type="checkbox" [checked]="setupCastling.blackKingSide"
-                    [disabled]="!canSetupCastle('blackKingSide')" (change)="toggleCastlingRight('blackKingSide')" />
-                  <span>0-0</span>
-                </label>
-                <label class="ui-check" title="Black queenside castling">
-                  <input type="checkbox" [checked]="setupCastling.blackQueenSide"
-                    [disabled]="!canSetupCastle('blackQueenSide')" (change)="toggleCastlingRight('blackQueenSide')" />
-                  <span>0-0-0</span>
-                </label>
-              </div>
-            </div>
-          </div>
-          <div class="meta-block">
-            <span class="meta-label">En passant</span>
-            <label class="ep-label">
-              <select [value]="setupEnPassant" (change)="onSetupEnPassantSelected(($any($event.target)).value)">
-                <option value="-">None</option>
-                @for (square of getSetupEnPassantOptions(); track square) {
-                  <option [value]="square">{{ square }}</option>
-                }
-              </select>
+        <div class="setup-row">
+          <span class="ui-label setup-label" id="setup-turn-label">Side to move</span>
+          <div class="setup-options" role="radiogroup" aria-labelledby="setup-turn-label">
+            <label class="ui-check">
+              <input type="radio" name="setup-side-to-move" [checked]="setupSideToMove === 'w'"
+                (change)="setSetupSideToMove('w')" />
+              <span>White</span>
+            </label>
+            <label class="ui-check">
+              <input type="radio" name="setup-side-to-move" [checked]="setupSideToMove === 'b'"
+                (change)="setSetupSideToMove('b')" />
+              <span>Black</span>
             </label>
           </div>
         </div>
+
+        <div class="setup-row">
+          <span class="ui-label setup-label" id="setup-castling-label">Castling</span>
+          <div class="setup-options" role="group" aria-labelledby="setup-castling-label">
+            <div class="castle-side" role="group" aria-label="White castling rights">
+              <span class="castle-side-name">White</span>
+              <label class="ui-check" title="White kingside castling">
+                <input type="checkbox" [checked]="setupCastling.whiteKingSide"
+                  [disabled]="!canSetupCastle('whiteKingSide')" (change)="toggleCastlingRight('whiteKingSide')" />
+                <span>O-O</span>
+              </label>
+              <label class="ui-check" title="White queenside castling">
+                <input type="checkbox" [checked]="setupCastling.whiteQueenSide"
+                  [disabled]="!canSetupCastle('whiteQueenSide')" (change)="toggleCastlingRight('whiteQueenSide')" />
+                <span>O-O-O</span>
+              </label>
+            </div>
+            <div class="castle-side" role="group" aria-label="Black castling rights">
+              <span class="castle-side-name">Black</span>
+              <label class="ui-check" title="Black kingside castling">
+                <input type="checkbox" [checked]="setupCastling.blackKingSide"
+                  [disabled]="!canSetupCastle('blackKingSide')" (change)="toggleCastlingRight('blackKingSide')" />
+                <span>O-O</span>
+              </label>
+              <label class="ui-check" title="Black queenside castling">
+                <input type="checkbox" [checked]="setupCastling.blackQueenSide"
+                  [disabled]="!canSetupCastle('blackQueenSide')" (change)="toggleCastlingRight('blackQueenSide')" />
+                <span>O-O-O</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-row">
+          <label class="ui-label setup-label" for="setup-en-passant">En passant</label>
+          <select id="setup-en-passant" class="ui-select ui-select--sm setup-ep" [value]="setupEnPassant"
+            (change)="onSetupEnPassantSelected(($any($event.target)).value)">
+            <option value="-">None</option>
+            @for (square of getSetupEnPassantOptions(); track square) {
+              <option [value]="square">{{ square }}</option>
+            }
+          </select>
+        </div>
+
         <div class="setup-actions">
-          <button type="button" class="tool-btn icon-only" (click)="flipBoard()" aria-label="Reverse board">&#8635;</button>
-          <button type="button" class="tool-btn" (click)="applyStartingPositionPreset()">Starting position</button>
-          <button type="button" class="tool-btn clear" (click)="clearPosition()">Clear</button>
-          <button type="button" class="tool-btn" (click)="cancelSetupMode()">Cancel</button>
-          <button type="button" class="tool-btn primary" (click)="saveSetupMode()">Save</button>
+          <div class="ui-btn-row">
+            <button type="button" class="ui-btn ui-btn--sm ui-btn--icon" (click)="flipBoard()" aria-label="Flip board" title="Flip board">
+              <span class="material-symbols-outlined" aria-hidden="true">swap_vert</span>
+            </button>
+            <button type="button" class="ui-btn ui-btn--sm" (click)="applyStartingPositionPreset()">Starting position</button>
+            <button type="button" class="ui-btn ui-btn--sm" (click)="clearPosition()">Clear</button>
+          </div>
+          <div class="ui-btn-row">
+            <button type="button" class="ui-btn ui-btn--sm" (click)="cancelSetupMode()">Cancel</button>
+            <button type="button" class="ui-btn ui-btn--sm ui-btn--primary" (click)="saveSetupMode()">Save</button>
+          </div>
         </div>
       </div>
     }

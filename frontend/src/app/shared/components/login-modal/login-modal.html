@@ -2,87 +2,87 @@
   <div class="ui-modal login-modal" [class.has-close-button]="showCloseButton" role="dialog" aria-modal="true"
     tabindex="-1" appModalBehavior (dismiss)="showCloseButton ? onClose() : null"
     (click)="$event.stopPropagation()">
-    <button *ngIf="showCloseButton" class="close-btn" (click)="onClose()" title="Close" aria-label="Close">
+    <button *ngIf="showCloseButton" type="button" class="ui-btn ui-btn--ghost ui-btn--icon ui-btn--sm close-btn" (click)="onClose()" title="Close" aria-label="Close">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
     </button>
     
     @if (showCloseButton && mode() !== 'verify-email') {
-      <div class="mode-switch">
-        <button type="button" class="mode-btn" [class.active]="mode() === 'login' || mode() === 'forgot' || mode() === 'verify-email'" (click)="switchMode('login')">Sign in</button>
-        <button type="button" class="mode-btn" [class.active]="mode() === 'register'" (click)="switchMode('register')">Register</button>
+      <div class="ui-tabs mode-switch" role="tablist" aria-label="Account">
+        <button type="button" role="tab" class="ui-tab" [attr.aria-selected]="mode() === 'login' || mode() === 'forgot' || mode() === 'verify-email'" (click)="switchMode('login')">Sign in</button>
+        <button type="button" role="tab" class="ui-tab" [attr.aria-selected]="mode() === 'register'" (click)="switchMode('register')">Register</button>
       </div>
     }
 
     @if (errorMessage()) {
-      <p class="feedback error">{{ errorMessage() }}</p>
+      <p class="ui-notice ui-notice--error">{{ errorMessage() }}</p>
     }
 
     @if (infoMessage()) {
-      <p class="feedback info" [class.confirmation-info]="mode() === 'verify-email'">{{ infoMessage() }}</p>
+      <p class="ui-notice">{{ infoMessage() }}</p>
     }
 
     @if (mode() === 'login') {
       <form class="login-form" [formGroup]="loginForm" (ngSubmit)="submitLogin()">
-        <div class="form-group">
-          <label for="username">Username or email</label>
-          <input id="username" type="text" formControlName="username" placeholder="Enter username or email" />
+        <div class="ui-field">
+          <label class="ui-label" for="username">Username or email</label>
+          <input id="username" class="ui-input" type="text" formControlName="username" placeholder="Enter username or email" />
         </div>
 
-        <div class="form-group">
-          <label for="password">Password</label>
-          <input id="password" type="password" formControlName="password" placeholder="Enter your password" />
+        <div class="ui-field">
+          <label class="ui-label" for="password">Password</label>
+          <input id="password" class="ui-input" type="password" formControlName="password" placeholder="Enter your password" />
         </div>
 
-        <button type="button" class="forgot-link" (click)="openForgotPassword()">Forgot password?</button>
+        <button type="button" class="ui-link form-link" (click)="openForgotPassword()">Forgot password?</button>
 
-        <button type="submit" class="ui-btn ui-btn--primary login-submit" [disabled]="isSubmitting()">{{ isSubmitting() ? 'Signing in...' : 'Sign In' }}</button>
+        <button type="submit" class="ui-btn ui-btn--primary ui-btn--block login-submit" [disabled]="isSubmitting()">{{ isSubmitting() ? 'Signing in...' : 'Sign In' }}</button>
       </form>
     }
 
     @if (mode() === 'register') {
       <form class="login-form" [formGroup]="registerForm" (ngSubmit)="submitRegister()">
-        <div class="form-group">
-          <label for="register-username">Username</label>
-          <input id="register-username" type="text" formControlName="username" placeholder="Choose username" />
+        <div class="ui-field">
+          <label class="ui-label" for="register-username">Username</label>
+          <input id="register-username" class="ui-input" type="text" formControlName="username" placeholder="Choose username" />
         </div>
 
-        <div class="form-group">
-          <label for="register-email">Email</label>
-          <input id="register-email" type="email" formControlName="email" placeholder="Enter email" />
+        <div class="ui-field">
+          <label class="ui-label" for="register-email">Email</label>
+          <input id="register-email" class="ui-input" type="email" formControlName="email" placeholder="Enter email" />
           @if (shouldShowRegisterEmailError()) {
-            <small class="field-error">{{ getRegisterEmailError() }}</small>
+            <small class="ui-error">{{ getRegisterEmailError() }}</small>
           }
         </div>
 
-        <div class="form-group">
-          <label for="register-password">Password</label>
-          <input id="register-password" type="password" formControlName="password" placeholder="At least 8 characters" />
+        <div class="ui-field">
+          <label class="ui-label" for="register-password">Password</label>
+          <input id="register-password" class="ui-input" type="password" formControlName="password" placeholder="At least 8 characters" />
         </div>
 
-        <div class="form-group">
-          <label for="register-confirm-password">Confirm password</label>
-          <input id="register-confirm-password" type="password" formControlName="confirmPassword" placeholder="Retype password" />
+        <div class="ui-field">
+          <label class="ui-label" for="register-confirm-password">Confirm password</label>
+          <input id="register-confirm-password" class="ui-input" type="password" formControlName="confirmPassword" placeholder="Retype password" />
         </div>
 
-        <button type="submit" class="ui-btn ui-btn--primary login-submit" [disabled]="isSubmitting()">{{ isSubmitting() ? 'Creating...' : 'Create account' }}</button>
+        <button type="submit" class="ui-btn ui-btn--primary ui-btn--block login-submit" [disabled]="isSubmitting()">{{ isSubmitting() ? 'Creating...' : 'Create account' }}</button>
       </form>
     }
 
     @if (mode() === 'forgot') {
       <form class="login-form" [formGroup]="forgotForm" (ngSubmit)="submitForgotPassword()">
-        <div class="form-group">
-          <label for="forgot-email">Email</label>
-          <input id="forgot-email" type="email" formControlName="email" placeholder="Enter account email" />
+        <div class="ui-field">
+          <label class="ui-label" for="forgot-email">Email</label>
+          <input id="forgot-email" class="ui-input" type="email" formControlName="email" placeholder="Enter account email" />
         </div>
 
-        <button type="submit" class="ui-btn ui-btn--primary login-submit" [disabled]="isSubmitting()">{{ isSubmitting() ? 'Sending...' : 'Send reset link' }}</button>
-        <button *ngIf="showCloseButton" type="button" class="forgot-link" (click)="switchMode('login')">Back to sign in</button>
+        <button type="submit" class="ui-btn ui-btn--primary ui-btn--block login-submit" [disabled]="isSubmitting()">{{ isSubmitting() ? 'Sending...' : 'Send reset link' }}</button>
+        <button *ngIf="showCloseButton" type="button" class="ui-link form-link" (click)="switchMode('login')">Back to sign in</button>
       </form>
     }
 
     @if (mode() === 'verify-email') {
       <div class="verify-email-block">
-        <h3>Confirm your email</h3>
+        <h2 class="ui-modal-title">Confirm your email</h2>
         <p>We sent a confirmation link to <strong>{{ pendingConfirmationIdentifier() }}</strong>.</p>
         <p>Please confirm your account to continue.</p>
 
@@ -91,29 +91,29 @@
           <p class="verify-email-hint">
             Make sure your address is correct:
             <strong>{{ pendingConfirmationIdentifier() }}</strong>.
-            <button type="button" class="inline-action" (click)="openChangePendingEmail()">Change it</button>
+            <button type="button" class="ui-link" (click)="openChangePendingEmail()">Change it</button>
           </p>
         </div>
 
         @if (showChangePendingEmail()) {
           <form class="login-form verify-email-change-form" [formGroup]="changePendingEmailForm" (ngSubmit)="submitChangePendingEmail()">
-            <div class="form-group">
-              <label for="change-pending-email">New email address</label>
-              <input id="change-pending-email" type="email" formControlName="newEmail" placeholder="Enter corrected email" />
+            <div class="ui-field">
+              <label class="ui-label" for="change-pending-email">New email address</label>
+              <input id="change-pending-email" class="ui-input" type="email" formControlName="newEmail" placeholder="Enter corrected email" />
             </div>
 
             @if (requiresPasswordInputForPendingEmailChange()) {
-              <div class="form-group">
-                <label for="change-pending-password">Password</label>
-                <input id="change-pending-password" type="password" formControlName="password" placeholder="Enter your password" />
-                <small class="field-hint">Required only when your session password is unavailable.</small>
+              <div class="ui-field">
+                <label class="ui-label" for="change-pending-password">Password</label>
+                <input id="change-pending-password" class="ui-input" type="password" formControlName="password" placeholder="Enter your password" />
+                <small class="ui-hint">Required only when your session password is unavailable.</small>
               </div>
             }
 
-            <button type="submit" class="ui-btn ui-btn--primary login-submit" [disabled]="isSubmitting()">
+            <button type="submit" class="ui-btn ui-btn--primary ui-btn--block login-submit" [disabled]="isSubmitting()">
               {{ isSubmitting() ? 'Updating...' : 'Update email and send confirmation' }}
             </button>
-            <button type="button" class="btn-text" (click)="cancelChangePendingEmail()">Cancel</button>
+            <button type="button" class="ui-link form-link" (click)="cancelChangePendingEmail()">Cancel</button>
           </form>
         }
       </div>
@@ -122,28 +122,28 @@
     @if (mode() === 'reset') {
       @if (resetCompleted()) {
         <div class="verify-email-block reset-success-block">
-          <h3>Password changed successfully</h3>
+          <h2 class="ui-modal-title">Password changed</h2>
           <p>You can go back and log in with your new password.</p>
-          <button type="button" class="ui-btn ui-btn--primary login-submit" (click)="goToSignIn()">Go to sign in</button>
+          <button type="button" class="ui-btn ui-btn--primary ui-btn--block login-submit" (click)="goToSignIn()">Go to sign in</button>
         </div>
       } @else {
         <form class="login-form" [formGroup]="resetForm" (ngSubmit)="submitResetPassword()">
-          <div class="form-group">
-            <label for="reset-email">Email</label>
-            <input id="reset-email" type="email" formControlName="email" placeholder="Enter account email" />
+          <div class="ui-field">
+            <label class="ui-label" for="reset-email">Email</label>
+            <input id="reset-email" class="ui-input" type="email" formControlName="email" placeholder="Enter account email" />
           </div>
 
-          <div class="form-group">
-            <label for="reset-password">New password</label>
-            <input id="reset-password" type="password" formControlName="newPassword" placeholder="At least 8 characters" />
+          <div class="ui-field">
+            <label class="ui-label" for="reset-password">New password</label>
+            <input id="reset-password" class="ui-input" type="password" formControlName="newPassword" placeholder="At least 8 characters" />
           </div>
 
-          <div class="form-group">
-            <label for="reset-confirm-password">Confirm new password</label>
-            <input id="reset-confirm-password" type="password" formControlName="confirmPassword" placeholder="Retype password" />
+          <div class="ui-field">
+            <label class="ui-label" for="reset-confirm-password">Confirm new password</label>
+            <input id="reset-confirm-password" class="ui-input" type="password" formControlName="confirmPassword" placeholder="Retype password" />
           </div>
 
-          <button type="submit" class="ui-btn ui-btn--primary login-submit" [disabled]="isSubmitting()">{{ isSubmitting() ? 'Updating...' : 'Reset password' }}</button>
+          <button type="submit" class="ui-btn ui-btn--primary ui-btn--block login-submit" [disabled]="isSubmitting()">{{ isSubmitting() ? 'Updating...' : 'Reset password' }}</button>
         </form>
       }
     }

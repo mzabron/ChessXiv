@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Input, Output, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ModalBehaviorDirective } from '../../../../shared/directives/modal-behavior.directive';
 
 export interface Database {
   id: string;
@@ -22,7 +23,7 @@ export type DatabaseScope = 'all' | 'mine' | 'bookmarks';
 @Component({
   selector: 'app-databases-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ModalBehaviorDirective],
   templateUrl: './databases-panel.component.html',
   styleUrl: './databases-panel.component.scss'
 })
@@ -46,7 +47,6 @@ export class DatabasesPanelComponent {
   scope = signal<DatabaseScope>('all');
   searchQuery = signal('');
   sortOption = signal<'createdDesc' | 'createdAsc' | 'nameAsc' | 'nameDesc' | 'gamesDesc' | 'gamesAsc'>('createdDesc');
-  isSortMenuOpen = signal(false);
   isRefreshing = signal(false);
   isSettingsOpen = signal(false);
   settingsName = signal('');
@@ -131,13 +131,8 @@ export class DatabasesPanelComponent {
     this.toggleBookmark.emit(database);
   }
 
-  toggleSortMenu(): void {
-    this.isSortMenuOpen.update(open => !open);
-  }
-
   selectSort(option: 'createdDesc' | 'createdAsc' | 'nameAsc' | 'nameDesc' | 'gamesDesc' | 'gamesAsc'): void {
     this.sortOption.set(option);
-    this.isSortMenuOpen.set(false);
   }
 
   requestRefresh(): void {

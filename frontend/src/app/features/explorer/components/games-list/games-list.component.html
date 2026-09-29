@@ -1,9 +1,9 @@
-<article class="panel games-panel">
-  <div class="tabs" role="tablist" aria-label="Games panel tabs" appReorderableTabs
+<article class="ui-panel games-panel">
+  <div class="ui-tabs tabs" role="tablist" aria-label="Games panel tabs" appReorderableTabs
     #tabs="reorderableTabs" [storageKey]="tabOrderStorageKey" [defaultOrder]="defaultTabOrder"
     (click)="tabs.onClickCapture($event)">
     @for (tab of tabs.order; track tab) {
-    <button type="button" role="tab" class="tab-btn" [class.active]="activeTab === tab"
+    <button type="button" role="tab" class="ui-tab tab-btn"
       [class.is-dragging]="tabs.draggedTab === tab"
       [class.is-drop-target]="tabs.dragOverTab === tab && tabs.draggedTab !== tab"
       [style.transform]="tabs.draggedTab === tab ? 'translateX(' + tabs.dragOffsetX + 'px)' : null"
@@ -31,19 +31,19 @@
   } @else if (activeTab === 'games') {
   <div class="tab-body" role="tabpanel" aria-label="Games tab content">
     @if (gamesLoaded) {
-    <header class="panel-header db-summary">
+    <header class="ui-panel-header db-summary">
       <div class="db-summary-main">
         <h2>{{ databaseName }}</h2>
         <p>{{ totalCount }} games</p>
       </div>
-      <div class="db-summary-actions">
+      <div class="ui-btn-row db-summary-actions">
         @if (sourceType === 'imported') {
         @if (isRegisteredUser) {
-        <button type="button" class="summary-btn primary" (click)="openSaveDatabaseModal()">Save to database</button>
+        <button type="button" class="ui-btn ui-btn--sm ui-btn--primary" (click)="openSaveDatabaseModal()">Save to database</button>
         } @else {
-        <button type="button" class="summary-btn" (click)="signInRequested.emit()">Sign in to save</button>
+        <button type="button" class="ui-btn ui-btn--sm" (click)="signInRequested.emit()">Sign in to save</button>
         }
-        <button type="button" class="summary-btn" (click)="closeDatabase.emit()">Close</button>
+        <button type="button" class="ui-btn ui-btn--sm" (click)="closeDatabase.emit()">Close</button>
         }
 
         @if (sourceType === 'userDatabase') {
@@ -53,14 +53,14 @@
         </button>
         }
         @if (isRegisteredUser) {
-        <button type="button" class="summary-btn" (click)="openAddToDatabaseModal()">Add to database</button>
+        <button type="button" class="ui-btn ui-btn--sm" (click)="openAddToDatabaseModal()">Add to database</button>
         }
-        <button type="button" class="summary-btn" (click)="closeDatabase.emit()">Close</button>
+        <button type="button" class="ui-btn ui-btn--sm" (click)="closeDatabase.emit()">Close</button>
         }
       </div>
     </header>
     } @else {
-    <header class="panel-header">
+    <header class="ui-panel-header">
       <h2>Games</h2>
       <p>No games loaded yet.</p>
     </header>
@@ -93,61 +93,73 @@
 </article>
 
 @if (isSaveModalOpen) {
-<div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Save games to a database"
-  (click)="closeSaveDatabaseModal()">
-  <div class="save-modal" (click)="$event.stopPropagation()">
-    <header class="save-modal-header">
-      <h3>{{ modalMode === 'saveDraft' ? 'Save imported games' : 'Add games to a database' }}</h3>
-      <button type="button" class="close-btn" aria-label="Close" (click)="closeSaveDatabaseModal()">&times;</button>
+<div class="ui-modal-overlay" (click)="closeSaveDatabaseModal()">
+  <div class="ui-modal" role="dialog" aria-modal="true" aria-labelledby="save-modal-title" tabindex="-1"
+    appModalBehavior (dismiss)="closeSaveDatabaseModal()" (click)="$event.stopPropagation()">
+    <header>
+      <h2 id="save-modal-title" class="ui-modal-title">
+        {{ modalMode === 'saveDraft' ? 'Save imported games' : 'Add games to a database' }}
+      </h2>
+      <p class="ui-modal-description">
+        {{ selectionSummary }} {{ modalMode === 'saveDraft' ? 'will be saved.' : 'will be added.' }}
+      </p>
     </header>
 
-    <p class="field-label">
-      {{ selectionSummary }} {{ modalMode === 'saveDraft' ? 'will be saved.' : 'will be added.' }}
-    </p>
+    <div class="ui-modal-body">
+      <div class="save-mode" role="radiogroup" aria-label="Target database">
+        <label class="ui-check">
+          <input type="radio" name="save-mode" value="merge" [(ngModel)]="saveMode" />
+          <span>Existing database</span>
+        </label>
+        <label class="ui-check">
+          <input type="radio" name="save-mode" value="create" [(ngModel)]="saveMode" />
+          <span>New database</span>
+        </label>
+      </div>
 
-    <div class="save-mode-switch" role="group" aria-label="Target database">
-      <button type="button" class="mode-btn" [class.active]="saveMode === 'merge'"
-        (click)="saveMode = 'merge'">Existing database</button>
-      <button type="button" class="mode-btn" [class.active]="saveMode === 'create'"
-        (click)="saveMode = 'create'">New database</button>
+      @if (saveMode === 'merge') {
+      @if (availableTargetDatabases.length === 0) {
+      <p class="ui-hint">You haven't created any databases yet - create one instead.</p>
+      } @else {
+      <div class="ui-field">
+        <label class="ui-label" for="save-target-db">Target database</label>
+        <select id="save-target-db" class="ui-select" [(ngModel)]="selectedTargetDatabaseId">
+          @for (db of availableTargetDatabases; track db.id) {
+          <option [value]="db.id">{{ db.name }}</option>
+          }
+        </select>
+        <p class="ui-hint">Games already in that database are skipped, not duplicated.</p>
+      </div>
+      }
+      } @else {
+      <div class="ui-field">
+        <label class="ui-label" for="save-new-db-name">Name</label>
+        <input id="save-new-db-name" type="text" class="ui-input" [(ngModel)]="newDatabaseName"
+          placeholder="e.g. My openings" />
+      </div>
+      <div class="ui-field">
+        <label class="ui-label" for="save-new-db-visibility">Visibility</label>
+        <select id="save-new-db-visibility" class="ui-select" [(ngModel)]="newDatabaseVisibility">
+          <option value="private">Private - only you can open it</option>
+          <option value="public">Public - anyone can open it</option>
+        </select>
+      </div>
+      }
+
+      @if (savedGamesLimit > 0) {
+      <p class="ui-hint">
+        Saved games: {{ savedGamesUsed | number }} / {{ savedGamesLimit | number }}
+      </p>
+      }
+
+      @if (saveModalError) {
+      <p class="ui-error" role="alert">{{ saveModalError }}</p>
+      }
     </div>
 
-    @if (saveMode === 'merge') {
-    @if (availableTargetDatabases.length === 0) {
-    <p class="field-label">You haven't created any databases yet - create one instead.</p>
-    } @else {
-    <label class="field-label" for="save-target-db">Target database</label>
-    <select id="save-target-db" class="field-input" [(ngModel)]="selectedTargetDatabaseId">
-      @for (db of availableTargetDatabases; track db.id) {
-      <option [value]="db.id">{{ db.name }}</option>
-      }
-    </select>
-    <p class="field-label">Games already in that database are skipped, not duplicated.</p>
-    }
-    } @else {
-    <label class="field-label" for="save-new-db-name">New database name</label>
-    <input id="save-new-db-name" type="text" class="field-input" [(ngModel)]="newDatabaseName"
-      placeholder="e.g. My openings" />
-    <label class="field-label" for="save-new-db-visibility">Visibility</label>
-    <select id="save-new-db-visibility" class="field-input" [(ngModel)]="newDatabaseVisibility">
-      <option value="private">Private - only you can open it</option>
-      <option value="public">Public - anyone can open it</option>
-    </select>
-    }
-
-    @if (savedGamesLimit > 0) {
-    <p class="field-label">
-      Saved games: {{ savedGamesUsed | number }} / {{ savedGamesLimit | number }}
-    </p>
-    }
-
-    @if (saveModalError) {
-    <p class="modal-error" role="alert">{{ saveModalError }}</p>
-    }
-
-    <div class="save-modal-actions">
-      <button type="button" class="summary-btn" (click)="closeSaveDatabaseModal()">Cancel</button>
-      <button type="button" class="summary-btn primary" (click)="confirmSaveDatabase()">
+    <div class="ui-modal-actions">
+      <button type="button" class="ui-btn" (click)="closeSaveDatabaseModal()">Cancel</button>
+      <button type="button" class="ui-btn ui-btn--primary" (click)="confirmSaveDatabase()">
         {{ modalMode === 'saveDraft' ? 'Save' : 'Add' }}
       </button>
     </div>

@@ -63,15 +63,15 @@
       (filtersReset)="onGamesFiltersReset()" />
 
     <!-- Focus Mode Side Panel -->
-    <div class="focus-side-panel panel fade-in" *ngIf="isFocusMode">
+    <div class="focus-side-panel ui-panel fade-in" *ngIf="isFocusMode">
       <div class="tabs-shell">
-        <button type="button" class="tabs-nav tabs-nav-left" aria-label="Scroll tabs left"
-          (click)="scrollFocusTabs('left')">&#9664;</button>
-        <div class="tabs" #focusTabs appReorderableTabs #focusTabOrder="reorderableTabs"
+        <button type="button" class="ui-btn ui-btn--ghost ui-btn--icon ui-btn--sm tabs-nav" aria-label="Scroll tabs left"
+          (click)="scrollFocusTabs('left')"><span class="material-symbols-outlined" aria-hidden="true">chevron_left</span></button>
+        <div class="ui-tabs tabs" role="tablist" #focusTabs appReorderableTabs #focusTabOrder="reorderableTabs"
           [storageKey]="focusTabOrderStorageKey" [defaultOrder]="defaultFocusTabOrder"
           (click)="focusTabOrder.onClickCapture($event)">
           @for (tab of focusTabOrder.order; track tab) {
-          <button type="button" class="tab-btn" [class.active]="focusRightTab === tab"
+          <button type="button" role="tab" class="ui-tab tab-btn" [attr.aria-selected]="focusRightTab === tab"
             [class.is-dragging]="focusTabOrder.draggedTab === tab"
             [class.is-drop-target]="focusTabOrder.dragOverTab === tab && focusTabOrder.draggedTab !== tab"
             [style.transform]="focusTabOrder.draggedTab === tab ? 'translateX(' + focusTabOrder.dragOffsetX + 'px)' : null"
@@ -84,8 +84,8 @@
           </button>
           }
         </div>
-        <button type="button" class="tabs-nav tabs-nav-right" aria-label="Scroll tabs right"
-          (click)="scrollFocusTabs('right')">&#9654;</button>
+        <button type="button" class="ui-btn ui-btn--ghost ui-btn--icon ui-btn--sm tabs-nav" aria-label="Scroll tabs right"
+          (click)="scrollFocusTabs('right')"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button>
       </div>
       <div class="tab-body fade-in">
         <div *ngIf="focusRightTab === 'databases'" class="full-height-child">
@@ -107,12 +107,9 @@
           (plySelected)="onPlySelected($event)" />
 
         <div *ngIf="focusRightTab === 'games'" class="full-height-child" style="display: flex; flex-direction: column;">
-          <header style="padding: 1rem 1rem 0.75rem;">
-            <h2
-              style="margin: 0; font-family: 'Space Grotesk', 'Segoe UI', sans-serif; font-weight: 700; font-size: 1rem; letter-spacing: 0.02em;">
-              Games</h2>
-            <p style="margin: 0.35rem 0 0; color: var(--muted); font-size: 0.9rem;">{{ gamesLoaded ?
-              draftGamesTotalCount() + ' games loaded.' : 'No games loaded yet.' }}</p>
+          <header class="ui-panel-header">
+            <h2>Games</h2>
+            <p>{{ gamesLoaded ? draftGamesTotalCount() + ' games loaded.' : 'No games loaded yet.' }}</p>
           </header>
 
           @if (!gamesLoaded) {
@@ -142,11 +139,13 @@
 </main>
 
 @if (isImporting()) {
-<div class="import-progress-overlay" role="dialog" aria-modal="true" aria-label="Import progress">
-  <div class="import-progress-card">
-    <h3>Importing PGN</h3>
-    <p class="status-line">{{ importProgress()?.message ?? 'Processing games...' }}</p>
-    <dl>
+<div class="ui-modal-overlay">
+  <div class="ui-modal" role="dialog" aria-modal="true" aria-labelledby="import-progress-title">
+    <header>
+      <h2 id="import-progress-title" class="ui-modal-title">Importing PGN</h2>
+      <p class="ui-modal-description" aria-live="polite">{{ importProgress()?.message ?? 'Processing games...' }}</p>
+    </header>
+    <dl class="import-stats">
       <div>
         <dt>Parsed</dt>
         <dd>{{ importProgress()?.parsedCount ?? 0 }}</dd>
@@ -165,43 +164,47 @@
 }
 
 @if (isSavingDraft() || saveDraftCompleted()) {
-<div class="import-progress-overlay" role="dialog" aria-modal="true" aria-label="Save progress">
-  <div class="save-status-card">
+<div class="ui-modal-overlay">
+  <div class="ui-modal ui-modal--sm save-status" role="dialog" aria-modal="true" aria-label="Save progress">
     @if (isSavingDraft()) {
-    <div class="loading-spinner" aria-hidden="true"></div>
-    <p class="save-status-text">Saving games</p>
+    <div class="ui-spinner" aria-hidden="true"></div>
+    <p class="ui-modal-title">Saving games</p>
     } @else {
-    <p class="save-status-success">Success</p>
-    <button type="button" class="save-status-close" (click)="closeSaveDraftModal()">Close</button>
+    <p class="ui-modal-title">Games saved</p>
+    <button type="button" class="ui-btn ui-btn--primary ui-btn--block" (click)="closeSaveDraftModal()">Close</button>
     }
   </div>
 </div>
 }
 
 @if (deleteConfirmationVisible()) {
-<div class="import-progress-overlay" role="dialog" aria-modal="true" aria-label="Delete confirmation">
-  <div class="delete-confirm-card">
-    @if (deleteConfirmationKind() === 'draft') {
-    <h3>Delete imported draft?</h3>
-    <p>This will remove all currently imported draft games.</p>
-    } @else if (deleteConfirmationKind() === 'games') {
-    <h3>Remove {{ selectedGameIds().length }} {{ selectedGameIds().length === 1 ? 'game' : 'games' }}?</h3>
-    <p>
-      They will be removed from <strong>{{ currentDatabaseName }}</strong>. Any game that is
-      not saved in another database will be deleted permanently.
-    </p>
-    } @else {
-    <h3>Delete database?</h3>
-    <p>
-      This will permanently delete
-      <strong>{{ deleteConfirmationDatabaseName() }}</strong>
-      and its games.
-    </p>
-    }
+<div class="ui-modal-overlay">
+  <div class="ui-modal ui-modal--sm" role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title">
+    <header>
+      @if (deleteConfirmationKind() === 'draft') {
+      <h2 id="delete-confirm-title" class="ui-modal-title">Delete imported draft?</h2>
+      <p class="ui-modal-description">This will remove all currently imported draft games.</p>
+      } @else if (deleteConfirmationKind() === 'games') {
+      <h2 id="delete-confirm-title" class="ui-modal-title">
+        Remove {{ selectedGameIds().length }} {{ selectedGameIds().length === 1 ? 'game' : 'games' }}?
+      </h2>
+      <p class="ui-modal-description">
+        They will be removed from <strong>{{ currentDatabaseName }}</strong>. Any game that is
+        not saved in another database will be deleted permanently.
+      </p>
+      } @else {
+      <h2 id="delete-confirm-title" class="ui-modal-title">Delete database?</h2>
+      <p class="ui-modal-description">
+        This will permanently delete
+        <strong>{{ deleteConfirmationDatabaseName() }}</strong>
+        and its games.
+      </p>
+      }
+    </header>
 
-    <div class="delete-confirm-actions">
-      <button type="button" class="confirm-btn" (click)="cancelDeleteConfirmation()">Cancel</button>
-      <button type="button" class="confirm-btn danger" (click)="confirmDeleteConfirmation()">
+    <div class="ui-modal-actions">
+      <button type="button" class="ui-btn" (click)="cancelDeleteConfirmation()">Cancel</button>
+      <button type="button" class="ui-btn ui-btn--danger" (click)="confirmDeleteConfirmation()">
         {{ deleteConfirmationKind() === 'games' ? 'Remove' : 'Delete' }}
       </button>
     </div>

@@ -1,33 +1,8 @@
-.panel {
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface);
-  box-shadow: 0 14px 28px rgb(61 42 27 / 8%);
-}
-
-.panel-header {
-  padding: 0.75rem 0.85rem 0.55rem;
-
-  h2 {
-    margin: 0;
-    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
-    font-weight: 700;
-    font-size: 0.94rem;
-    letter-spacing: 0.02em;
-  }
-
-  p {
-    margin: 0.28rem 0 0;
-    color: var(--text-muted);
-    font-size: 0.76rem;
-  }
-}
-
+/* Rows divided by hairlines, like every other list in the app. */
 .tree-list {
   display: flex;
   flex-direction: column;
-  gap: 0.42rem;
-  padding: 0 0.85rem 0.85rem;
+  border-top: 1px solid var(--line);
 }
 
 .tree-item {
@@ -40,15 +15,22 @@
      between the share, the game count and the bar - which is where the row needed air. */
   gap: 0.9rem;
   align-items: center;
-  border: 1px solid #dfd2bc;
-  border-radius: 8px;
-  padding: 0.45rem 0.58rem;
-  background: #f8f3e8;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  transition: background var(--transition);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  &:hover {
+    background: var(--hover);
+  }
 }
 
 .move {
-  font: 600 0.8rem/1 'Space Grotesk', 'Segoe UI', sans-serif;
-  color: #342518;
+  font: 600 var(--text-sm) / 1 var(--font-sans);
+  color: var(--text);
   background: transparent;
   border: 0;
   text-align: left;
@@ -61,9 +43,10 @@
 }
 
 .meta {
-  font-size: 0.72rem;
-  color: #6f604e;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Numbers above, graph below. They were previously printed inside the bands, which forced
@@ -88,7 +71,7 @@
   display: inline-flex;
   align-items: baseline;
   gap: 0.24rem;
-  font: 600 0.64rem/1 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  font: 600 0.64rem/1 var(--font-sans);
   font-variant-numeric: tabular-nums;
   color: var(--text);
   white-space: nowrap;
@@ -137,20 +120,20 @@
 
 .tree-caption {
   margin: 0;
-  padding: 0 0.85rem 0.5rem;
+  padding: 0 var(--space-4) var(--space-2);
   color: var(--text-muted);
-  font-size: 0.73rem;
+  font-size: var(--text-xs);
 }
 
 .tree-status {
   margin: 0;
-  padding: 0 0.85rem 0.85rem;
+  padding: 0 var(--space-4) var(--space-4);
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
 }
 
 .tree-status-error {
-  color: #9a2f2f;
+  color: var(--danger);
 }
 
 @media (max-width: 1120px) {
@@ -162,12 +145,4 @@
   .results {
     grid-column: 1 / -1;
   }
-}
-
-:host-context(body.dark-theme) {
-  /* Raised rather than sunk: a near-black row inside the panel read as a hole in it. */
-  .tree-item { border-color: var(--line); background: var(--surface-raised); }
-  .move { color: var(--text); }
-  .meta { color: var(--text-muted); }
-  .tree-status-error { color: var(--danger); }
 }

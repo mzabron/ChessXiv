@@ -8,6 +8,7 @@ import { GamesTableComponent } from '../games-table/games-table.component';
 import { DraftGameListItem, DraftGamesResultSortMode, DraftGamesSortBy, DraftGamesSortDirection } from '../../services/draft-import-api.service';
 import { ExplorerGamesFilterState, createDefaultExplorerGamesFilterState } from '../../services/games-filters.models';
 import { ReorderableTabsDirective } from '../../../../shared/directives/reorderable-tabs.directive';
+import { ModalBehaviorDirective } from '../../../../shared/directives/modal-behavior.directive';
 
 interface UserDatabaseOption {
   id: string;
@@ -30,7 +31,7 @@ interface SaveDatabaseRequestPayload {
 @Component({
   selector: 'app-games-list',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, EmptyGamesStateComponent, FiltersPanelComponent, DatabasesPanelComponent, GamesTableComponent, ReorderableTabsDirective],
+  imports: [DecimalPipe, FormsModule, EmptyGamesStateComponent, FiltersPanelComponent, DatabasesPanelComponent, GamesTableComponent, ReorderableTabsDirective, ModalBehaviorDirective],
   templateUrl: './games-list.component.html',
   styleUrl: './games-list.component.scss'
 })
