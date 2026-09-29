@@ -20,8 +20,12 @@ export type GamesPanelTab = 'games' | 'filters' | 'databases';
 /** Whether the modal is promoting the whole draft or copying a filtered selection. */
 type SaveModalMode = 'saveDraft' | 'addSelection';
 
+/** Which games a save or add covers: the ticked ones, or every game matching the filters. */
+export type SaveGamesScope = 'selected' | 'all';
+
 interface SaveDatabaseRequestPayload {
   intent: SaveModalMode;
+  scope: SaveGamesScope;
   mode: 'merge' | 'create';
   targetDatabaseId?: string;
   newDatabaseName?: string;
@@ -76,6 +80,8 @@ export class GamesListComponent {
   protected isSaveModalOpen = false;
   protected modalMode: SaveModalMode = 'saveDraft';
   protected saveMode: 'merge' | 'create' = 'merge';
+  /** Null until chosen: adding every matching game has to be picked on purpose. */
+  protected gamesScope: SaveGamesScope | null = null;
   protected selectedTargetDatabaseId = '';
   protected newDatabaseName = '';
   protected newDatabaseVisibility: 'private' | 'public' = 'private';
@@ -170,15 +176,17 @@ export class GamesListComponent {
     return this.myDatabases.filter(db => db.id !== this.activeDatabaseId);
   }
 
-  /** Describes what "Add" will copy, so the user is not guessing before confirming. */
-  protected get selectionSummary(): string {
-    const explicitCount = this.selectedGameIds.length;
+  /** What "all" means for the games currently listed, for the dialog's second option. */
+  protected get allGamesLabel(): string {
+    const count = this.totalCount.toLocaleString('en-US');
 
-    if (explicitCount > 0) {
-      return `${explicitCount} selected ${explicitCount === 1 ? 'game' : 'games'}`;
+    if (this.hasActiveFilters) {
+      return `All ${count} games matching the filters`;
     }
 
-    return `All ${this.totalCount} games matching the current filters`;
+    return this.sourceType === 'imported'
+      ? `All ${count} imported games`
+      : `All ${count} games in this database`;
   }
 
   protected openSaveDatabaseModal(): void {
@@ -199,6 +207,12 @@ export class GamesListComponent {
       : this.myDatabases;
 
     this.saveMode = targets.length > 0 ? 'merge' : 'create';
+    // Ticked games are the obvious answer when there are any. With none ticked, saving an
+    // import still defaults to all of it - that is what saving an import means - but adding
+    // from a database does not: copying thousands of games is not something to do by default.
+    this.gamesScope = this.selectedGameIds.length > 0
+      ? 'selected'
+      : mode === 'saveDraft' ? 'all' : null;
     this.selectedTargetDatabaseId = targets[0]?.id ?? '';
     this.newDatabaseName = '';
     this.newDatabaseVisibility = 'private';
@@ -213,6 +227,12 @@ export class GamesListComponent {
   protected confirmSaveDatabase(): void {
     this.saveModalError = '';
 
+    const scope = this.gamesScope;
+    if (!scope || (scope === 'selected' && this.selectedGameIds.length === 0)) {
+      this.saveModalError = 'Choose which games to add.';
+      return;
+    }
+
     if (this.saveMode === 'merge') {
       if (!this.selectedTargetDatabaseId) {
         this.saveModalError = 'Select a target database.';
@@ -221,6 +241,7 @@ export class GamesListComponent {
 
       this.saveDatabaseRequest.emit({
         intent: this.modalMode,
+        scope,
         mode: 'merge',
         targetDatabaseId: this.selectedTargetDatabaseId,
         visibility: 'private'
@@ -237,6 +258,7 @@ export class GamesListComponent {
 
     this.saveDatabaseRequest.emit({
       intent: this.modalMode,
+      scope,
       mode: 'create',
       newDatabaseName: trimmedName,
       visibility: this.newDatabaseVisibility

@@ -534,6 +534,7 @@ export class ExplorerPageComponent implements OnDestroy {
 
   protected async onSaveDatabaseRequest(payload: {
     intent: 'saveDraft' | 'addSelection';
+    scope: 'selected' | 'all';
     mode: 'merge' | 'create';
     targetDatabaseId?: string;
     newDatabaseName?: string;
@@ -577,7 +578,7 @@ export class ExplorerPageComponent implements OnDestroy {
         // trip the saved-games limit even when the visible/filtered/selected count was small.
         // addGamesFromSelection honors filters and an explicit selection for both the draft
         // and a user database, so "what you see is what gets saved" now actually holds.
-        await this.addCurrentSelectionToDatabase(userDatabaseId);
+        await this.addCurrentSelectionToDatabase(userDatabaseId, payload.scope);
       } catch (addError) {
         if (createdDatabaseId) {
           // A "New database" save that fails to add anything must not leave an empty,
@@ -638,8 +639,10 @@ export class ExplorerPageComponent implements OnDestroy {
     }
   }
 
-  private async addCurrentSelectionToDatabase(targetDatabaseId: string): Promise<void> {
-    const explicitIds = this.selectedGameIds();
+  private async addCurrentSelectionToDatabase(targetDatabaseId: string, scope: 'selected' | 'all'): Promise<void> {
+    // The dialog asked which games, so the answer is used as given - "all" means all even
+    // when some are ticked.
+    const explicitIds = scope === 'selected' ? this.selectedGameIds() : [];
 
     const result = await firstValueFrom(
       this.userDatabasesApi.addGamesFromSelection(targetDatabaseId, {
@@ -648,7 +651,9 @@ export class ExplorerPageComponent implements OnDestroy {
             ? this.activeUserDatabaseId() ?? undefined
             : undefined,
         gameIds: explicitIds.length > 0 ? explicitIds : undefined,
-        filters: toExplorerGamesFiltersQuery(this.gamesFilters())
+        // The filters the list was loaded with, not the live form: the dialog's count comes
+        // from the list, and unapplied edits in the Filters tab must not change what is added.
+        filters: toExplorerGamesFiltersQuery(this.appliedGamesFilters())
       })
     );
 

@@ -100,21 +100,46 @@
       <h2 id="save-modal-title" class="ui-modal-title">
         {{ modalMode === 'saveDraft' ? 'Save imported games' : 'Add games to a database' }}
       </h2>
-      <p class="ui-modal-description">
-        {{ selectionSummary }} {{ modalMode === 'saveDraft' ? 'will be saved.' : 'will be added.' }}
-      </p>
+      <p class="ui-modal-description">Choose which games, and where they should go.</p>
     </header>
 
     <div class="ui-modal-body">
-      <div class="save-mode" role="radiogroup" aria-label="Target database">
-        <label class="ui-check">
-          <input type="radio" name="save-mode" value="merge" [(ngModel)]="saveMode" />
-          <span>Existing database</span>
-        </label>
-        <label class="ui-check">
-          <input type="radio" name="save-mode" value="create" [(ngModel)]="saveMode" />
-          <span>New database</span>
-        </label>
+      <div class="ui-field">
+        <span class="ui-label" id="save-scope-label">Games</span>
+        <div class="option-list" role="radiogroup" aria-labelledby="save-scope-label">
+          <label class="ui-check">
+            <input type="radio" name="save-scope" value="selected" [(ngModel)]="gamesScope"
+              [disabled]="selectedGameIds.length === 0" />
+            <span>
+              @if (selectedGameIds.length > 0) {
+              {{ selectedGameIds.length }} ticked {{ selectedGameIds.length === 1 ? 'game' : 'games' }}
+              } @else {
+              Ticked games
+              }
+            </span>
+          </label>
+          @if (selectedGameIds.length === 0) {
+          <p class="ui-hint option-hint">To add only some games, cancel and tick them in the list first.</p>
+          }
+          <label class="ui-check">
+            <input type="radio" name="save-scope" value="all" [(ngModel)]="gamesScope" />
+            <span>{{ allGamesLabel }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="ui-field">
+        <span class="ui-label" id="save-target-label">Save to</span>
+        <div class="save-mode" role="radiogroup" aria-labelledby="save-target-label">
+          <label class="ui-check">
+            <input type="radio" name="save-mode" value="merge" [(ngModel)]="saveMode" />
+            <span>Existing database</span>
+          </label>
+          <label class="ui-check">
+            <input type="radio" name="save-mode" value="create" [(ngModel)]="saveMode" />
+            <span>New database</span>
+          </label>
+        </div>
       </div>
 
       @if (saveMode === 'merge') {
@@ -159,7 +184,7 @@
 
     <div class="ui-modal-actions">
       <button type="button" class="ui-btn" (click)="closeSaveDatabaseModal()">Cancel</button>
-      <button type="button" class="ui-btn ui-btn--primary" (click)="confirmSaveDatabase()">
+      <button type="button" class="ui-btn ui-btn--primary" [disabled]="!gamesScope" (click)="confirmSaveDatabase()">
         {{ modalMode === 'saveDraft' ? 'Save' : 'Add' }}
       </button>
     </div>
