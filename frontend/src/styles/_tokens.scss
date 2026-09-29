@@ -93,20 +93,24 @@
 }
 
 body.dark-theme {
-  --bg: #17181c;
-  --surface: #202127;
-  --surface-raised: #282a31;
-  --surface-sunken: #1a1b20;
+  /* The page sits well below the panels on it. The first dark palette kept them only a few
+     shades apart (#17181c against #202127), and a dark theme cannot fall back on shadows to
+     separate them the way the light one does - a shadow on near-black is invisible - so the
+     surfaces themselves have to differ, and the hairline around them has to be visible. */
+  --bg: #0e0f12;
+  --surface: #23252c;
+  --surface-raised: #2c2f37;
+  --surface-sunken: #181a1f;
 
-  /* Deliberately higher contrast than before: the old dark palette used #858585 for muted
-     text and a mid-blue accent, both of which sat below a comfortable contrast ratio. */
-  --text: #e8e6e3;
-  --text-muted: #a9a49c;
-  --text-subtle: #8b867e;
+  /* Every text level clears 4.5:1 on every surface above, including --text-subtle on
+     --surface-raised (4.96), which the previous values missed. */
+  --text: #eeece8;
+  --text-muted: #bdb8ae;
+  --text-subtle: #a29d93;
   --text-on-accent: #10221b;
 
-  --line: #383a42;
-  --line-strong: #4a4d57;
+  --line: #464a55;
+  --line-strong: #5d6270;
 
   /* A desaturated green rather than the old blue: it keeps the light theme's identity and
      reads far better against a warm-neutral dark surface than #3b82f6 did. */

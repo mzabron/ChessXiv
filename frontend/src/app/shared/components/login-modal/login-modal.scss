@@ -51,13 +51,21 @@
   padding-right: 44px;
 }
 
+/* The colour is set explicitly: without it a button falls back to the browser's own black,
+   which is what left the inactive tab unreadable in the dark theme. */
 .mode-btn {
   border: 1px solid var(--line);
   background: transparent;
+  color: var(--text);
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
   padding: 8px 10px;
+  cursor: pointer;
+
+  &:hover:not(.active) {
+    border-color: var(--line-strong);
+  }
 
   &.active {
     background: var(--text);
@@ -171,6 +179,11 @@ button:disabled {
   &:hover {
     color: #1f3b76;
   }
+}
+
+/* Navy on a dark modal is unreadable; the lighter accent is the dark theme's hover. */
+:host-context(body.dark-theme) .forgot-link:hover {
+  color: var(--accent-strong);
 }
 
 .verify-email-block {

@@ -165,7 +165,8 @@
 }
 
 :host-context(body.dark-theme) {
-  .tree-item { border-color: var(--line); background: var(--bg); }
+  /* Raised rather than sunk: a near-black row inside the panel read as a hole in it. */
+  .tree-item { border-color: var(--line); background: var(--surface-raised); }
   .move { color: var(--text); }
   .meta { color: var(--text-muted); }
   .tree-status-error { color: var(--danger); }

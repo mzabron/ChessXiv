@@ -502,10 +502,51 @@
  * button styles side by side.
  */
 :host-context(body.dark-theme) {
-  /* Board coordinates sit on top of the squares, not on a themed surface. */
-  .file-label,
-  .rank-label {
-    color: rgb(255 255 255 / 45%);
+  /* The player strips were drawn in fixed dark browns, which on a dark panel left the names,
+     ratings and clocks all but invisible. */
+  .player-strip {
+    color: var(--text);
+  }
+
+  .player-rating,
+  .player-clock {
+    color: var(--text-muted);
+  }
+
+  /* The picker's tiles keep the light piece tray: the black piece artwork is dark and would
+     vanish on a dark tile. */
+  .promotion-picker {
+    border-color: var(--line-strong);
+    background: var(--surface-raised);
+  }
+
+  .promotion-option {
+    background: var(--piece-tray);
+  }
+
+  /* Set Position controls: light fills under light text, which read as blank chips. */
+  .meta-chip,
+  .ep-label select {
+    background: var(--surface-raised);
+  }
+
+  .meta-chip.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+
+  /* Board coordinates sit on top of the squares, not on a themed surface, and one colour
+     cannot read on both: a faint white measured 1.6:1 on the light squares. Each label
+     takes the opposite of the square it sits on, which clears 4.5:1 on both. */
+  .square.light .file-label,
+  .square.light .rank-label {
+    color: rgb(0 0 0 / 70%);
+  }
+
+  .square.dark .file-label,
+  .square.dark .rank-label {
+    color: rgb(255 255 255 / 90%);
   }
 
   .square.selected {

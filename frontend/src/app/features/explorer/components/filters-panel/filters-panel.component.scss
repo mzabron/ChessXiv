@@ -207,7 +207,7 @@
   .tab-note.disabled { color: var(--text-muted); }
   .section-card {
     border-color: var(--line);
-    background: color-mix(in srgb, var(--surface) 88%, #000 12%);
+    background: var(--surface-raised);
   }
 
   .section-card h3,
@@ -237,9 +237,10 @@
     background: var(--surface-raised);
   }
 
+  /* Was --text on --text, so the tooltip opened as a blank light box. */
   .help-tooltip {
-    border-color: var(--line);
-    background: var(--text);
+    border-color: var(--line-strong);
+    background: var(--surface-raised);
     color: var(--text);
   }
 }
