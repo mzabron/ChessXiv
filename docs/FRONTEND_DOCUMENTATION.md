@@ -68,6 +68,18 @@ Note:
   build. **A production host must send them too** or analysis loses multi-threading. The COEP
   header is also why the board's piece images carry `crossorigin="anonymous"`: they come from
   upload.wikimedia.org, which sends CORS headers but no Cross-Origin-Resource-Policy.
+- In production, `engine/` is cached by Cloudflare. By default Cloudflare does not cache
+  `.wasm` (`cf-cache-status: DYNAMIC`), so every visitor who chose the Full build pulled 99 MB
+  from the origin's home uplink - about 40 s of saturated upload each at 20 Mbit/s, slowing the
+  whole site meanwhile. A Cache Rule fixes that: **URI Path** starts with `/engine/`, Eligible
+  for cache, Edge TTL ignoring cache-control at 1 month. The field must be URI Path - URI Full
+  includes the scheme and host, so a `/engine/` prefix never matches. A long TTL is safe because
+  the file names carry the Stockfish version; a new version gets new URLs, so nothing ever needs
+  purging. Check with two `curl -sI https://chessxiv.org/engine/stockfish-19-lite.wasm` calls:
+  `MISS` then `HIT`, with the `cross-origin-*` headers present both times.
+- Do not set those cache headers in nginx with a `location /engine/` block instead. A location
+  with its own `add_header` stops inheriting the server-level ones, which silently drops
+  COOP/COEP from the engine files and drops analysis back to a single thread.
 
 ## 3. Application Entry and Global Providers
 
